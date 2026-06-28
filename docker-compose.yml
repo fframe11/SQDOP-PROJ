@@ -1,0 +1,227 @@
+version: '3.8'
+
+services:
+  elasticsearch:
+    image: elasticsearch:8.10.2
+    container_name: sdoqap-elasticsearch
+    restart: always
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms1g -Xmx1g
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q '\"status\":\"green\"\\|\"status\":\"yellow\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+    networks:
+      - sdoqap_network
+
+
+  kibana:
+    image: kibana:8.10.2
+    container_name: sdoqap-kibana
+    restart: always
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    ports:
+      - "${KIBANA_PORT}:5601"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+    networks:
+      - sdoqap_network
+
+
+  namenode:
+    image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
+    container_name: sdoqap-namenode
+    restart: always
+    environment:
+      - CLUSTER_NAME=sdoqap_lake
+      - ENSURE_NAMENODE_DIR=/hadoop/dfs/name
+      - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
+    env_file:
+      - .env
+    ports:
+      - "9870:9870"
+      - "9002:9000" # Map to 9002 to avoid conflict with other services (like MinIO) on 9000
+    volumes:
+      - hadoop_namenode:/hadoop/dfs/name
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+    networks:
+      - sdoqap_network
+
+
+  datanode:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    container_name: sdoqap-datanode
+    restart: always
+    environment:
+      - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
+    env_file:
+      - .env
+    depends_on:
+      - namenode
+    volumes:
+      - hadoop_datanode:/hadoop/dfs/data
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+    networks:
+      - sdoqap_network
+
+
+  spark-master:
+    image: bitnamilegacy/spark:3.4.1
+    container_name: sdoqap-spark-master
+    restart: always
+    environment:
+      - SPARK_MODE=master
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+    ports:
+      - "8081:8080" # Spark Web UI (map to 8081 to avoid conflict)
+      - "7077:7077"
+    volumes:
+      - ./spark:/opt/spark-apps
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+    networks:
+      - sdoqap_network
+
+
+  spark-worker:
+    image: bitnamilegacy/spark:3.4.1
+    container_name: sdoqap-spark-worker
+    restart: always
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - SPARK_WORKER_MEMORY=2G
+      - SPARK_WORKER_CORES=2
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+    depends_on:
+      - spark-master
+    volumes:
+      - ./spark:/opt/spark-apps
+    deploy:
+      resources:
+        limits:
+          memory: 3.5G
+    networks:
+      - sdoqap_network
+
+
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: sdoqap-n8n
+    restart: always
+    environment:
+      - N8N_ENFORCE_SETTINGS_FILE_FOR_FILESYSTEM=false
+      - N8N_RESTRICT_FILE_ACCESS_TO=/stress_test
+    ports:
+      - "${N8N_PORT}:5678"
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./stress test:/stress_test
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+    networks:
+      - sdoqap_network
+
+
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+      network: host
+    container_name: sdoqap-api
+    restart: always
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    environment:
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+    ports:
+      - "${API_PORT}:8000"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    networks:
+      - sdoqap_network
+
+
+  grafana:
+    image: grafana/grafana-oss:10.1.5
+    container_name: sdoqap-grafana
+    restart: always
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    ports:
+      - "${GRAFANA_PORT}:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    networks:
+      - sdoqap_network
+
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: sdoqap-postgres
+    restart: always
+    environment:
+      - POSTGRES_USER=sdoqap
+      - POSTGRES_PASSWORD=sdoqap
+      - POSTGRES_DB=sdoqap_oltp
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    networks:
+      - sdoqap_network
+
+
+volumes:
+  elasticsearch_data:
+  hadoop_namenode:
+  hadoop_datanode:
+  n8n_data:
+  postgres_data:
+
+networks:
+  sdoqap_network:
+    driver: bridge

@@ -1,0 +1,299 @@
+Terms of Reference (TOR)
+โครงการพัฒนาระบบ Adaptive Data Reliability & Lineage Platform (ADRLP)
+ชื่อโครงการ
+
+ระบบตรวจสอบคุณภาพ ติดตามเส้นทาง และบริหารความน่าเชื่อถือของข้อมูลอัตโนมัติสำหรับองค์กร
+
+1. หลักการและเหตุผล
+
+องค์กรจำนวนมากมีข้อมูลกระจายอยู่หลายระบบ เช่น ฐานข้อมูล ระบบเว็บไซต์ API และไฟล์ข้อมูล ส่งผลให้เกิดปัญหา
+
+ข้อมูลผิดพลาด
+Schema เปลี่ยนโดยไม่รู้ตัว
+ข้อมูลซ้ำ
+Dashboard แสดงผลผิด
+ใช้เวลาตรวจสอบนาน
+
+ในหลายกรณีปัญหาไม่ได้เกิดจากการวิเคราะห์ แต่เกิดจากการที่ข้อมูลไม่มีความน่าเชื่อถือ
+
+โครงการนี้จึงพัฒนาระบบกลางสำหรับ
+
+รับข้อมูล
+ประมวลผล ETL
+ตรวจคุณภาพข้อมูล
+ติดตามเส้นทางข้อมูล (Data Lineage)
+แจ้งเตือนความผิดปกติ
+
+โดยใช้ทรัพยากรฟรีและฐานข้อมูลของมหาวิทยาลัย
+
+2. วัตถุประสงค์
+
+2.1 พัฒนาระบบรับข้อมูลจากหลายแหล่ง
+
+2.2 พัฒนา ETL Pipeline แบบอัตโนมัติ
+
+2.3 พัฒนาระบบตรวจสอบคุณภาพข้อมูล
+
+2.4 พัฒนาระบบติดตามต้นทางข้อมูล
+
+2.5 ลดเวลาในการตรวจสอบและแก้ไขปัญหาข้อมูล
+
+3. ขอบเขตโครงการ
+Input
+
+รองรับ
+
+PostgreSQL
+MySQL
+CSV
+Excel
+REST API
+Process
+
+ระบบต้องสามารถ
+
+Extract
+
+Transform
+
+Load
+
+Validate
+
+Detect
+
+Track
+
+Recover
+Output
+
+ระบบต้องแสดงผล
+
+Data Quality Report
+
+Lineage Dashboard
+
+Alert
+
+Data API
+4. ผู้ใช้งาน
+
+Primary User
+
+Data Engineer
+
+Secondary User
+
+Developer
+Administrator
+Researcher
+5. Architecture
+SOURCE
+
+↓
+
+INGESTION
+
+↓
+
+ETL
+
+↓
+
+RAW DB
+
+↓
+
+QUALITY CHECK
+
+↓
+
+LINEAGE
+
+↓
+
+RECOVERY
+
+↓
+
+SERVING
+6. Functional Requirements
+FR-01 Data Ingestion
+
+ระบบต้องรองรับ
+
+Database Connection
+CSV Upload
+API Fetch
+
+Output
+
+Raw Dataset
+FR-02 ETL Engine
+
+ระบบต้อง
+
+Extract
+Transform
+Load
+
+รองรับ
+
+Batch Processing
+FR-03 Data Quality
+
+ตรวจ
+
+Missing
+
+Duplicate
+
+Schema
+
+Freshness
+
+สร้าง
+
+Quality Score
+FR-04 Data Lineage
+
+ติดตาม
+
+Source
+
+↓
+
+Pipeline
+
+↓
+
+Database
+
+↓
+
+Output
+FR-05 Alert
+
+แจ้งเตือนเมื่อ
+
+Quality ต่ำ
+
+Schema เปลี่ยน
+FR-06 Recovery
+
+รองรับ
+
+Retry
+
+Quarantine
+7. Non-Functional Requirements
+
+Availability
+
+≥95%
+
+Response
+
+≤3 sec
+
+Pipeline
+
+≤15 min
+
+Storage
+
+Database มหาวิทยาลัย
+
+Budget
+
+0 บาท
+8. เทคโนโลยี
+
+ETL
+
+Python
+dbt
+
+Workflow
+
+Apache Airflow
+
+Database
+
+PostgreSQL (มหาวิทยาลัย)
+
+API
+
+FastAPI
+
+Visualization
+
+Grafana
+
+Container
+
+Docker
+
+Version
+
+GitHub
+9. แผนดำเนินงาน (16 สัปดาห์)
+
+สัปดาห์ 1–2
+
+Requirement
+Design
+
+สัปดาห์ 3–5
+
+ETL
+Database
+
+สัปดาห์ 6–8
+
+Quality Engine
+
+สัปดาห์ 9–10
+
+Lineage
+
+สัปดาห์ 11–13
+
+Recovery
+Dashboard
+
+สัปดาห์ 14–15
+
+Testing
+
+สัปดาห์ 16
+
+Deploy
+Presentation
+10. ตัวชี้วัดความสำเร็จ (KPI)
+
+ลดเวลา Detect ปัญหา
+
+จาก >1 ชั่วโมง
+เหลือ <10 นาที
+
+ตรวจจับ Schema Error
+
+≥90%
+
+Pipeline สำเร็จ
+
+≥95%
+
+คุณภาพข้อมูล
+
+≥90 คะแนน
+11. ทรัพยากรที่ใช้
+
+ใช้ของฟรีทั้งหมด
+
+Database มหาวิทยาลัย
+GitHub
+Docker
+Open Source
+เครื่องคอมพิวเตอร์ผู้พัฒนา

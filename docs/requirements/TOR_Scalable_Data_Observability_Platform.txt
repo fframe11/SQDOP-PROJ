@@ -1,0 +1,97 @@
+เอกสารข้อกำหนดขอบเขตงาน (Terms of Reference: TOR)
+โครงการระบบบริหารจัดการความน่าเชื่อถือและติดตามเส้นทางข้อมูลขนาดใหญ่
+(Scalable Data Observability and Quality Assurance Platform - SDOQAP)
+
+1. หลักการและเหตุผล
+ในปัจจุบัน องค์กรขับเคลื่อนด้วยข้อมูลขนาดใหญ่ (Big Data) ที่ถูกรวบรวมมาจากแหล่งข้อมูลที่หลากหลายและมีรูปแบบแตกต่างกัน เช่น ฐานข้อมูลเชิงสัมพันธ์ (Relational Databases) ระบบเว็บแอปพลิเคชัน โค้ดภายในระบบภายนอกผ่าน REST API และไฟล์ข้อมูลดิบ (CSV/Excel) ปัญหาสำคัญที่มักเกิดขึ้นในกระบวนการจัดการข้อมูลไม่ใช่การขาดแคลนข้อมูล หากแต่เป็นความน่าเชื่อถือของข้อมูล (Data Reliability) และความสามารถในการตรวจสอบความเป็นมาของข้อมูล (Data Observability)
+
+ปรากฏการณ์ความผิดพลาดของข้อมูล อาทิ โครงสร้างข้อมูลเปลี่ยนแปลงโดยไม่แจ้งล่วงหน้า (Schema Drift) ข้อมูลสูญหายระหว่างท่อส่ง (Data Dropping) และข้อมูลซ้ำซ้อน ส่งผลกระทบโดยตรงต่อระบบประมวลผลปลายทาง รวมถึงระบบการจำแนกข้อมูลขั้นสูง (Advanced Classification Models) และแดชบอร์ดเพื่อการบริหาร การค้นหาต้นตอของความผิดพลาดในระบบกระจายศูนย์ (Distributed Systems) มักใช้เวลานานและขาดประสิทธิภาพเนื่องจากไม่มีการเก็บบันทึกเส้นทางข้อมูลอย่างเป็นระบบ
+
+โครงการนี้จึงมุ่งพัฒนาระบบกลางระดับโปรดักชัน (Production-grade Infrastructure) เพื่อทำหน้าที่รับข้อมูล ประมวลผลแบบกระจายศูนย์ ตรวจสอบคุณภาพข้อมูลในระดับแถว (Row-level Quality Validation) และสร้างระบบติดตามเส้นทางข้อมูลต้นน้ำถึงปลายน้ำ (End-to-End Data Lineage) โดยมุ่งเน้นการใช้สถาปัตยกรรมที่รองรับการสเกลข้อมูลปริมาณมากเพื่อแก้ปัญหาคอขวดอย่างยั่งยืน
+
+2. วัตถุประสงค์
+2.1 เพื่อออกแบบและพัฒนาระบบสถาปัตยกรรมข้อมูลขนาดใหญ่ (Big Data Architecture) ที่รองรับการประมวลผลข้อมูลระดับล้านเรคคอร์ด (1,000,000+ records) ได้อย่างมีประสิทธิภาพ
+2.2 เพื่อสร้างท่อส่งข้อมูล (Data Pipeline) ที่มีระบบตรวจสอบคุณภาพข้อมูลอัตโนมัติ (Automated Data Quality Engine) สามารถคำนวณและประเมินคะแนนความบริสุทธิ์ของข้อมูลได้ทันที
+2.3 เพื่อพัฒนาระบบ Data Observability ที่สามารถติดตาม ตรวจสอบ และแสดงผลเส้นทางข้อมูล (Data Lineage) และบันทึกประวัติการเปลี่ยนแปลงโครงสร้างข้อมูล (Schema Evolution)
+2.4 เพื่อพัฒนาระบบกักกันและฟื้นฟูข้อมูล (Data Quarantine and Recovery Mechanism) เพื่อให้ท่อส่งข้อมูลหลักทำงานได้อย่างต่อเนื่องแม้เกิดความผิดปกติในบางสเต็ป
+
+3. ขอบเขตของโครงการ (Scope of Work)
+โครงการมีระยะเวลาดำเนินงานทั้งสิ้น 6 เดือน (24 สัปดาห์) โดยมีขอบเขตการพัฒนาระบบแบ่งออกเป็น 5 ส่วนหลัก ดังนี้:
+
+3.1 การรับและจัดเก็บข้อมูล (Data Ingestion & Storage Lake)
+- พัฒนาระบบสั่งการและจัดลำดับงาน (Workflow Orchestration) เพื่อเชื่อมต่อและดึงข้อมูลจากแหล่งภายนอกแบบสตรีมมิ่งและแบบชุด (Batch & Micro-batch) รองรับระบบฐานข้อมูล PostgreSQL, MySQL, REST API และไฟล์สเปรดชีต
+- จัดตั้งระบบคลังข้อมูลดิบ (Data Lake Storage) บนระบบไฟล์กระจายศูนย์ รองรับการจัดเก็บข้อมูลแบบ Schema-on-read โดยไม่มีการจำกัดโครงสร้างข้อมูลล่วงหน้า
+
+3.2 การประมวลผลแบบกระจายศูนย์และเครื่องมือตรวจสอบคุณภาพ (Distributed Data Processing & Quality Engine)
+- พัฒนาสคริปต์ประมวลผลข้อมูลขนาน (Parallel Processing) เพื่อทำ Data Extraction, Transformation, และ Loading (ETL) ข้อมูลขนาดใหญ่
+- สร้างระบบตรวจสอบกฎเกณฑ์ข้อมูล (Data Validation Rules) ตรวจสอบค่าว่าง (Null Values) ข้อมูลซ้ำซ้อน (Duplicates) รูปแบบข้อมูลไม่ตรงตามกำหนด (Pattern Mismatch) และการเปลี่ยนแปลงของโครงสร้างข้อมูล (Schema Drift Detection)
+- คำนวณคะแนนรวมคุณภาพข้อมูล (Data Quality Score) เป็นรายชุดข้อมูลและรายฟิลด์เพื่อบันทึกเป็น Metadata
+
+3.3 ระบบการติดตามเส้นทางและสเปกข้อมูล (Data Observability & Lineage Visualization)
+- พัฒนาระบบจับความเคลื่อนไหวและประวัติของข้อมูล (Metadata Trace & Auditing) จากต้นทางส่งต่อไปยังหน่วยประมวลผลจนถึงจุดปลายทาง
+- จัดเก็บข้อมูลความสัมพันธ์ของข้อมูลในรูปแบบโครงสร้างกราฟหรือตารางเชื่อมโยงระบุตัวตน (Source ID to Target ID) เพื่อใช้วาดภาพความสัมพันธ์ของท่อส่งข้อมูล
+
+3.4 ระบบกักกันและการกู้คืนข้อมูล (Quarantine & Autonomous Recovery)
+- พัฒนาระบบคัดแยกข้อมูลที่มีปัญหา (Data Quarantine) โดยระเบียนข้อมูลที่สอบตกเกณฑ์มาตรฐานจะถูกแยกโครงสร้างออกไปจัดเก็บในส่วนควบคุมเพื่อไม่ให้ท่อส่งข้อมูลหลักหยุดทำงาน
+- พัฒนาระบบพยายามซ้ำอัตโนมัติ (Automated Retry Strategy) สำหรับการเชื่อมต่อเครือข่ายที่ล้มเหลว หรือการดึงข้อมูลจาก API ที่ขัดข้อง
+
+3.5 การให้บริการข้อมูลและแผงควบคุม (Data Serving & Dashboard)
+- พัฒนา Application Programming Interface (API) ความเร็วสูงเพื่อทำหน้าที่ส่งต่อข้อมูลที่ผ่านการคลีนแล้ว และส่งข้อมูล Metadata/Metrics ไปยังระบบประมวลผลปลายทางหรือโมเดลวิเคราะห์อื่นๆ
+- พัฒนาหน้าต่างแสดงผลสถิติและเส้นทางข้อมูล (Observability UI) สำหรับผู้ดูแลระบบและวิศวกรข้อมูล
+
+4. สถาปัตยกรรมระบบ (System Architecture)
+[DATA SOURCES] (API, PostgreSQL, CSV)
+      ↓ 
+[INGESTION WORKFLOW] (n8n Automations & Python Ingestors)
+      ↓ 
+[DATA LAKE STORAGE] (Apache Hadoop HDFS / Parquet Storage)
+      ↓ 
+[PROCESSING ENGINE] (Apache Spark - Parallel Cleansing & Quality Validation)
+      ↓ 
+[OBSERVABILITY STORAGE] (Elasticsearch - Logs, Traces & Metadata Storage)
+      ↓ 
+[METADATA & VISUALIZATION] (Kibana & Grafana - Node Graph Lineage Dashboard)
+      ↓ 
+[DATA SERVING LAYER] (FastAPI High-performance Service Layer)
+
+5. คุณสมบัติทางเทคนิคของระบบ (System Requirements)
+5.1 คุณสมบัติเชิงหน้าที่ (Functional Requirements)
+- FR-01 Automated Ingestion Engine: ระบบต้องดึงข้อมูลจาก REST API และ Database ภายนอกตามเวลาที่กำหนดโดยอัตโนมัติ และแปลงข้อมูลให้อยู่ในรูปแบบโครงสร้างกลางเพื่อส่งเข้า Data Lake
+- FR-02 Distributed ETL: ระบบต้องใช้หน่วยประมวลผลแบบกระจายศูนย์ในการจัดกลุ่ม แปลงชนิดข้อมูล และทำความสะอาดข้อมูลระดับล้านแถวได้พร้อมกัน
+- FR-03 Data Profiling & Quality: ระบบต้องตรวจสอบกฎ 5 มิติ (Completeness, Uniqueness, Conformity, Timeliness, Accuracy) และสร้างค่าคะแนนเป็น Metadata บันทึกแยกไว้
+- FR-04 Schema Drift Alert: หากตรวจพบว่า Schema ต้นทางไม่ตรงกับสเปกปัจจุบัน ระบบต้องส่งคำเตือนไปยังแชนเนลสื่อสารทันทีและทำการบันทึกข้อมูลนั้นเข้าจุดกักกัน
+- FR-05 End-to-End Lineage: ระบบต้องแสดงกราฟความสัมพันธ์จากระบบต้นทาง ผ่านชื่อท่อส่งข้อมูล ชื่อตารางปลายทาง จนถึงตัวแปรในหน้า Dashboard ได้อย่างชัดเจน
+- FR-06 Data Quarantine Zone: ข้อมูลที่เสียหายจะถูกแยกออกเป็นไฟล์สำรองพิเศษเพื่อเปิดโอกาสให้ Data Engineer เข้ามาตรวจสอบและแก้ไขแบบ Manual ภายหลัง
+
+5.2 คุณสมบัติที่ไม่ใช่เชิงหน้าที่ (Non-Functional Requirements)
+- Scalability & Performance: ระบบประมวลผลข้อมูล (Spark Engine) ต้องรองรับการประมวลผลข้อมูลอย่างน้อย 1,000,000 แถวต่อ Batch โดยใช้เวลาประมวลผลรวมและตรวจคุณภาพไม่เกิน 10 นาที
+- System Availability: ตัวระบบติดตามและตรวจสอบข้อมูล (Observability Platform) ต้องมีความพร้อมใช้งาน (Uptime) ไม่ต่ำกว่า 99% ในสภาพแวดล้อมทดสอบ
+- API Responsiveness: ตัวแอปพลิเคชัน FastAPI ในการสืบค้นข้อมูลเชิงโครงสร้างและสถานะของ Lineage ต้องมีเวลาตอบสนอง (Response Time) เฉลี่ยไม่เกิน 2 วินาทีต่อคำสั่งซื้อข้อมูล
+- Cost Efficiency & Resource Constraint: โครงการต้องพัฒนาภายใต้งบประมาณค่าลิขสิทธิ์ซอฟต์แวร์ 0 บาท โดยเลือกใช้เทคโนโลยี Open Source และทรัพยากรระบบคอมพิวเตอร์ส่วนบุคคลและเซิร์ฟเวอร์จำลองร่วมกัน
+
+6. แผนการดำเนินงานโครงการ (Project Timeline - 6 เดือน / 24 สัปดาห์)
+- เดือนที่ 1 (สัปดาห์ 1–4): ศึกษาทบทวนวรรณกรรมและการออกแบบระบบสถาปัตยกรรม, ติดตั้งและตั้งค่าระบบจัดเก็บไฟล์กระจายศูนย์ Hadoop HDFS, พัฒนาท่อส่งข้อมูลต้นน้ำตัวแรกด้วย n8n และ Python scripts
+- เดือนที่ 2–3 (สัปดาห์ 5–12): พัฒนาระบบประมวลผลกระจายศูนย์ด้วย Apache Spark, เขียนโค้ดระบบคำนวณสถิติและคะแนนคุณภาพข้อมูลระดับแถว, สร้างกลไกตรวจจับ Schema Drift และ Data Profiling
+- เดือนที่ 4 (สัปดาห์ 13–16): ติดตั้งและกำหนดค่าคอนฟิก ELK Stack (Elasticsearch, Logstash), ออกแบบโครงสร้างการส่งต่อ Metadata จากท่อส่งและฐานข้อมูล, พัฒนาระบบจัดทำดัชนีเพื่อค้นหาและเชื่อมโยงข้อมูล Lineage
+- เดือนที่ 5 (สัปดาห์ 17–20): พัฒนาระบบกักกันข้อมูล (Quarantine Zone) และระบบ Retry ลูป, สร้างหน้าแผงควบคุมระบบด้วย Kibana และ Grafana Node Graph, พัฒนา FastAPI บริการส่งต่อข้อมูลล้างสะอาดแบบ Endpoint API
+- เดือนที่ 6 (สัปดาห์ 21–24): ทำการทดสอบแรงกดดันระบบด้วยข้อมูลมหาศาล (Load & Stress Testing), ค้นหาคอขวดและปรับแต่ง Memory Tuning บน Spark และ Elasticsearch, จัดทำคู่มือและเตรียมข้อมูลพิทช์นำเสนอระบบ
+
+7. ตัวชี้วัดความสำเร็จ (Key Performance Indicators: KPIs)
+- KPI-01: การลดเวลาตรวจพบปัญหาข้อมูล (Mean Time to Detection - MTTD) ระบบต้องตรวจจับความผิดปกติของข้อมูลและแจ้งเตือนได้ภายในเวลา ตํ่ากว่า 5 นาที
+- KPI-02: ความแม่นยำในการระบุต้นตอความเสียหาย (Lineage Traceability Accuracy) ระบบต้องแสดงเส้นทางย้อนกลับไปหาตารางหรือ API ต้นทางได้อย่างถูกต้องแม่นยำไม่น้อยกว่า 95%
+- KPI-03: อัตราการสูญเสียของระบบประมวลผล (Pipeline Data Loss Rate) อัตราความสำเร็จของ Pipeline อยู่ที่ ≥99.5% สำหรับข้อมูลขนาดใหญ่
+- KPI-04: ประสิทธิภาพการสเกลระบบ (Data Volume Scalability Benchmark) ระบบไม่เกิดอาการหน่วยความจำเต็ม (Out of Memory) เมื่อวิ่งทดสอบกับชุดข้อมูลจำลองขนาด 1,000,000 เรคคอร์ด
+
+8. เทคโนโลยีที่เลือกใช้ (Technology Stack)
+- Workflow Orchestration / Ingestion: n8n และ Python Custom Ingestors
+- Distributed Storage Framework: Apache Hadoop HDFS
+- High-Performance Processing Engine: Apache Spark
+- Data Observability & Log Core: Elasticsearch และ Logstash
+- Visualization UI: Kibana และ Grafana (Node Graph Panel)
+- Application Programming Interface: FastAPI
+- Containerization & Deployment: Docker และ Docker Compose
+- Version Control System: GitHub
+
+9. ทรัพยากรและงบประมาณ (Resources & Budget)
+- งบประมาณโครงการ: 0 บาท (ใช้ซอฟต์แวร์ลิขสิทธิ์ Open Source ทั้งหมด)
+- ทรัพยากรโครงสร้างพื้นฐาน: ระบบคอมพิวเตอร์ส่วนบุคคลของทีมผู้พัฒนาและโฮสต์จำลองของสถาบันการศึกษาเพื่อใช้รัน Dockerized Cluster ของสถาปัตยกรรมระบบทดสอบ

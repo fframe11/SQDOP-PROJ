@@ -1,0 +1,76 @@
+{
+    "mbti": {
+        "primary_key": [
+            "author",
+            "text"
+        ],
+        "date_column": null,
+        "schema_spec": {
+            "author": "StringType",
+            "text": "StringType",
+            "label": "StringType",
+            "EI": "StringType",
+            "NS": "StringType",
+            "TF": "StringType",
+            "JP": "StringType"
+        }
+    },
+    "users": {
+        "primary_key": "id",
+        "date_column": "updated_at",
+        "schema_spec": {
+            "id": "IntegerType",
+            "username": "StringType",
+            "email": "StringType",
+            "role": "StringType",
+            "created_at": "TimestampType",
+            "updated_at": "TimestampType"
+        }
+    },
+    "products": {
+        "primary_key": "product_id",
+        "date_column": null,
+        "schema_spec": {
+            "product_id": "StringType",
+            "product_category_name": "StringType",
+            "product_name_lenght": "IntegerType",
+            "product_description_lenght": "IntegerType",
+            "product_photos_qty": "IntegerType",
+            "product_weight_g": "IntegerType",
+            "product_length_cm": "IntegerType",
+            "product_height_cm": "IntegerType",
+            "product_width_cm": "IntegerType"
+        }
+    },
+    "gov_data": {
+        "primary_key": "_id",
+        "date_column": null,
+        "schema_spec": {
+            "_id": "IntegerType",
+            "\u0e25\u0e33\u0e14\u0e31\u0e1a": "IntegerType",
+            "\u0e0a\u0e37\u0e48\u0e2d\u0e23\u0e32\u0e22\u0e01\u0e32\u0e23": "StringType",
+            "\u0e1b\u0e23\u0e30\u0e40\u0e20\u0e17": "StringType",
+            "\u0e23\u0e32\u0e22\u0e25\u0e30\u0e40\u0e2d\u0e35\u0e22\u0e14": "StringType"
+        }
+    },
+    "sales_records": {
+        "primary_key": "order_id",
+        "date_column": "order_date",
+        "schema_spec": {
+            "region": "StringType",
+            "country": "StringType",
+            "item_type": "StringType",
+            "sales_channel": "StringType",
+            "order_priority": "StringType",
+            "order_date": "StringType",
+            "order_id": "IntegerType",
+            "ship_date": "StringType",
+            "units_sold": "IntegerType",
+            "unit_price": "DoubleType",
+            "unit_cost": "DoubleType",
+            "total_revenue": "DoubleType",
+            "total_cost": "DoubleType",
+            "total_profit": "DoubleType"
+        }
+    }
+}

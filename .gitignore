@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+.env
+
+# IDEs
+.idea/
+.vscode/
+
+# Docker/Database
+postgres_data/
+airflow_logs/
+airflow_plugins/
+n8n/credentials.json
+n8n/database.sqlite
+
+# Large local datasets
+stress test/*.csv
+stress test/**/*.csv
+
+# OS files
+.DS_Store
+Thumbs.db

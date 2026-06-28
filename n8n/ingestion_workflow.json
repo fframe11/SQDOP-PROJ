@@ -1,0 +1,326 @@
+{
+  "id": "1",
+  "name": "SDOQAP_Ingestion_Pipeline",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 30
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger-node",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [250, 150]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ingest",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "webhook-trigger-node",
+      "name": "WebhookTrigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {},
+      "id": "manual-trigger-node",
+      "name": "When clicking 'Test workflow'",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [250, 450]
+    },
+    {
+      "parameters": {
+        "filePath": "/stress_test/Olist Brazilian E-Commerce/olist_products_dataset.csv"
+      },
+      "id": "read-products-node",
+      "name": "Read Products CSV",
+      "type": "n8n-nodes-base.readBinaryFile",
+      "typeVersion": 1,
+      "position": [450, 150]
+    },
+    {
+      "parameters": {
+        "jsCode": "const binaryDataBuffer = await this.helpers.getBinaryDataBuffer(0, 'data');\nconst textString = Buffer.from(binaryDataBuffer).toString('utf-8');\nreturn { json: { csv: textString } };"
+      },
+      "id": "convert-products-node",
+      "name": "Convert Products to Text",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 150]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "http://namenode:9870/webhdfs/v1/data/raw/products/products.csv?op=CREATE&overwrite=true&user.name=root",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "text/csv"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "text/plain",
+        "body": "={{ $json.csv }}",
+        "options": {}
+      },
+      "id": "upload-products-node",
+      "name": "Upload Products to HDFS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [850, 150]
+    },
+    {
+      "parameters": {
+        "url": "https://data.go.th/api/3/action/datastore_search?resource_id=b5c54455-9447-407a-8002-7660703484d7&limit=10000",
+        "options": {}
+      },
+      "id": "fetch-gov-node",
+      "name": "Fetch Thai Gov API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const records = $json.result.records;\nif (!records || records.length === 0) return [{ json: { csv: \"\" } }];\nconst headers = Object.keys(records[0]);\nconst csvRows = [headers.join(\",\")];\nfor (const row of records) {\n  const values = headers.map(header => {\n    const val = row[header];\n    const escaped = ('' + (val === null || val === undefined ? '' : val)).replace(/\"/g, '\"\"');\n    return `\"${escaped}\"`;\n  });\n  csvRows.push(values.join(\",\"));\n}\nreturn [{ json: { csv: csvRows.join(\"\\n\") } }];"
+      },
+      "id": "convert-gov-node",
+      "name": "Convert Gov JSON to CSV",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "http://namenode:9870/webhdfs/v1/data/raw/gov_data/gov_data.csv?op=CREATE&overwrite=true&user.name=root",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "text/csv"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "text/plain",
+        "body": "={{ $json.csv }}",
+        "options": {}
+      },
+      "id": "upload-gov-node",
+      "name": "Upload Gov CSV to HDFS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM sales_records;",
+        "additionalFields": {}
+      },
+      "id": "query-sales-node",
+      "name": "Query Sales Records",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.1,
+      "position": [450, 450],
+      "credentials": {
+        "postgres": {
+          "id": "c711aa48-356f-4cd2-b67a-12908a85f401",
+          "name": "Postgres Local"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const records = items.map(item => item.json);\nif (records.length === 0) return [{ json: { csv: \"\" } }];\nconst headers = Object.keys(records[0]);\nconst csvRows = [headers.join(\",\")];\nfor (const row of records) {\n  const values = headers.map(header => {\n    const val = row[header];\n    const escaped = ('' + (val === null || val === undefined ? '' : val)).replace(/\"/g, '\"\"');\n    return `\"${escaped}\"`;\n  });\n  csvRows.push(values.join(\",\"));\n}\nreturn [{ json: { csv: csvRows.join(\"\\n\") } }];"
+      },
+      "id": "convert-sales-node",
+      "name": "Convert Sales to CSV",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 450]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "http://namenode:9870/webhdfs/v1/data/raw/sales_records/sales_records.csv?op=CREATE&overwrite=true&user.name=root",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "text/csv"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "text/plain",
+        "body": "={{ $json.csv }}",
+        "options": {}
+      },
+      "id": "upload-sales-node",
+      "name": "Upload Sales CSV to HDFS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [850, 450]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Read Products CSV",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Thai Gov API",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Query Sales Records",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WebhookTrigger": {
+      "main": [
+        [
+          {
+            "node": "Read Products CSV",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Thai Gov API",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Query Sales Records",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking 'Test workflow'": {
+      "main": [
+        [
+          {
+            "node": "Read Products CSV",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Thai Gov API",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Query Sales Records",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Products CSV": {
+      "main": [
+        [
+          {
+            "node": "Convert Products to Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert Products to Text": {
+      "main": [
+        [
+          {
+            "node": "Upload Products to HDFS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Thai Gov API": {
+      "main": [
+        [
+          {
+            "node": "Convert Gov JSON to CSV",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert Gov JSON to CSV": {
+      "main": [
+        [
+          {
+            "node": "Upload Gov CSV to HDFS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Sales Records": {
+      "main": [
+        [
+          {
+            "node": "Convert Sales to CSV",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert Sales to CSV": {
+      "main": [
+        [
+          {
+            "node": "Upload Sales CSV to HDFS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "active": true
+}

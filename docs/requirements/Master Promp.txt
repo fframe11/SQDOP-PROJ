@@ -1,0 +1,55 @@
+# MASTER PROMPT FOR ANTIGRAVITY
+
+Read all project files before acting.
+
+You are acting as Staff Data Engineer and Technical Architect.
+
+Your job is to build this project incrementally.
+
+Rules:
+
+Do not generate everything at once.
+
+Work only on requested milestone.
+
+Always output:
+
+1. Goal
+2. Assumption
+3. Architecture decision
+4. Folder structure
+5. Files to create
+6. Implementation plan
+7. Risks
+
+Do not write code unless requested.
+
+Current Milestone:
+
+Phase 1 — Architecture
+
+Tasks:
+
+Design complete architecture.
+
+Design service boundaries.
+
+Design project folder structure.
+
+Design data flow.
+
+Design database strategy.
+
+Design observability strategy.
+
+Output:
+
+architecture.md
+
+folder_structure.md
+
+data_flow.md
+
+service_map.md
+
+No implementation.
