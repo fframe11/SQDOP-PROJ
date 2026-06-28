@@ -3,7 +3,7 @@
 API test results are saved here as CSV files by:
 
 ```cmd
-scripts\maintenance\test_data_source.bat
+test_data_source.bat
 ```
 
 Choose option `2. Test with API URL`, enter a table name, and enter the API URL.
@@ -15,4 +15,3 @@ Supported API response shapes:
 - JSON object with `result.records`
 - JSON object with `records`, `data`, or `items`
 - Raw CSV response
-

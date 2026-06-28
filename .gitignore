@@ -19,6 +19,7 @@ n8n/credentials.json
 n8n/database.sqlite
 
 # Large local datasets
+/*.csv
 stress test/*.csv
 stress test/**/*.csv
 user_inputs/datasets/*

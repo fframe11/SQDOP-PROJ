@@ -5,10 +5,12 @@ rem ------------------------------------------------------------
 rem Verify Pipeline Script
 rem ------------------------------------------------------------
 
-rem Run the existing start_and_test.bat
-call start_and_test.bat
+rem Run the root startup script
+pushd "%~dp0..\.." >nul
+call start_system.bat
 if %errorlevel% neq 0 (
-    echo [ERROR] start_and_test.bat failed with exit code %errorlevel%.
+    echo [ERROR] start_system.bat failed with exit code %errorlevel%.
+    popd >nul
     exit /b %errorlevel%
 )
 
@@ -39,4 +41,5 @@ if %errorlevel% equ 0 (
 
 
 echo [SUCCESS] Verification completed.
+popd >nul
 exit /b 0

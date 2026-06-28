@@ -10,7 +10,7 @@ echo   This script starts the platform only.
 echo   It does NOT run dataset/API ingestion tests.
 echo.
 echo   After this finishes, run:
-echo     scripts\maintenance\test_data_source.bat
+echo     test_data_source.bat
 echo =======================================================================
 echo.
 
@@ -143,7 +143,7 @@ echo   Elasticsearch:  http://localhost:9200/
 echo   Kibana:         http://localhost:!KIBANA_PORT!/
 echo.
 echo   To run a data test, use:
-echo     scripts\maintenance\test_data_source.bat
+echo     test_data_source.bat
 echo =======================================================================
 echo.
 pause

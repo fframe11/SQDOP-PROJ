@@ -75,8 +75,8 @@ echo.
 echo =======================================================================
 echo   Installation and Setup Completed Successfully!
 echo =======================================================================
-echo   You are now ready to run the start_and_test.bat script to boot 
-echo   up the system, ingest data, and open the observability portal.
+echo   You are now ready to run start_system.bat from the project root.
+echo   Then run test_data_source.bat to test a CSV dataset or API URL.
 echo =======================================================================
 echo.
 pause

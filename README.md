@@ -1,85 +1,36 @@
 # ETL-Project
 
-ระบบนี้คือ **SDOQAP - Scalable Data Observability and Quality Assurance Platform** สำหรับทดสอบงาน Data Engineering แบบ end-to-end ตั้งแต่รับข้อมูลจากหลายแหล่ง, เก็บลง Data Lake, ตรวจคุณภาพข้อมูลด้วย Spark, บันทึกผลลง Elasticsearch และแสดงผลผ่านเว็บกลางกับ Grafana
+ระบบนี้คือ **SDOQAP - Scalable Data Observability and Quality Assurance Platform** สำหรับทดสอบงาน Data Engineering แบบ end-to-end: รับข้อมูลจาก Dataset หรือ API, เก็บเข้า HDFS, ตรวจคุณภาพด้วย Spark, บันทึกผลลง Elasticsearch และดูผลผ่านเว็บกลางกับ Grafana
 
-สำหรับผู้ที่ clone repo ไปใช้งาน ให้ใช้ 2 script หลักนี้:
+## ใช้งานหลัก 2 ไฟล์
 
-```cmd
-scripts\maintenance\start_and_test.bat
-scripts\maintenance\test_data_source.bat
-```
-
-`start_and_test.bat` ใช้เปิดระบบอย่างเดียว ส่วน `test_data_source.bat` ใช้เลือกว่าจะทดสอบด้วยไฟล์ dataset หรือ API URL
-
-## ภาพรวมระบบ
-
-SDOQAP ทำงานเป็น data observability platform ที่รับข้อมูลจากหลาย source แล้วตรวจคุณภาพข้อมูลแบบอัตโนมัติ
-
-1. รับข้อมูลจาก CSV dataset หรือ API
-2. โหลด raw data เข้า HDFS ที่ `/data/raw/<table_name>`
-3. ใช้ Spark ตรวจ schema, primary key, duplicate records, missing value และ date freshness
-4. แยกข้อมูลดีไปที่ `/data/active/<table_name>`
-5. แยกข้อมูลที่ไม่ผ่าน rule ไปที่ `/data/quarantine/<table_name>`
-6. เขียนผล quality, lineage และ pipeline status ลง Elasticsearch
-7. แสดงผลผ่าน FastAPI Central Portal และ Grafana
-
-## Service หลัก
-
-| Service | หน้าที่ | URL เริ่มต้น |
-| --- | --- | --- |
-| FastAPI Central Portal | เว็บกลางสำหรับดูสถานะระบบ, KPI, quality, lineage และ pipeline run | `http://localhost:8002/` |
-| Grafana | Dashboard สำหรับ observability | `http://localhost:3002/` |
-| n8n | Workflow orchestration สำหรับ flow ที่ต้องใช้ n8n | `http://localhost:5678/` |
-| HDFS NameNode | Data Lake สำหรับ raw/active/quarantine data | `http://localhost:9870/` |
-| Spark Master | ประมวลผล quality validation | `http://localhost:8081/` |
-| Elasticsearch | เก็บผลลัพธ์ quality, lineage และ pipeline run | `http://localhost:9200/` |
-| Kibana | สำรวจข้อมูลใน Elasticsearch | `http://localhost:5601/` |
-| PostgreSQL | Mock database source | `localhost:5432` |
-
-Port สามารถแก้ได้ใน `.env`
-
-## สิ่งที่ต้องติดตั้ง
-
-แนะนำให้รันบน Windows และติดตั้งสิ่งต่อไปนี้ก่อน
-
-1. Docker Desktop
-2. WSL2
-3. Git
-4. RAM อย่างน้อย 8 GB
-
-ตรวจ Docker:
+หลัง clone repo ผู้ใช้จะเห็น script อยู่หน้าโปรเจกต์เลย:
 
 ```cmd
-docker ps
+start_system.bat
+test_data_source.bat
 ```
 
-ถ้ายังไม่มี `.env` ให้รัน:
+ใช้ตามลำดับนี้:
 
-```cmd
-scripts\maintenance\install_sdoqap.bat
-```
+1. `start_system.bat` เปิดระบบทั้งหมด
+2. `test_data_source.bat` เลือกว่าจะเทสด้วยไฟล์ dataset หรือ API URL
 
-## วิธีใช้งานสำหรับผู้ clone repo
-
-### 1. เปิดระบบ
+## Start ระบบ
 
 รัน:
 
 ```cmd
-scripts\maintenance\start_and_test.bat
+start_system.bat
 ```
 
-script นี้จะทำเฉพาะงาน start platform:
+script นี้จะ:
 
-1. อ่าน config จาก `.env`
-2. สั่ง `docker compose up -d`
-3. import n8n workflow ถ้ามีไฟล์พร้อม
-4. รอ HDFS, Elasticsearch, FastAPI และ n8n พร้อมใช้งาน
-5. เปิด Central Portal และ Grafana
+1. start Docker Compose services
+2. รอ HDFS, Elasticsearch, API และ n8n พร้อมใช้งาน
+3. เปิดเว็บกลางและ Grafana
 
-script นี้ **ไม่รันทดสอบข้อมูลให้อัตโนมัติแล้ว** เพื่อให้ผู้ใช้เลือกเองว่าจะ test ด้วย dataset หรือ API
-
-หลังระบบพร้อม ให้เปิดเว็บกลาง:
+เว็บกลาง:
 
 ```text
 http://localhost:8002/
@@ -93,15 +44,15 @@ username: admin
 password: admin
 ```
 
-### 2. เลือกทดสอบด้วย Dataset หรือ API
+## Test ด้วย Dataset หรือ API
 
-รัน:
+หลังระบบเปิดแล้ว ให้รัน:
 
 ```cmd
-scripts\maintenance\test_data_source.bat
+test_data_source.bat
 ```
 
-ใน script จะมีเมนู:
+เมนูที่มี:
 
 ```text
 1. Test with local CSV dataset
@@ -111,78 +62,55 @@ scripts\maintenance\test_data_source.bat
 5. Exit
 ```
 
-## จุดวางไฟล์ Dataset
+## กรณีเลือก Dataset
 
-ให้วางไฟล์ CSV ที่ต้องการทดสอบไว้ที่:
-
-```text
-user_inputs/datasets/
-```
-
-ตัวอย่าง:
+วางไฟล์ CSV ไว้หน้าโปรเจกต์ เช่น:
 
 ```text
-user_inputs/datasets/orders.csv
-user_inputs/datasets/customers.csv
-user_inputs/datasets/sales_records.csv
+DataEngProj/
+├─ start_system.bat
+├─ test_data_source.bat
+├─ orders.csv
+└─ docker-compose.yml
 ```
 
-จากนั้นรัน:
-
-```cmd
-scripts\maintenance\test_data_source.bat
-```
-
-เลือก option `1. Test with local CSV dataset`
-
-ระบบจะถาม:
-
-```text
-Enter table name for HDFS/Spark:
-Enter CSV file name or full path:
-```
-
-ตัวอย่างการกรอก:
+จากนั้นรัน `test_data_source.bat` เลือกข้อ `1` แล้วพิมพ์ชื่อไฟล์ได้เลย:
 
 ```text
 Enter table name for HDFS/Spark: orders
 Enter CSV file name or full path: orders.csv
 ```
 
-script จะทำให้โดยอัตโนมัติ:
-
-1. copy CSV เข้า container ของ HDFS NameNode
-2. สร้าง HDFS path `/data/raw/orders`
-3. upload ไฟล์เป็น `/data/raw/orders/orders.csv`
-4. run Spark quality engine ด้วย table name `orders`
-5. เขียนผลลัพธ์ลง Elasticsearch
-6. ดูผลได้ที่ Central Portal
-
-## จุดทดสอบ API
-
-ถ้ามี API URL ให้รัน:
-
-```cmd
-scripts\maintenance\test_data_source.bat
-```
-
-เลือก option `2. Test with API URL`
-
-ระบบจะถาม:
+หรือจะวางไฟล์ไว้ใน:
 
 ```text
-Enter table name for HDFS/Spark:
-Enter API URL:
+user_inputs/datasets/
 ```
 
-ตัวอย่าง:
+แล้วพิมพ์ชื่อไฟล์อย่างเดียวก็ได้เช่นกัน:
+
+```text
+Enter CSV file name or full path: orders.csv
+```
+
+script จะ upload ไฟล์เข้า HDFS ที่:
+
+```text
+/data/raw/orders/orders.csv
+```
+
+จากนั้นจะรัน Spark quality check และส่งผลไปที่ Elasticsearch เพื่อดูในเว็บกลาง
+
+## กรณีเลือก API
+
+รัน `test_data_source.bat` เลือกข้อ `2` แล้วกรอก API URL ใน terminal ได้เลย:
 
 ```text
 Enter table name for HDFS/Spark: gov_data
 Enter API URL: https://example.com/api/data
 ```
 
-script จะ download API response แล้วแปลงเป็น CSV เท่าที่ทำได้ จากนั้นบันทึกไว้ที่:
+script จะ download API response, แปลงเป็น CSV เท่าที่ทำได้ แล้วเก็บไว้ที่:
 
 ```text
 user_inputs/apis/<table_name>.csv
@@ -196,11 +124,23 @@ user_inputs/apis/<table_name>.csv
 - JSON object ที่มี `records`, `data`, หรือ `items`
 - raw CSV response
 
-หลังแปลงเสร็จ script จะ upload CSV เข้า HDFS และรัน Spark quality check เหมือนกรณี dataset
+หลังจากนั้นระบบจะ upload เข้า HDFS และรัน Spark quality check เหมือนกรณี dataset
 
-## การกำหนด Schema สำหรับ Dataset ใหม่
+## Service หลัก
 
-Spark quality engine สามารถ infer schema เบื้องต้นได้ แต่ถ้าต้องการผลที่แม่นขึ้น ให้เพิ่ม config ใน:
+| Service | URL |
+| --- | --- |
+| Central Portal | `http://localhost:8002/` |
+| Grafana | `http://localhost:3002/` |
+| n8n | `http://localhost:5678/` |
+| HDFS NameNode | `http://localhost:9870/` |
+| Spark Master | `http://localhost:8081/` |
+| Elasticsearch | `http://localhost:9200/` |
+| Kibana | `http://localhost:5601/` |
+
+## Schema สำหรับข้อมูลใหม่
+
+ถ้าต้องการกำหนด primary key, date column หรือ expected schema ให้เพิ่ม config ใน:
 
 ```text
 spark/schema_registry.json
@@ -223,9 +163,9 @@ spark/schema_registry.json
 }
 ```
 
-ถ้าไม่เพิ่ม schema ระบบจะเลือก primary key และ date column เองจากชื่อ column เช่น `id`, `<table>_id`, `date`, `created_at`, `updated_at`, `timestamp`
+ถ้าไม่เพิ่ม schema ระบบจะ infer schema เบื้องต้นให้อัตโนมัติ
 
-## วิธีตรวจว่าระบบทำงาน
+## ตรวจระบบ
 
 ดู container:
 
@@ -233,7 +173,7 @@ spark/schema_registry.json
 docker compose ps
 ```
 
-ดู raw data ใน HDFS:
+ดู raw data:
 
 ```cmd
 docker exec sdoqap-namenode hdfs dfs -ls /data/raw
@@ -257,37 +197,19 @@ docker exec sdoqap-namenode hdfs dfs -ls /data/quarantine
 curl http://localhost:9200/_cat/indices?v
 ```
 
-ดู API health:
+## ไฟล์ที่ไม่ควร push ขึ้น Git
 
-```cmd
-curl http://localhost:8002/health
-```
-
-## API Endpoint สำคัญ
-
-```text
-http://localhost:8002/health
-http://localhost:8002/api/v1/services/status
-http://localhost:8002/api/v1/kpi/stats
-http://localhost:8002/api/v1/quality
-http://localhost:8002/api/v1/pipeline
-http://localhost:8002/api/v1/lineage/products
-```
-
-## ไฟล์ที่ไม่ได้ push ขึ้น GitHub
-
-repo นี้ไม่เก็บไฟล์ต่อไปนี้ด้วยเหตุผลด้านความปลอดภัยและขนาดไฟล์
+repo ตั้งค่า ignore ไว้แล้วสำหรับ:
 
 - `.env`
+- root-level CSV เช่น `orders.csv`
+- `user_inputs/datasets/*`
+- `user_inputs/apis/*`
 - `n8n/credentials.json`
 - `n8n/database.sqlite`
-- CSV dataset ขนาดใหญ่ใน `stress test/`
-- ไฟล์ที่ผู้ใช้วางเองใน `user_inputs/datasets/`
-- ไฟล์ API output ใน `user_inputs/apis/`
+- dataset ใหญ่ใน `stress test/`
 
-ถ้าต้องการทดสอบ ให้เตรียม dataset หรือ API ของตัวเอง แล้วใช้ `test_data_source.bat`
-
-## การปิดระบบ
+## ปิดระบบ
 
 หยุด container:
 
@@ -295,26 +217,10 @@ repo นี้ไม่เก็บไฟล์ต่อไปนี้ด้ว
 docker compose down
 ```
 
-หยุดและลบ volume ทั้งหมด:
+reset volume ทั้งหมด:
 
 ```cmd
 docker compose down -v
-```
-
-คำสั่ง `down -v` จะลบข้อมูลใน PostgreSQL, Elasticsearch, HDFS และ n8n volume ทั้งหมด ใช้เมื่อต้องการ reset ระบบ
-
-## Folder สำคัญ
-
-```text
-api/                         FastAPI serving layer และเว็บกลาง
-docs/                        เอกสาร architecture และ system design
-grafana/provisioning/        Grafana datasource provisioning
-n8n/                         n8n workflow export
-scripts/maintenance/         start/test/install scripts
-spark/                       Spark quality engine และ schema registry
-user_inputs/datasets/        จุดวาง CSV dataset สำหรับผู้ใช้
-user_inputs/apis/            จุดเก็บ API output สำหรับผู้ใช้
-docker-compose.yml           service orchestration
 ```
 
 ## License

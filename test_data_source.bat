@@ -6,11 +6,14 @@ cls
 echo =======================================================================
 echo   SDOQAP Dataset/API Test Runner
 echo =======================================================================
-echo   Use this script after start_and_test.bat has started the platform.
+echo   Use this script after start_system.bat has started the platform.
 echo.
-echo   Input folders:
-echo     user_inputs\datasets  - put CSV files here
-echo     user_inputs\apis      - downloaded API test files are saved here
+echo   Dataset input:
+echo     Put CSV files in this project folder, then type the file name.
+echo     You can also put CSV files in user_inputs\datasets.
+echo.
+echo   API input:
+echo     Select API mode and paste/type the API URL in this terminal.
 echo =======================================================================
 echo.
 
@@ -72,10 +75,13 @@ echo =======================================================================
 echo   Local CSV Dataset Test
 echo =======================================================================
 echo Place your CSV file in:
+echo   this project folder ^(same level as this script^)
+echo or:
 echo   user_inputs\datasets
 echo.
 echo You may enter either:
 echo   - file name only: orders.csv
+echo   - file name from user_inputs\datasets: orders.csv
 echo   - full path: C:\path\to\orders.csv
 echo.
 set /p table_name="Enter table name for HDFS/Spark (example: orders): "
@@ -97,7 +103,7 @@ if not exist "%input_file%" set "input_file=user_inputs\datasets\%dataset_file%"
 
 if not exist "%input_file%" (
     echo [ERROR] File not found: %dataset_file%
-    echo Put the file in user_inputs\datasets or enter a full path.
+    echo Put the file in this project folder, put it in user_inputs\datasets, or enter a full path.
     pause
     goto menu
 )
@@ -120,6 +126,8 @@ echo =======================================================================
 echo The script downloads the API response and converts JSON array/object data
 echo to CSV when possible. The output is saved in:
 echo   user_inputs\apis
+echo.
+echo Paste/type your API URL directly in this terminal.
 echo.
 set /p table_name="Enter table name for HDFS/Spark (example: api_orders): "
 if "%table_name%"=="" (
@@ -185,25 +193,25 @@ echo [CHECK] Verifying required services...
 docker ps >nul 2>&1
 if %errorlevel% neq 0 (
     echo [ERROR] Docker daemon is not running.
-    echo Please start Docker Desktop, then run scripts\maintenance\start_and_test.bat.
+    echo Please start Docker Desktop, then run start_system.bat.
     exit /b 1
 )
 
 docker ps --format "{{.Names}}" | findstr /I "sdoqap-namenode" >nul
 if %errorlevel% neq 0 (
-    echo [ERROR] sdoqap-namenode is not running. Run scripts\maintenance\start_and_test.bat first.
+    echo [ERROR] sdoqap-namenode is not running. Run start_system.bat first.
     exit /b 1
 )
 
 docker ps --format "{{.Names}}" | findstr /I "sdoqap-spark-master" >nul
 if %errorlevel% neq 0 (
-    echo [ERROR] sdoqap-spark-master is not running. Run scripts\maintenance\start_and_test.bat first.
+    echo [ERROR] sdoqap-spark-master is not running. Run start_system.bat first.
     exit /b 1
 )
 
 docker ps --format "{{.Names}}" | findstr /I "sdoqap-elasticsearch" >nul
 if %errorlevel% neq 0 (
-    echo [ERROR] sdoqap-elasticsearch is not running. Run scripts\maintenance\start_and_test.bat first.
+    echo [ERROR] sdoqap-elasticsearch is not running. Run start_system.bat first.
     exit /b 1
 )
 
