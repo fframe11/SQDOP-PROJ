@@ -21,6 +21,10 @@ n8n/database.sqlite
 # Large local datasets
 stress test/*.csv
 stress test/**/*.csv
+user_inputs/datasets/*
+!user_inputs/datasets/README.md
+user_inputs/apis/*
+!user_inputs/apis/README.md
 
 # OS files
 .DS_Store
