@@ -1,0 +1,194 @@
+เอกสารข้อเสนอโครงการ (Project Proposal)
+โครงการระบบบริหารจัดการความน่าเชื่อถือและติดตามเส้นทางข้อมูลขนาดใหญ่
+(Scalable Data Observability and Quality Assurance Platform - SDOQAP)
+
+---
+
+1. ที่มาและความสำคัญ (Background and Significance)
+
+ในยุคปัจจุบันที่เทคโนโลยีดิจิทัลและอินเทอร์เน็ตเข้ามามีบทบาทสำคัญ องค์กรต่างๆ ขับเคลื่อนธุรกิจด้วยข้อมูลขนาดใหญ่ (Big Data)
+ที่ถูกรวบรวมมาจากแหล่งข้อมูลดิบที่หลากหลาย เช่น ฐานข้อมูลระบบภายใน (Relational Databases),
+การดึงข้อมูลผ่านเว็บแอปพลิเคชันและ API ภายนอก (REST API), และไฟล์นำเข้าทั่วไป (CSV/JSON/Excel)
+
+อย่างไรก็ตาม อุปสรรคที่สำคัญที่สุดของการใช้ประโยชน์จาก Big Data ไม่ใช่การจัดหาข้อมูล
+แต่คือ "ความน่าเชื่อถือของข้อมูล (Data Reliability)" และ "ความสามารถในการสังเกตการณ์ท่อส่งข้อมูล (Data Observability)"
+ปัญหาทางเทคนิค เช่น โครงสร้างข้อมูลเปลี่ยนแปลงโดยไม่แจ้งล่วงหน้า (Schema Drift), ข้อมูลสูญหายระหว่างการส่งผ่าน (Data Dropping),
+และข้อมูลชำรุดซ้ำซ้อน ส่งผลกระทบเชิงลบโดยตรงต่อระบบปลายทางและการนำข้อมูลไปวิเคราะห์ต่อยอด
+
+กระบวนการค้นหาและแก้ไขต้นตอของข้อมูลที่เสียหาย (Root Cause Analysis) ในระบบกระจายศูนย์ดั้งเดิมมักทำได้ยากและล่าช้า
+เนื่องจากขาดระบบบันทึกสถานะและแผนผังเส้นทางข้อมูลที่เป็นรูปธรรม ส่งผลให้องค์กรสูญเสียค่าใช้จ่ายและเวลาโดยใช่เหตุ
+
+ด้วยเหตุนี้ โครงการ SDOQAP จึงถูกจัดทำขึ้นเพื่อแก้ไขปัญหาดังกล่าว โดยนำเสนอสถาปัตยกรรมกระจายศูนย์
+ประสิทธิภาพสูง (Apache Spark และ Hadoop HDFS) ที่ไม่เพียงแต่ประมวลผลล้างและจัดเก็บข้อมูลเท่านั้น
+แต่ยังมีระบบสังเกตการณ์ (Data Observability) ที่ช่วยระบุตำแหน่งข้อบกพร่อง เปลี่ยนสีแจ้งเตือนในแผนผังแบบเรียลไทม์
+และคำนวณประเมินความสูญเสียเป็นตัวเงินจริงเชิงธุรกิจ
+
+---
+
+2. วัตถุประสงค์ (Objectives)
+
+2.1 เพื่อออกแบบและพัฒนาระบบสถาปัตยกรรมข้อมูลขนาดใหญ่ (Big Data Architecture) ที่รองรับการประมวลผลข้อมูลขนานระดับล้านแถว
+2.2 เพื่อสร้างท่อข้อมูลอัจฉริยะ (Data Pipeline) ที่มีกระบวนการคัดกรองล้างและคำนวณคะแนนคุณภาพข้อมูล (Data Quality Score)
+    เป็นรายแถวและรายชุดข้อมูลโดยอัตโนมัติ
+2.3 เพื่อพัฒนาโมเดลการพยากรณ์แนวโน้มคุณภาพข้อมูล (7-Day Quality Score Projection) และกลไกตรวจจับการเปลี่ยนแปลง
+    ของรูปแบบข้อมูล (Schema Drift) เพื่อป้องกันปัญหาในท่อส่งข้อมูลล่วงหน้า
+2.4 เพื่อพัฒนาแผนภาพการติดตามตรวจสอบความสัมพันธ์และเส้นทางของข้อมูลแบบเรียลไทม์ (End-to-End Real-time Data Lineage Map)
+    ช่วยชี้เป้าจุดขัดข้องได้อย่างแม่นยำ
+2.5 เพื่อพัฒนาระบบกักกันและกลไกสั่งรันข้อมูลใหม่แบบปิดลูป (Data Quarantine & Pipeline Recovery Loop)
+    ให้สามารถแก้ไขและฟื้นฟูข้อมูลที่เสียหายกลับเข้าระบบได้อย่างสะดวกและรวดเร็ว
+
+---
+
+3. ประโยชน์ที่ได้รับจากโครงการ (Expected Benefits)
+
+3.1 องค์กรได้รับแพลตฟอร์มตรวจสอบความถูกต้องของข้อมูลที่มีประสิทธิภาพ ลดความเสี่ยงในการนำข้อมูลที่ชำรุดไปประเมินผลเชิงธุรกิจ
+3.2 ลดเวลาเฉลี่ยในการตรวจพบความผิดปกติของข้อมูล (Mean Time to Detection: MTTD) ให้เหลือต่ำกว่า 5 นาที
+    ผ่านการแจ้งเตือนสดบนระบบแผนผังและหน้า Log Stream
+    (อ้างอิง: M&T Bank ลด Time-to-Resolution ลง 90% จากการใช้ Monte Carlo, montecarlodata.com/customers, 2024)
+3.3 ท่อส่งข้อมูลหลักทำงานได้อย่างมีเสถียรภาพและต่อเนื่อง (Pipeline Availability >= 99%)
+    เนื่องจากข้อมูลที่เสียเกณฑ์จะถูกแยกเข้าส่วนกักกันทันทีโดยไม่สร้างปัญหาให้ระบบล่ม
+3.4 Data Engineer สามารถสืบหาคอขวดและจุดขัดข้องของข้อมูลย้อนกลับไปยังตารางหรือ API ต้นทางได้อย่างแม่นยำสูง
+    (Lineage Traceability Accuracy >= 95%)
+3.5 ผู้บริหารสามารถมองเห็นความเสียหายและคอขวดสะสมในรูปของตัวเงินที่สูญเสียไปจริง (Cost of Poor Data Quality - COPDQ)
+    เพื่อนำไปประเมินประสิทธิภาพและวางแผนพัฒนาคุณภาพระบบได้ทันท่วงที
+
+---
+
+4. ขอบเขตโครงงาน (Project Scope)
+
+4.1 กลุ่มผู้ใช้ระบบ (Target User Groups)
+
+ระบบ SDOQAP ถูกพัฒนาบนสถาปัตยกรรม On-Premise แบบ Apache Hadoop HDFS และ Apache Spark
+ซึ่งตาม Gartner Market Guide for Data Observability Tools (2024) และ Acceldata customer case studies (2024-2025)
+ระบบประเภทนี้ถูกนำไปใช้จริงในองค์กรขนาดกลาง-ใหญ่ที่มีโครงสร้างพื้นฐานข้อมูลแบบ Legacy หรือ Hybrid
+เช่น ธนาคาร, การเงิน, โทรคมนาคม และหน่วยงานที่ต้องปฏิบัติตามกฎหมายคุ้มครองข้อมูล
+
+จากการวิจัยข้อมูลตลาดในปี 2025-2026 ผู้ใช้งานจริงของระบบแบบ SDOQAP แบ่งออกเป็น 4 กลุ่มหลัก ดังนี้:
+
+---
+
+กลุ่มที่ 1: Data Engineer / DataOps Engineer
+บทบาท: ผู้ใช้หลักรายวัน (Primary Daily Operator)
+
+ที่มาของข้อมูล:
+จาก dbt Labs State of Analytics Engineering Survey 2024 (getdbt.com) และ Monte Carlo customer case studies
+(montecarlodata.com/customers, 2024-2025) ระบุว่า Data Engineer คือกลุ่มที่มีปฏิสัมพันธ์กับระบบ
+Observability มากที่สุดในชีวิตประจำวัน เป้าหมายหลักคือการลด Mean Time to Detect (MTTD)
+และ Mean Time to Resolve (MTTR) ของ Pipeline Incident
+(อ้างอิง: LightsOnData.com, lightsondata.com, 2025; dataops.live product personas, 2024-2025)
+
+ฟังก์ชันที่ใช้จริงในระบบ SDOQAP:
+- ตรวจสอบประวัติรอบการประมวลผล (Run ID, Pipeline Execution History) และคะแนนคุณภาพรายชุดข้อมูล
+- วิเคราะห์สาเหตุข้อมูลชำรุดระดับแถว (Quarantine Error Breakdown) เพื่อระบุต้นตอปัญหา Schema Drift
+- สั่งประมวลผลข้อมูลชำรุดซ้ำ (Retry Ingest & Audit) หลังจากแก้ไขโครงสร้างข้อมูลต้นทางเรียบร้อยแล้ว
+- ส่งออกประวัติ Metadata เป็นไฟล์ CSV เพื่อนำไปวิเคราะห์ต่อหรือส่งให้ทีมงานที่เกี่ยวข้อง
+
+ตัวอย่างจากงานวิจัย:
+M&T Bank ใช้ Monte Carlo ลด Time-to-Resolution ลง 90% ผ่าน Data Engineer Dashboard
+(montecarlodata.com/customers, 2024-2025)
+Calendly ลด Bug Ticket ที่เกี่ยวกับข้อมูล 40% หลังจาก Data Engineer ใช้ Observability Platform
+(montecarlodata.com/customers, 2024)
+
+---
+
+กลุ่มที่ 2: Infrastructure Engineer / DevOps Engineer
+บทบาท: ผู้ดูแลระบบพื้นฐาน (System Reliability Owner)
+
+ที่มาของข้อมูล:
+ตาม Acceldata case studies (acceldata.io/case-studies, 2024-2025) สำหรับระบบ On-Premise Hadoop/Spark
+โดยเฉพาะ Infrastructure Engineer คือผู้ใช้งานสำคัญที่ต้องมองเห็นสถานะและสุขภาพของ Cluster ทั้งระบบ
+เครื่องมือที่ Acceldata เรียกว่า "Pulse" สำหรับ node-level monitoring เทียบตรงกับ Service Status Hub ของ SDOQAP
+(อ้างอิง: acceldata.io/case-studies, 2024; CNCF Observability Whitepaper, cncf.io, 2024-2025)
+
+ฟังก์ชันที่ใช้จริงในระบบ SDOQAP:
+- ตรวจสอบสถานะบริการแบบกระจายศูนย์ (Service Status Hub: HDFS Namenode, Spark Master/Worker, Elasticsearch)
+- ดู Log กิจกรรมระบบสด (Live System Log Stream) พร้อมระบบสีแยกแยะระดับความรุนแรง
+  (สีน้ำเงิน = ข้อมูลทั่วไป, สีเหลือง = คำเตือน, สีแดง = ปัญหาวิกฤต)
+- ตรวจสอบการใช้งาน CPU, Memory และค่าตอบสนอง SLA Latency ของ Cluster
+- จัดการท่อข้อมูลฉุกเฉินเมื่อเส้นทาง Lineage Map เปลี่ยนเป็นสีแดง (Danger Path Alert)
+
+ตัวอย่างจากงานวิจัย:
+PhonePe (Walmart) ใช้ Acceldata สเกล Cluster จาก 70 เป็น 1,500+ nodes ประหยัดค่าใช้จ่าย $5M
+โดย Infrastructure Team เป็นผู้ใช้งานหลักสำหรับ node monitoring
+(acceldata.io/case-studies, 2024)
+
+---
+
+กลุ่มที่ 3: Compliance Officer / Data Governance Lead
+บทบาท: ผู้กำกับดูแลและตรวจสอบข้อมูล (Regulatory & Audit User)
+
+ที่มาของข้อมูล:
+ตาม Forrester Wave: Data Quality Solutions Q1 2026 (forrester.com) และ Gartner Market Guide 2024
+กลุ่มนี้เป็นผู้ใช้งานจริงในองค์กรที่อยู่ใน Regulated Industry เช่น
+ธนาคาร (ต้องปฏิบัติตาม BCBS 239, AML regulations),
+การดูแลสุขภาพ (HIPAA compliance),
+และองค์กรที่ต้องปฏิบัติตาม PDPA (ไทย) หรือ GDPR (ยุโรป)
+กลุ่มนี้ไม่ได้ใช้ Interface ทางเทคนิคโดยตรง แต่ดึง Lineage Report และ Audit Log ไปสร้างรายงานตรวจสอบ
+(อ้างอิง: Forrester Wave Q1 2026, forrester.com; Gartner Market Guide for Data Observability Tools, gartner.com, 2024)
+
+ฟังก์ชันที่ใช้จริงในระบบ SDOQAP:
+- ดึงข้อมูล Lineage JSON และประวัติการประมวลผลย้อนหลังจาก Elasticsearch
+  เพื่อสร้างรายงานตรวจสอบและพิสูจน์เส้นทางข้อมูลต่อ Auditor ภายนอก
+- ตรวจสอบอัตราการตกเกณฑ์ของข้อมูล (Quarantine Rate) เพื่อประเมินความสอดคล้อง
+  กับข้อกำหนดมาตรฐานคุณภาพข้อมูลระดับองค์กรและกฎหมาย
+
+หมายเหตุสำคัญ: กลุ่มนี้มีนัยสำคัญเฉพาะในองค์กรที่อยู่ใน Regulated Industry เท่านั้น
+ไม่ใช่ผู้ใช้ทั่วไปในทุกประเภทองค์กร
+
+---
+
+กลุ่มที่ 4: CDO / Head of Data
+บทบาท: ผู้บริหารสายข้อมูล (Executive Sponsor - ใช้แบบ Summary View เท่านั้น)
+
+ที่มาของข้อมูล:
+ตาม Forrester (forrester.com, 2025) และ IBM CDO research (ibm.com, 2024-2025)
+CDO หรือ Head of Data คือ "ผู้ริเริ่มและอนุมัติโครงการ (Executive Sponsor)" ไม่ใช่ผู้ใช้งาน Dashboard รายวัน
+โดยโครงการ Data Observability มักถูกริเริ่มจาก 2 เส้นทาง คือ:
+(1) Top-Down: CDO ตอบสนองต่อแรงกดดันจาก AI Scaling หรือ Regulatory Mandate จากผู้ถือหุ้น
+(2) Bottom-Up: Senior Data Engineer สะสม Pipeline Incident จนเสนอขอเครื่องมือผ่านสายการบังคับบัญชา
+(อ้างอิง: Forrester.com 2025, IBM CDO research ibm.com, Monte Carlo IMPACT Summit 2025 impactdatasummit.com)
+
+ฟังก์ชันที่ใช้จริงในระบบ SDOQAP (ใช้แบบ Occasional / High-level Summary เท่านั้น):
+- ดูตัวเลขคะแนนคุณภาพภาพรวม (Global Quality Score) และ KPI สรุป
+- ตรวจสอบมูลค่าความสูญเสียทางการเงินสะสม (Cost of Poor Data Quality - COPDQ)
+  เพื่อนำไปอ้างอิงในการจัดสรรงบประมาณหรือรายงานต่อคณะกรรมการบริษัท
+- ดูกราฟพยากรณ์คุณภาพ 7 วัน (Quality Forecast) เพื่อวางแผนกลยุทธ์บริการ
+
+---
+
+4.2 กลุ่มที่ไม่ถูกรวมเป็นผู้ใช้หลัก (Excluded User Groups with Rationale)
+
+(1) Domain Data Owner ตามหลักการ Data Mesh:
+ไม่ถูกรวมเป็นกลุ่มผู้ใช้หลัก เนื่องจากตาม Practitioner surveys 2025-2026 และ Market research
+พบว่า Data Mesh Ownership ยังเป็น "แนวคิดเชิงปรัชญา" ในองค์กรส่วนใหญ่ที่ยังไม่ได้ดำเนินการจริง
+โดยเฉพาะในบริบทขององค์กรที่กำลังพัฒนาระบบข้อมูลขนาดใหญ่ระยะแรก
+(อ้างอิง: DataOps.live product pages 2024-2025, practitioner community consensus)
+Data Mesh market size: ~$1.66B (2025), แต่การนำไปปฏิบัติจริงยังจำกัดอยู่ใน
+large enterprises เช่น Netflix, Intuit, Zalando เป็นหลัก
+
+(2) AI/ML Engineer:
+ใช้ระบบทางอ้อมผ่าน FastAPI endpoint เพื่อดึงข้อมูลสะอาดจาก HDFS Active Store
+ไปป้อน Training Pipeline โดยอัตโนมัติ ไม่ใช่ผู้ใช้ Dashboard โดยตรง
+(อ้างอิง: Monte Carlo Agent Observability launch, BusinessWire August 2025)
+
+(3) Business Analyst / BI Developer:
+เป็นผู้รับประโยชน์ทางอ้อม (Indirect Beneficiary) จากข้อมูลสะอาดที่ระบบผลิตขึ้น
+ไม่ใช่ผู้ใช้ Dashboard ของ SDOQAP โดยตรง
+Dashboard ของ SDOQAP มีความเป็น Technical Tool สูงเกินไปสำหรับกลุ่มนี้
+(อ้างอิง: Gartner Market Guide for Data Observability Tools, gartner.com, 2024)
+
+---
+
+แหล่งอ้างอิงหลักในการระบุกลุ่มผู้ใช้งาน (Key References for User Group Identification):
+
+- Gartner Market Guide for Data Observability Tools: gartner.com (2024)
+- Forrester Wave: Data Quality Solutions Q1 2026: forrester.com
+- Monte Carlo customer case studies: https://www.montecarlodata.com/customers/ (2024-2025)
+- Acceldata case studies: https://www.acceldata.io/case-studies (2024-2025)
+- dbt Labs State of Analytics Engineering Survey: getdbt.com (2024)
+- LightsOnData (George Firican): https://www.lightsondata.com (2025)
+- IBM CDO research: ibm.com (2024-2025)
+- DataOps.live persona documentation: dataops.live (2024-2025)
+- BusinessWire: Monte Carlo Agent Observability launch (August 2025)
+- CNCF Observability Whitepaper: cncf.io (2024-2025)
+- Monte Carlo IMPACT Summit 2025: impactdatasummit.com

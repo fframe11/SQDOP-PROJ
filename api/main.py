@@ -59,7 +59,7 @@ def get_services_status():
         "Spark Master": {"host": "spark-master", "port": 8080, "url": "http://localhost:8081"},
         "Spark Worker": {"host": "spark-worker", "port": 8081, "url": None}
     }
-    
+
     results = {}
     futures = {name: executor.submit(check_port, info["host"], info["port"]) for name, info in services.items()}
     for name, info in services.items():
@@ -71,7 +71,7 @@ def get_services_status():
             "status": status,
             "url": info["url"]
         }
-            
+
     return results
 
 @app.get("/api/v1/kpi/stats")
@@ -123,7 +123,7 @@ def get_anomaly_sources():
     for i in range(12):
         ts = now - timedelta(minutes=(11 - i) * 10)
         timestamps.append(ts.strftime("%H:%M"))
-        
+
     def get_scores_for_table(table_name, default_val=100.0):
         if not es.indices.exists(index="sdoqap_quality_runs"):
             return [default_val] * 12
@@ -148,7 +148,7 @@ def get_anomaly_sources():
     api_scores = get_scores_for_table("users", default_val=99.0)
     db_scores = get_scores_for_table("products", default_val=99.5)
     csv_scores = get_scores_for_table("mbti", default_val=98.0)
-    
+
     anomaly_point = {
         "source": "CSV",
         "index": 8,
@@ -156,7 +156,7 @@ def get_anomaly_sources():
         "score": csv_scores[8],
         "reason": "Quality degradation detected on CSV data source."
     }
-    
+
     try:
         if es.indices.exists(index="sdoqap_schema_drifts"):
             drift_res = es.search(index="sdoqap_schema_drifts", body={"sort": [{"timestamp": "desc"}], "size": 1})
@@ -173,7 +173,7 @@ def get_anomaly_sources():
                 anomaly_point["reason"] = f"Schema Drift on '{drift['table_name']}': " + ", ".join(mismatches)
     except Exception:
         pass
-        
+
     return {
         "timestamps": timestamps,
         "api": api_scores,
@@ -205,7 +205,7 @@ def get_quality_projection():
                 denom = (n * sum_xx - sum_x * sum_x)
                 m = (n * sum_xy - sum_x * sum_y) / denom if denom != 0 else -0.5
                 c = (sum_y - m * sum_x) / n
-                
+
                 projected_scores = []
                 ci_high = []
                 ci_low = []
@@ -215,13 +215,13 @@ def get_quality_projection():
                     projected_scores.append(round(proj_val, 2))
                     ci_high.append(round(min(100.0, proj_val + 1.2 + (0.4 * day)), 2))
                     ci_low.append(round(max(0.0, proj_val - 1.5 - (0.6 * day)), 2))
-                
+
                 stability = max(5.0, min(100.0, 100.0 + (m * 80) - (abs(m) * 20)))
                 breach_prob = max(0.1, min(99.9, 1.2 if m >= -0.1 else (abs(m) * 50.0 + 10.0)))
-                
+
                 trend_desc = "Decline detected" if m < 0 else "Stable or improving trend detected"
                 trend_desc += f" in pipeline runs (slope: {m:.3f} per run)"
-                
+
                 days_until_crisis = 7
                 crisis_component = "None"
                 crisis_reason = "No quality crisis predicted in the next 7 days."
@@ -289,7 +289,7 @@ def get_diagnostic_clustering():
                     table = doc.get("table_name", "unknown")
                     count = doc.get("quarantined_records", 0)
                     reasons[f"quarantined_{table}"] = reasons.get(f"quarantined_{table}", 0) + count
-            
+
             if reasons:
                 total_errors = sum(reasons.values())
                 clusters = []
@@ -343,29 +343,59 @@ def get_business_impact():
     es = Elasticsearch(ELASTICSEARCH_URL)
     try:
         total_quarantined = 0
+        total_records = 1
         has_drift = False
         drift_table = "users"
+
         if es.indices.exists(index="sdoqap_quality_runs"):
-            res = es.search(index="sdoqap_quality_runs", body={"query": {"range": {"quarantined_records": {"gt": 0}}}, "size": 100})
+            res = es.search(index="sdoqap_quality_runs", body={"query": {"match_all": {}}, "size": 100})
             hits = res.get("hits", {}).get("hits", [])
             total_quarantined = sum(hit["_source"].get("quarantined_records", 0) for hit in hits)
+            total_records = sum(hit["_source"].get("total_records", 0) for hit in hits) or 1
+
         if es.indices.exists(index="sdoqap_schema_drifts"):
             drift_res = es.search(index="sdoqap_schema_drifts", body={"size": 1})
             if drift_res.get("hits", {}).get("hits", []):
                 has_drift = True
                 drift_table = drift_res["hits"]["hits"][0]["_source"].get("table_name", "users")
-        sales_impact = round((total_quarantined * 0.1) % 15.0, 1) or 4.5
-        sales_loss = int(total_quarantined * 5.2) or 12500
-        inventory_impact = 12.8 if has_drift else 0.0
-        inventory_loss = 38400 if has_drift else 0
-        total_loss = sales_loss + inventory_loss
-        degradation_desc = f"Sales Report accuracy impacted by {sales_impact}% due to {total_quarantined} quarantined records."
+
+        # ---------------------------------------------------------
+        # Standardized Framework: Cost of Poor Data Quality (COPDQ)
+        # Referenced by: Gartner ($12.9M avg annual cost) & IBM ($3.1 Trillion US economic cost)
+        # Formula: Total COPDQ = Cost of Correction + Cost of Lost Opportunities + Cost of Risk
+        # ---------------------------------------------------------
+
+        error_rate_pct = (total_quarantined / total_records) * 100
+
+        # 1. Cost of Correction (Operational cost to fix/re-ingest data)
+        # Industry avg: ~$2 per record in engineering/compute time
+        cost_of_correction = total_quarantined * 2
+
+        # 2. Cost of Lost Opportunities (Business revenue impact)
+        # Assume 5% of defective records would cause a lost transaction averaging $50
+        cost_of_lost_opportunities = int(total_quarantined * 0.05 * 50)
+
+        # 3. Cost of Risk (Compliance, GDPR, SLA breaches)
+        # Escalates significantly if schema drift is detected
+        risk_multiplier = 5 if has_drift else 1
+        cost_of_risk = total_quarantined * risk_multiplier
+
+        # Apportion costs to KPI Connections
+        sales_loss_usd = cost_of_lost_opportunities
+        inventory_loss_usd = cost_of_correction + cost_of_risk
+        total_loss = sales_loss_usd + inventory_loss_usd
+
+        sales_impact_pct = round(error_rate_pct * 0.8, 2)
+        inventory_impact_pct = round(15.5 if has_drift else (error_rate_pct * 0.4), 2)
+
+        degradation_desc = f"Sales Report accuracy degraded by {sales_impact_pct}%. (Framework: Gartner/IBM COPDQ - Calculated from Lost Opportunities)."
         if has_drift:
-            degradation_desc += f" Schema drift detected on table '{drift_table}' causes 12.8% inventory forecast reliability drop."
+            degradation_desc += f" Schema drift on '{drift_table}' adds severe compliance & operational risk."
+
         return {
             "kpi_connections": [
-                {"kpi_name": "Sales Report Accuracy", "status": "WARN" if sales_impact > 0 else "OK", "impact_pct": sales_impact, "monetary_loss_usd": sales_loss},
-                {"kpi_name": "Inventory Forecast Reliability", "status": "CRITICAL" if inventory_impact > 0 else "OK", "impact_pct": inventory_impact, "monetary_loss_usd": inventory_loss},
+                {"kpi_name": "Sales Report Accuracy", "status": "WARN" if sales_impact_pct < 10 else "CRITICAL", "impact_pct": sales_impact_pct, "monetary_loss_usd": sales_loss_usd},
+                {"kpi_name": "Inventory Forecast Reliability", "status": "CRITICAL" if inventory_impact_pct > 5 else "OK", "impact_pct": inventory_impact_pct, "monetary_loss_usd": inventory_loss_usd},
                 {"kpi_name": "User Recommendations CTR", "status": "OK", "impact_pct": 0.0, "monetary_loss_usd": 0}
             ],
             "total_financial_impact_usd": total_loss,
@@ -373,7 +403,8 @@ def get_business_impact():
                 {"node": "active-store", "impact": degradation_desc}
             ]
         }
-    except Exception:
+    except Exception as e:
+        print(f"Error in impact calculation: {e}")
         pass
     return {
         "kpi_connections": [
@@ -402,7 +433,7 @@ def get_actionable_recommendations():
                 table = drift.get("table_name", "unknown")
                 details = drift.get("drift_details", {})
                 mismatches = list(details.keys())
-                
+
                 if table not in seen_notify:
                     seen_notify.add(table)
                     idx = len(seen_notify)
@@ -413,7 +444,7 @@ def get_actionable_recommendations():
                         "action_type": "NOTIFY_DEV",
                         "status": "PENDING"
                     })
-                
+
                 if table not in seen_halt:
                     seen_halt.add(table)
                     idx = len(seen_halt)
@@ -522,7 +553,7 @@ def get_performance_metrics():
 def get_system_activity(limit: int = 15):
     es = Elasticsearch(ELASTICSEARCH_URL)
     events = []
-    
+
     try:
         if es.indices.exists(index="sdoqap_pipeline_runs"):
             res = es.search(index="sdoqap_pipeline_runs", query={"match_all": {}}, sort=[{"timestamp": {"order": "desc", "unmapped_type": "date"}}], size=limit)
@@ -532,7 +563,7 @@ def get_system_activity(limit: int = 15):
                 table = doc.get("table_name", "unknown")
                 run_id = doc.get("run_id", "unknown")
                 ts = doc.get("timestamp")
-                
+
                 if state == "failed":
                     msg = f"❌ Pipeline execution FAILED for table '{table}' (Run ID: {run_id}). Error: {doc.get('error_msg')}"
                 elif state == "quarantined":
@@ -541,14 +572,14 @@ def get_system_activity(limit: int = 15):
                     msg = f"✅ Pipeline execution SUCCESS for table '{table}' (Run ID: {run_id})"
                 else:
                     msg = f"⚙️ Pipeline run status '{state}' for table '{table}' (Run ID: {run_id})"
-                
+
                 events.append({
                     "timestamp": ts,
                     "level": "error" if state == "failed" else ("warning" if state in ["quarantined", "warnings"] else "info"),
                     "component": "Pipeline",
                     "message": msg
                 })
-                
+
         if es.indices.exists(index="sdoqap_quality_runs"):
             res = es.search(index="sdoqap_quality_runs", query={"match_all": {}}, sort=[{"timestamp": {"order": "desc", "unmapped_type": "date"}}], size=limit)
             for hit in res["hits"]["hits"]:
@@ -559,7 +590,7 @@ def get_system_activity(limit: int = 15):
                 quarantine = doc.get("quarantined_records", 0)
                 score = doc.get("quality_score", 0.0)
                 ts = doc.get("timestamp")
-                
+
                 msg = f"📊 Quality Audit completed for '{table}' (Run ID: {run_id}). Score: {score:.2f}%. Clean: {clean:,} | Quarantined: {quarantine:,}"
                 events.append({
                     "timestamp": ts,
@@ -567,7 +598,7 @@ def get_system_activity(limit: int = 15):
                     "component": "QualityEngine",
                     "message": msg
                 })
-                
+
         if es.indices.exists(index="sdoqap_schema_drifts"):
             res = es.search(index="sdoqap_schema_drifts", query={"match_all": {}}, sort=[{"timestamp": {"order": "desc", "unmapped_type": "date"}}], size=limit)
             for hit in res["hits"]["hits"]:
@@ -576,7 +607,7 @@ def get_system_activity(limit: int = 15):
                 run_id = doc.get("run_id")
                 details = doc.get("drift_details", {})
                 ts = doc.get("timestamp")
-                
+
                 msg = f"🚨 SCHEMA DRIFT detected in '{table}' (Run ID: {run_id}). Details: {json.dumps(details)}"
                 events.append({
                     "timestamp": ts,
@@ -584,10 +615,10 @@ def get_system_activity(limit: int = 15):
                     "component": "AuditEngine",
                     "message": msg
                 })
-                
+
         events.sort(key=lambda x: x["timestamp"], reverse=True)
         return events[:limit]
-        
+
     except Exception as e:
         return [{
             "timestamp": datetime.utcnow().isoformat(),
@@ -697,7 +728,7 @@ def read_portal():
                 color: var(--accent-red);
                 box-shadow: 0 0 10px rgba(244, 63, 94, 0.05);
             }
-            
+
             /* Service Hub status pills */
             .service-hub {
                 display: flex;
@@ -815,14 +846,14 @@ def read_portal():
                 height: 100%;
                 min-height: 0;
             }
-            
+
             /* Sizing configurations inside columns using flex scale */
             .col-left > .glass-card:nth-child(1) { flex: 4.2; }
             .col-left > .glass-card:nth-child(2) { flex: 5.8; }
-            
+
             .col-center > .glass-card:nth-child(1) { flex: 4.5; }
             .col-center > .glass-card:nth-child(2) { flex: 5.5; }
-            
+
             .col-right > .glass-card:nth-child(1) { flex: 3.2; }
             .col-right > .glass-card:nth-child(2) { flex: 3.4; }
             .col-right > .glass-card:nth-child(3) { flex: 3.4; }
@@ -1514,7 +1545,7 @@ def read_portal():
                                 <div class="card-subtitle" id="selected-run-subtitle">Detailed audit composition and records quality breakdown</div>
                             </div>
                         </div>
-                        
+
                         <!-- Schema Drift Warning Alert Banner -->
                         <div id="schema-drift-alert-container" style="display: none; margin: 0 0 10px 0; padding: 6px 10px; background: rgba(244, 63, 94, 0.08); border: 1px solid rgba(244, 63, 94, 0.3); border-radius: 8px;">
                             <div style="display: flex; gap: 8px; align-items: flex-start;">
@@ -1694,19 +1725,19 @@ def read_portal():
                                     classDef process fill:#0284c7,stroke:#38bdf8,stroke-width:2px,color:#fff;
                                     classDef passed fill:#059669,stroke:#34d399,stroke-width:2px,color:#fff;
                                     classDef failed fill:#dc2626,stroke:#f87171,stroke-width:2px,color:#fff;
-                                    
+
                                     src[Data Source] -->|Ingest| n8n[n8n Orchestrator]
                                     n8n -->|Save| hdfs_raw[HDFS Raw Store]
                                     hdfs_raw -->|Audit| spark[Spark Audit Engine]
-                                    
+
                                     spark -->|Passed| api_serving[FastAPI Serving Layer]
                                     spark -->|Failed| hdfs_quarantine[HDFS Quarantine Store]
-                                    
+
                                     class src,hdfs_raw raw;
                                     class n8n,spark process;
                                     class api_serving passed;
                                     class hdfs_quarantine failed;
-                                    
+
                                     click hdfs_raw call showLineageNodeDetail() "View Raw HDFS Path"
                                     click spark call showLineageNodeDetail() "View Spark Executor"
                                     click api_serving call showLineageNodeDetail() "View Active HDFS Path"
@@ -1750,7 +1781,7 @@ def read_portal():
                                 <button class="btn-tab" id="btn-rtab-dist" onclick="switchRightTab('dist')">Distributions</button>
                             </div>
                         </div>
-                        
+
                         <div id="right-tab-console" class="terminal-window" style="flex-grow: 1; min-height: 0; display: flex; flex-direction: column;">
                             <div class="terminal-header">
                                 <div class="terminal-controls">
@@ -1798,13 +1829,13 @@ def read_portal():
                 fetchServicesStatus();
                 fetchScorecard();
                 fetchSystemActivities();
-                
+
                 // Fetch new observability and analytics components
                 fetchKPIStats();
                 fetchAnomalySources();
                 fetchPerformanceMetrics();
                 switchBlueprintTab(0);
-                
+
                 // Interval checks for live updates
                 setInterval(fetchServicesStatus, 5000);
                 setInterval(fetchSystemActivities, 3000);
@@ -1933,11 +1964,11 @@ def read_portal():
                     .then(data => {
                         const cpuVal = data.current_cpu !== undefined && data.current_cpu !== null ? parseFloat(data.current_cpu) : 0.0;
                         document.getElementById('perf-cpu-val').innerText = isNaN(cpuVal) ? '0.0%' : cpuVal.toFixed(1) + '%';
-                        
+
                         const latencyData = data.processing_latency_seconds;
                         const lastLatency = (latencyData && latencyData.length > 0) ? latencyData[latencyData.length - 1] : 0;
                         document.getElementById('perf-latency-val').innerText = lastLatency + 's';
-                        
+
                         const options = {
                             series: [
                                 { name: 'CPU Usage (%)', data: data.cpu_usage_pct },
@@ -2011,11 +2042,11 @@ def read_portal():
                         document.getElementById('bp-projection-summary').innerText = data.historical_trend + `. Regression forecasts show the trend line.`;
                         document.getElementById('bp-metric-stability').innerText = data.stability_index || '98.4%';
                         document.getElementById('bp-metric-breach').innerText = data.sla_breach_probability || '1.2%';
-                        
+
                         const alertContainer = document.getElementById('bp-projection-alert-container');
                         const alertTitle = document.getElementById('bp-projection-alert-title');
                         const alertWarning = document.getElementById('bp-projection-warning');
-                        
+
                         if (data.crisis_forecast.severity === 'LOW' || data.crisis_forecast.impacted_component === 'None') {
                             alertContainer.style.background = 'rgba(16, 185, 129, 0.06)';
                             alertContainer.style.border = '1px solid rgba(16, 185, 129, 0.2)';
@@ -2031,7 +2062,7 @@ def read_portal():
                             alertWarning.style.color = '#fda4af';
                             alertWarning.innerText = `CRISIS IN ${data.crisis_forecast.days_until_crisis} DAYS on '${data.crisis_forecast.impacted_component}': ${data.crisis_forecast.reason}. Severity: ${data.crisis_forecast.severity}`;
                         }
-                        
+
                         const options = {
                             series: [
                                 { name: 'Forecast Quality (Median)', data: data.projected_scores },
@@ -2046,10 +2077,10 @@ def read_portal():
                                 foreColor: '#94a3b8'
                             },
                             colors: ['#fbbf24', '#34d399', '#f87171'],
-                            stroke: { 
-                                curve: 'smooth', 
-                                dashArray: [0, 5, 5], 
-                                width: [2.5, 1.2, 1.2] 
+                            stroke: {
+                                curve: 'smooth',
+                                dashArray: [0, 5, 5],
+                                width: [2.5, 1.2, 1.2]
                             },
                             grid: { borderColor: 'rgba(255,255,255,0.05)' },
                             xaxis: { categories: data.projection_days.map(d => `Day +${d}`) },
@@ -2074,7 +2105,7 @@ def read_portal():
                     .then(data => {
                         document.getElementById('bp-clustering-summary').innerText = `Diagnostic Clustering groups failure types to spot dominant root causes. Pattern analysis shows:`;
                         document.getElementById('bp-clustering-correlation').innerText = data.correlation_analysis;
-                        
+
                         const options = {
                             series: [{
                                 name: 'Error Count',
@@ -2110,14 +2141,14 @@ def read_portal():
                             },
                             colors: ['#6366f1'],
                             grid: { borderColor: 'rgba(255,255,255,0.05)' },
-                            xaxis: { 
+                            xaxis: {
                                 categories: data.clusters.map(c => `${c.source} (${c.pattern})`),
                                 labels: {
                                     show: false
                                 }
                             },
                             theme: { mode: 'dark' },
-                            tooltip: { 
+                            tooltip: {
                                 theme: 'dark',
                                 y: {
                                     formatter: function(val, opt) {
@@ -2145,13 +2176,13 @@ def read_portal():
                     .then(data => {
                         const container = document.getElementById('bp-impact-cards');
                         container.innerHTML = '';
-                        
+
                         data.kpi_connections.forEach(k => {
                             const statusClass = k.status === 'CRITICAL' ? 'crit' : (k.status === 'WARN' ? 'warn' : 'ok');
                             const badgeColor = k.status === 'CRITICAL' ? 'var(--accent-red)' : (k.status === 'WARN' ? 'var(--accent-yellow)' : 'var(--accent-green)');
                             const valDisplay = k.status === 'OK' ? '100% Nominal' : `-${k.impact_pct}% Impact`;
                             const descDisplay = k.monetary_loss_usd > 0 ? `Est. Loss: $${k.monetary_loss_usd.toLocaleString()} USD` : 'Nominal Operations';
-                            
+
                             const card = `
                                 <div class="impact-card ${statusClass}">
                                     <span class="impact-kpi">${k.kpi_name}</span>
@@ -2173,7 +2204,7 @@ def read_portal():
                     .then(data => {
                         const container = document.getElementById('bp-actionable-items');
                         container.innerHTML = '';
-                        
+
                         data.recommendations.forEach(r => {
                             const statusBadge = r.status.toLowerCase();
                             const item = `
@@ -2199,7 +2230,7 @@ def read_portal():
             function executeActionableCommand(id, title, type) {
                 const terminal = document.getElementById('terminal-body-console');
                 const logTime = new Date().toLocaleTimeString();
-                
+
                 let successMsg = '';
                 if (type === 'NOTIFY_DEV') {
                     successMsg = `[Actionable Engine] Notification sent successfully to API developers for ticket ${id}.`;
@@ -2208,13 +2239,13 @@ def read_portal():
                 } else if (type === 'RESTORE_BACKUP') {
                     successMsg = `[Actionable Engine] Database traffic successfully rerouted to replica snapshot. Sync restored.`;
                 }
-                
+
                 const logLine = document.createElement('div');
                 logLine.className = 'log-line success';
                 logLine.innerHTML = `<span class="log-time">[${logTime}]</span> ${successMsg}`;
                 terminal.appendChild(logLine);
                 terminal.scrollTop = terminal.scrollHeight;
-                
+
                 alert(`Executed Action: ${title}
 Check the Live System Activity Console for confirmation details.`);
             }
@@ -2227,14 +2258,14 @@ Check the Live System Activity Console for confirmation details.`);
                         const container = document.getElementById('service-hub-container');
                         container.innerHTML = '';
                         let hasOffline = false;
-                        
+
                         Object.keys(data).forEach(name => {
                             const info = data[name];
                             const isOnline = info.status === 'online';
                             if (!isOnline && name !== 'Kibana' && name !== 'Grafana' && name !== 'Spark Worker' && name !== 'Spark Master' && name !== 'n8n Orchestrator') {
                                 hasOffline = true; // Key services offline triggers header warning
                             }
-                            
+
                             const linkTag = info.url ? `href="${info.url}" target="_blank"` : 'style="cursor: default;"';
                             const card = `
                                 <a ${linkTag} class="service-card">
@@ -2271,7 +2302,7 @@ Check the Live System Activity Console for confirmation details.`);
                         qualityData = data;
                         renderScorecardTable(data);
                         renderAreaChart(data);
-                        
+
                         // Select first row automatically on load
                         if (data && data.length > 0) {
                             selectRunRow(data[0].run_id);
@@ -2289,7 +2320,7 @@ Check the Live System Activity Console for confirmation details.`);
             function renderScorecardTable(data) {
                 const tbody = document.getElementById('scorecard-table-body');
                 tbody.innerHTML = '';
-                
+
                 if (!data || data.length === 0) {
                     tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">No audited runs found in Elasticsearch.</td></tr>';
                     return;
@@ -2320,8 +2351,8 @@ Check the Live System Activity Console for confirmation details.`);
             // Client-side Scorecard Filtering
             function filterScorecard() {
                 const query = document.getElementById('run-search').value.toLowerCase();
-                const filtered = qualityData.filter(run => 
-                    run.run_id.toLowerCase().includes(query) || 
+                const filtered = qualityData.filter(run =>
+                    run.run_id.toLowerCase().includes(query) ||
                     run.table_name.toLowerCase().includes(query)
                 );
                 renderScorecardTable(filtered);
@@ -2367,7 +2398,7 @@ Check the Live System Activity Console for confirmation details.`);
                         const alertContainer = document.getElementById('schema-drift-alert-container');
                         const listContainer = document.getElementById('schema-drift-details-list');
                         listContainer.innerHTML = '';
-                        
+
                         const drifts = pipelineData.schema_drift_alerts;
                         if (drifts && drifts.length > 0) {
                             alertContainer.style.display = 'block';
@@ -2459,7 +2490,7 @@ Check the Live System Activity Console for confirmation details.`);
                     donutEl.style.display = 'none';
                     barEl.style.display = 'block';
                     insightsEl.style.display = 'none';
-                    
+
                     const runId = document.getElementById('stat-run-id').innerText;
                     const run = qualityData.find(r => r.run_id === runId);
                     if (run) {
@@ -2469,7 +2500,7 @@ Check the Live System Activity Console for confirmation details.`);
                     donutEl.style.display = 'none';
                     barEl.style.display = 'none';
                     insightsEl.style.display = 'block';
-                    
+
                     const runId = document.getElementById('stat-run-id').innerText;
                     const run = qualityData.find(r => r.run_id === runId);
                     if (run) {
@@ -2484,7 +2515,7 @@ Check the Live System Activity Console for confirmation details.`);
                 document.getElementById('right-tab-dist').style.display = tab === 'dist' ? 'block' : 'none';
                 document.getElementById('btn-rtab-console').className = tab === 'console' ? 'btn-tab active' : 'btn-tab';
                 document.getElementById('btn-rtab-dist').className = tab === 'dist' ? 'btn-tab active' : 'btn-tab';
-                
+
                 if (tab === 'dist') {
                     const runId = document.getElementById('stat-run-id').innerText;
                     const run = qualityData.find(r => r.run_id === runId);
@@ -2729,7 +2760,7 @@ Check the Live System Activity Console for confirmation details.`);
                     });
 
                     const pct = quarantinedRecords > 0 ? ((maxCount / quarantinedRecords) * 100).toFixed(1) : '0.0';
-                    
+
                     let diagnosis = '';
                     if (primaryReason === 'missing_text') {
                         diagnosis = 'Scraper/Crawler Failure: High volume of empty text fields. Verify source data extractor rules and HTML parsing selectors.';
@@ -2917,18 +2948,18 @@ Check the Live System Activity Console for confirmation details.`);
                     sortedKeys = sortedKeys.slice(0, 15);
                 }
                 const seriesData = sortedKeys.map(k => classBalance[k]);
-                
+
                 let chartColors = [
-                    '#6366f1', '#4f46e5', '#3b82f6', '#2563eb', '#1d4ed8', 
+                    '#6366f1', '#4f46e5', '#3b82f6', '#2563eb', '#1d4ed8',
                     '#0ea5e9', '#0284c7', '#0369a1', '#06b6d4', '#0891b2',
                     '#10b981', '#059669', '#047857', '#14b8a6', '#0d9488', '#115e59'
                 ];
                 if (schemaType === 'users') {
                     chartColors = ['#06b6d4', '#10b981', '#fbbf24', '#f43f5e'];
                 }
-                
+
                 const dynamicHeight = Math.max(180, sortedKeys.length * 30);
-                
+
                 const options = {
                     series: [{
                         name: 'Records Count',
@@ -2995,10 +3026,10 @@ Check the Live System Activity Console for confirmation details.`);
             // Render Area Line Chart showing historical Quality scores trend
             function renderAreaChart(data) {
                 if (!data || data.length === 0) return;
-                
+
                 const tables = [...new Set(data.map(run => run.table_name))];
                 const chartSeries = [];
-                
+
                 tables.forEach(table => {
                     const tableRuns = data.filter(r => r.table_name === table).reverse();
                     chartSeries.push({
@@ -3079,7 +3110,7 @@ Check the Live System Activity Console for confirmation details.`);
                     .then(data => {
                         const consoleDiv = document.getElementById('terminal-body-console');
                         let newLogsHtml = '';
-                        
+
                         data.reverse().forEach(log => {
                             const logTime = new Date(log.timestamp).toLocaleTimeString();
                             newLogsHtml += `
@@ -3088,7 +3119,7 @@ Check the Live System Activity Console for confirmation details.`);
                                 </div>
                             `;
                         });
-                        
+
                         consoleDiv.innerHTML = newLogsHtml;
                         consoleDiv.scrollTop = consoleDiv.scrollHeight;
                     })
@@ -3110,10 +3141,10 @@ Check the Live System Activity Console for confirmation details.`);
                     .then(data => {
                         const rawNode = document.getElementById('lin-node-raw');
                         if (rawNode) rawNode.textContent = data.source_table || `raw-${table}`;
-                        
+
                         const activeNode = document.getElementById('lin-node-active');
                         if (activeNode) activeNode.textContent = data.target_table || `active-${table}`;
-                        
+
                         const quarantineNode = document.getElementById('lin-node-quarantine');
                         if (quarantineNode) {
                             let qPath = data.quarantine_path || '';
@@ -3129,7 +3160,7 @@ Check the Live System Activity Console for confirmation details.`);
             // Show node-specific details dynamically (Inspector Modal)
             function showLineageNodeDetail(nodeId) {
                 const table = currentLineageTable || 'mbti';
-                
+
                 // Fetch inspection details from backend
                 fetch(`/api/v1/lineage/inspect/${table}/${nodeId}`)
                     .then(res => {
@@ -3140,7 +3171,7 @@ Check the Live System Activity Console for confirmation details.`);
                         // Title & Node metadata
                         document.getElementById('inspector-node-name').innerText = `${data.node_name} [${table.toUpperCase()}]`;
                         document.getElementById('inspector-node-path').innerText = data.path;
-                        
+
                         // Icon mapping
                         const headerIcon = document.querySelector('#inspector-title i');
                         if (headerIcon) {
@@ -3193,7 +3224,7 @@ Check the Live System Activity Console for confirmation details.`);
                         const previewBody = document.getElementById('inspector-preview-body');
                         previewHead.innerHTML = '';
                         previewBody.innerHTML = '';
-                        
+
                         if (data.sample_data && data.sample_data.length > 0) {
                             const headers = Object.keys(data.sample_data[0]);
                             let headerHtml = '<tr>';
@@ -3202,7 +3233,7 @@ Check the Live System Activity Console for confirmation details.`);
                             });
                             headerHtml += '</tr>';
                             previewHead.innerHTML = headerHtml;
-                            
+
                             data.sample_data.forEach(row => {
                                 let rowHtml = '<tr>';
                                 headers.forEach(h => {
@@ -3223,7 +3254,7 @@ Check the Live System Activity Console for confirmation details.`);
                         } else {
                             previewBody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--text-muted);">No preview records available.</td></tr>';
                         }
-                        
+
                         document.getElementById('inspector-modal').style.display = 'flex';
                     })
                     .catch(err => {
@@ -3262,7 +3293,7 @@ Check the Live System Activity Console for confirmation details.`);
                         <div id="inspector-metadata-grid" class="metadata-grid">
                             <!-- Populated dynamically -->
                         </div>
-                        
+
                         <span class="panel-subtitle" style="margin-top: 10px;"><i class="fa-solid fa-list"></i> Schema Definition</span>
                         <div class="schema-table-wrapper">
                             <table class="schema-table">
@@ -3307,7 +3338,7 @@ def health_check():
         "status": "healthy",
         "elasticsearch": "unknown"
     }
-    
+
     try:
         res = requests.get(ELASTICSEARCH_URL, timeout=5)
         if res.status_code == 200:

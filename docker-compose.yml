@@ -213,6 +213,19 @@ services:
           memory: 512M
     networks:
       - sdoqap_network
+  ui:
+    build:
+      context: ./ui
+      dockerfile: Dockerfile
+    container_name: sdoqap-ui
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - api
+    networks:
+      - sdoqap_network
+
 
 
 volumes:

@@ -17,6 +17,7 @@ airflow_logs/
 airflow_plugins/
 n8n/credentials.json
 n8n/database.sqlite
+secrets/
 
 # Large local datasets
 /*.csv
@@ -26,6 +27,12 @@ user_inputs/datasets/*
 !user_inputs/datasets/README.md
 user_inputs/apis/*
 !user_inputs/apis/README.md
+
+# Build/dependency outputs
+ui/node_modules/
+ui/dist/
+scripts/*.log
+*.log
 
 # OS files
 .DS_Store

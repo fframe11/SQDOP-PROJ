@@ -1,0 +1,32 @@
+name: CI
+on: [push, pull_request]
+
+jobs:
+  smoke-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create CI environment file
+        run: |
+          cat > .env <<'EOF'
+          ELASTICSEARCH_HOST=elasticsearch
+          ELASTICSEARCH_PORT=9200
+          SPARK_MASTER_HOST=spark-master
+          SPARK_MASTER_PORT=7077
+          KIBANA_PORT=5601
+          GRAFANA_PORT=3002
+          N8N_PORT=5678
+          API_PORT=8002
+          EOF
+
+      - name: Validate Docker Compose file
+        run: docker compose -f docker-compose.yml config
+
+      - name: Check Python syntax
+        run: |
+          python -m py_compile api/main.py api/seed_es.py spark/spark_quality_engine.py spark/streaming_job.py scripts/reddit_stream.py
+
+      - name: Check UI manifest
+        run: test -f ui/package.json && test -f ui/package-lock.json
