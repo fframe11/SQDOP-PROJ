@@ -2,6 +2,7 @@
 setlocal enabledelayedexpansion
 title SDOQAP Phased Execution Manager (16GB RAM Mode)
 cls
+cd /d "%~dp0..\.."
 
 :check_docker
 echo Checking Docker Desktop status...

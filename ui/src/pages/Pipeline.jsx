@@ -13,12 +13,12 @@ export default function Pipeline() {
     setRetryResult(null);
     try {
       const res = await postApi(`/pipeline/retry/${runId}`);
-      setRetryResult({ success: true, message: `ทำการลองรันอีกครั้งสำเร็จ (New Run ID: ${res.new_run_id || 'N/A'})` });
+      setRetryResult({ success: true, message: `Retry triggered successfully (New Run ID: ${res.new_run_id || 'N/A'})` });
       // Refresh listings
       pipeline.refetch();
       quality.refetch();
     } catch (err) {
-      setRetryResult({ success: false, message: `เกิดข้อผิดพลาดในการรันใหม่: ${err.message}` });
+      setRetryResult({ success: false, message: `Failed to trigger retry: ${err.message}` });
     } finally {
       setRetrying(prev => ({ ...prev, [runId]: false }));
     }
@@ -39,8 +39,8 @@ export default function Pipeline() {
   return (
     <div className="page-container">
       <div className="page-header">
-        <h1>🔧 Pipeline Management</h1>
-        <p>ตรวจสอบ ติดตามและจัดการการประมวลผลของ Data Pipeline ทุกขั้นตอนอย่างมีประสิทธิภาพ</p>
+        <h1>Pipeline Management</h1>
+        <p>Monitor and manage Data Pipeline Runs</p>
       </div>
 
       {retryResult && (
@@ -51,16 +51,16 @@ export default function Pipeline() {
 
       {/* Pipeline Runs Table */}
       <div className="glass-card animate-in" style={{ marginBottom: '1.5rem', overflowX: 'auto' }}>
-        <h3 className="section-title">⚡ Pipeline Runs</h3>
-        <p className="section-subtitle">ประวัติการรันและสถานะการประมวลผลข้อมูลในแต่ละรอบของ Pipeline</p>
+        <h3 className="section-title">Pipeline Runs</h3>
+        <p className="section-subtitle">Pipeline execution history and status</p>
         
         {pipeline.loading ? (
           <div className="loading-state">
             <div className="loading-spinner"></div>
-            <span>กำลังโหลดข้อมูล Pipeline Runs...</span>
+            <span>Loading Pipeline Runs...</span>
           </div>
         ) : pipeline.error ? (
-          <div className="alert-box critical">ไม่สามารถเรียกข้อมูลประวัติการทำงานของ Pipeline ได้</div>
+          <div className="alert-box critical">Failed to fetch Pipeline history</div>
         ) : (
           <table className="data-table">
             <thead>
@@ -88,7 +88,7 @@ export default function Pipeline() {
                         disabled={retrying[run.run_id]}
                         onClick={() => handleRetry(run.run_id)}
                       >
-                        {retrying[run.run_id] ? 'กำลังรัน...' : '🔄 Retry'}
+                        {retrying[run.run_id] ? 'Retrying...' : 'Retry'}
                       </button>
                     )}
                   </td>
@@ -101,16 +101,16 @@ export default function Pipeline() {
 
       {/* Quality Audit History Table */}
       <div className="glass-card animate-in" style={{ overflowX: 'auto' }}>
-        <h3 className="section-title">🛡️ Quality Audit Log</h3>
-        <p className="section-subtitle">ประวัติผลการตรวจสอบคุณภาพ ความละเอียดของข้อมูล และคะแนนความเสถียรรายครั้ง</p>
+        <h3 className="section-title">Quality Audit Log</h3>
+        <p className="section-subtitle">Quality Audit execution history and Quality Score</p>
 
         {quality.loading ? (
           <div className="loading-state">
             <div className="loading-spinner"></div>
-            <span>กำลังโหลดผลการตรวจสอบคุณภาพ...</span>
+            <span>Loading Quality Audit results...</span>
           </div>
         ) : quality.error ? (
-          <div className="alert-box critical">ไม่สามารถเรียกข้อมูลผลการตรวจสอบคุณภาพข้อมูลได้</div>
+          <div className="alert-box critical">Failed to fetch Quality Audit history</div>
         ) : (
           <table className="data-table">
             <thead>

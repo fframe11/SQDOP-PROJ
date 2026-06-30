@@ -2,6 +2,7 @@
 setlocal enabledelayedexpansion
 title SDOQAP System Cool-Down and Cleanup Utility
 cls
+cd /d "%~dp0..\.."
 
 echo =======================================================================
 echo   SDOQAP System Cool-Down and Cleanup Utility

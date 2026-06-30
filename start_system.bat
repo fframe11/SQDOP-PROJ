@@ -2,6 +2,7 @@
 setlocal enabledelayedexpansion
 title SDOQAP System Startup
 cls
+cd /d "%~dp0"
 
 echo =======================================================================
 echo   SDOQAP System Startup
@@ -127,14 +128,14 @@ echo n8n is ready.
 echo.
 
 echo [5/5] Opening platform portals...
-start http://localhost:!API_PORT!/
+start http://localhost/
 start http://localhost:!GRAFANA_PORT!/
 
 echo.
 echo =======================================================================
 echo   SDOQAP platform is running.
 echo =======================================================================
-echo   Central Portal: http://localhost:!API_PORT!/
+echo   Central Portal: http://localhost/
 echo   Grafana:        http://localhost:!GRAFANA_PORT!/  ^(admin / admin^)
 echo   n8n:            http://localhost:!N8N_PORT!/
 echo   HDFS NameNode:  http://localhost:9870/

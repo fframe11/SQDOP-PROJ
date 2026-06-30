@@ -7,40 +7,40 @@ export default function Home() {
 
   const architectureFeatures = [
     {
-      icon: "📡",
+      icon: "IN",
       color: "blue",
       title: "Data Ingestion",
-      desc: "เชื่อมต่อข้อมูลแบบ Real-time ด้วย Apache Kafka และ API Gateway รองรับ Data Sources หลากหลาย"
+      desc: "Real-time data ingestion via Kafka and API Gateway, supporting diverse Data Sources."
     },
     {
-      icon: "⚡",
+      icon: "PR",
       color: "purple",
       title: "Processing Engine",
-      desc: "ประมวลผลข้อมูลด้วย Apache Spark Master/Worker Cluster แบบกระจายศูนย์ (Distributed Engine)"
+      desc: "Distributed processing powered by Apache Spark Cluster."
     },
     {
-      icon: "💾",
+      icon: "ST",
       color: "cyan",
       title: "Storage Layer",
-      desc: "จัดเก็บข้อมูลปริมาณมากใน HDFS และ Elasticsearch เพื่อการสืบค้นและทำดัชนีที่มีประสิทธิภาพ"
+      desc: "Massive data storage in HDFS and Elasticsearch for efficient querying and indexing."
     },
     {
-      icon: "🛡️",
+      icon: "QA",
       color: "emerald",
       title: "Quality Assurance",
-      desc: "ตรวจสอบคุณภาพข้อมูลอัตโนมัติด้วย Audit Engine คัดกรองข้อมูลผิดปกติเข้าสู่ HDFS Quarantine"
+      desc: "Automated Data Quality checks with Bad Data Quarantine routing."
     },
     {
-      icon: "📊",
+      icon: "MO",
       color: "amber",
       title: "Monitoring & Alerting",
-      desc: "ติดตามสถานะระบบและความผิดปกติผ่าน Prometheus, Grafana และ Loki แบบรวมศูนย์"
+      desc: "Centralized monitoring for Metrics and Logs via Grafana Stack."
     },
     {
-      icon: "🗂️",
+      icon: "DG",
       color: "rose",
       title: "Data Governance",
-      desc: "สร้าง Data Catalog, Lineage และติดตามโครงสร้างข้อมูลผ่าน OpenMetadata"
+      desc: "Data Catalog, Lineage, and schema tracking via OpenMetadata."
     }
   ];
 
@@ -48,19 +48,19 @@ export default function Home() {
     <div className="page-container">
       {/* Hero Section */}
       <section className="hero">
-        <div className="hero-badge">⚡ Scalable Data Observability & Quality Assurance Platform</div>
+        <div className="hero-badge">Scalable Data Observability & Quality Assurance Platform</div>
         <h1>
-          ยินดีต้อนรับสู่ <span className="gradient-text">SDOQAP</span>
+          Welcome to <span className="gradient-text">SDOQAP</span>
         </h1>
         <p className="hero-subtitle">
-          นวัตกรรมแพลตฟอร์มสังเกตการณ์และรับประกันคุณภาพข้อมูลขนาดใหญ่ ออกแบบและพัฒนาเพื่อแก้ปัญหาระบบ Data Pipeline ขนาดใหญ่ที่มีความซับซ้อน ได้ในระยะเวลาจำกัดอย่างมีประสิทธิภาพสูงสุด
+          Large-scale Data Observability platform designed to monitor and guarantee data quality for complex pipelines.
         </p>
         <div className="hero-actions">
           <Link to="/dashboard" className="btn btn-primary">
-            🚀 เปิด Dashboard ระบบ
+            Open System Dashboard
           </Link>
           <Link to="/analytics" className="btn btn-secondary">
-            🔍 วิเคราะห์ข้อมูลเชิงลึก
+            Deep Analytics Insight
           </Link>
         </div>
       </section>
@@ -69,7 +69,7 @@ export default function Home() {
       <div className="stats-bar">
         <div className="home-stat-item">
           <div className="home-stat-value">3 เดือน</div>
-          <div className="home-stat-label">ระยะเวลาพัฒนา</div>
+          <div className="home-stat-label">Development Time</div>
         </div>
         <div className="home-stat-item">
           <div className="home-stat-value">18+</div>
@@ -87,15 +87,15 @@ export default function Home() {
 
       {/* Live Service Status */}
       <div className="glass-card animate-in" style={{ marginBottom: '2rem' }}>
-        <h3 className="section-title">🔌 Live Infrastructure Status</h3>
-        <p className="section-subtitle" style={{ marginBottom: '1.25rem' }}>สถานะการเชื่อมต่อบริการระบบทั้งหมดแบบ Real-time</p>
+        <h3 className="section-title">Live Infrastructure Status</h3>
+        <p className="section-subtitle" style={{ marginBottom: '1.25rem' }}>Real-time service connection health</p>
         {loading ? (
           <div className="loading-state">
             <div className="loading-spinner"></div>
-            <span>กำลังตรวจสอบสถานะการเชื่อมต่อ...</span>
+            <span>Checking service health...</span>
           </div>
         ) : error ? (
-          <div className="alert-box critical">⚠️ ไม่สามารถเชื่อมต่อกับบริการ API ตรวจสอบสถานะได้</div>
+          <div className="alert-box critical">Failed to connect to health check API service</div>
         ) : services ? (
           <div className="status-grid">
             {Object.entries(services).map(([name, info]) => (
@@ -110,8 +110,8 @@ export default function Home() {
       </div>
 
       {/* Architecture Overview */}
-      <h2 className="section-title">สถาปัตยกรรมระบบนวัตกรรม</h2>
-      <p className="section-subtitle">ภาพรวมของ Component หลักที่เชื่อมต่ออยู่ใน Data Pipeline ของเรา</p>
+      <h2 className="section-title">System Architecture</h2>
+      <p className="section-subtitle">Core Components of Our Data Pipeline</p>
       <div className="card-grid">
         {architectureFeatures.map((f, i) => (
           <div key={i} className="glass-card animate-in">

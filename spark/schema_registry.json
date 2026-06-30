@@ -24,7 +24,8 @@
             "email": "StringType",
             "role": "StringType",
             "created_at": "TimestampType",
-            "updated_at": "TimestampType"
+            "updated_at": "TimestampType",
+            "age": "StringType"
         }
     },
     "products": {
@@ -62,7 +63,7 @@
             "item_type": "StringType",
             "sales_channel": "StringType",
             "order_priority": "StringType",
-            "order_date": "StringType",
+            "order_date": "TimestampType",
             "order_id": "IntegerType",
             "ship_date": "StringType",
             "units_sold": "IntegerType",

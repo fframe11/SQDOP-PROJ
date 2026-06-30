@@ -14,7 +14,7 @@ export default function NavBar() {
   return (
     <nav className="navbar">
       <Link to="/" className="navbar-brand">
-        <span className="brand-icon">⚡</span>
+        <span className="brand-icon">S</span>
         <span>SDOQAP</span>
         <span className="brand-sub">&nbsp;Data Observability Platform</span>
       </Link>

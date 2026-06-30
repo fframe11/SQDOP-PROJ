@@ -16,6 +16,8 @@ if %errorlevel% neq 0 (
   goto wait_docker
 )
 echo Docker daemon is running.
+cd /d "%~dp0.."
+
 rem Step 1: Start the system
 call "%~dp0..\start_system.bat" >> "%LOG_FILE%" 2>&1
 if %errorlevel% neq 0 (
@@ -26,8 +28,8 @@ if %errorlevel% neq 0 (
 )
 
 rem Step 2: Run data source test (dataset & API)
-rem The test_data_source.bat script already handles prompting for dataset vs API.
-call "%~dp0..\test_data_source.bat" >> "%LOG_FILE%" 2>&1
+rem Pipeline simulated inputs: Option 1 (CSV Test), table "users", file "users_dummy.csv", Option 5 (Exit)
+(echo 1 & echo users & echo users_dummy.csv & echo 5) | call "%~dp0..\test_data_source.bat" >> "%LOG_FILE%" 2>&1
 if %errorlevel% neq 0 (
   echo [ERROR] test_data_source.bat failed with exit code %errorlevel% >> "%LOG_FILE%"
   exit /b %errorlevel%

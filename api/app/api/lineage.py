@@ -119,58 +119,43 @@ def get_node_inspection(table_name: str, node_id: str):
     except Exception:
         pass
     
-    # Define schemas
-    if table == "users":
+    # Try to fetch real schema from latest schema drift log
+    schema = []
+    try:
+        if es.indices.exists(index="sdoqap_schema_drifts"):
+            res_schema = es.search(
+                index="sdoqap_schema_drifts",
+                body={
+                    "query": {"term": {"table_name.keyword": table}},
+                    "sort": [{"timestamp": {"order": "desc"}}],
+                    "size": 1
+                }
+            )
+            hits_s = res_schema.get("hits", {}).get("hits", [])
+            if hits_s:
+                doc_s = hits_s[0]["_source"]
+                registered_schema = doc_s.get("registered_schema", {})
+                for col, type_str in registered_schema.items():
+                    schema.append({
+                        "field": col,
+                        "type": type_str,
+                        "nullable": "True",
+                        "drift_detected": False
+                    })
+    except Exception:
+        pass
+
+    if not schema:
+        # Generic fallback
         schema = [
-            {"field": "id", "type": "IntegerType", "nullable": "False", "drift_detected": False},
-            {"field": "username", "type": "StringType", "nullable": "True", "drift_detected": False},
-            {"field": "email", "type": "StringType", "nullable": "True", "drift_detected": False},
-            {"field": "role", "type": "StringType", "nullable": "True", "drift_detected": False},
-            {"field": "created_at", "type": "TimestampType", "nullable": "True", "drift_detected": False},
-            {"field": "updated_at", "type": "TimestampType", "nullable": "True", "drift_detected": False}
+            {"field": "id", "type": "StringType", "nullable": "False", "drift_detected": False},
+            {"field": "data_preview", "type": "StringType", "nullable": "True", "drift_detected": False}
         ]
-        
-        # Sample data states
-        raw_samples = [
-            {"id": "1", "username": "alice_active", "email": "alice@gmail.com", "role": "admin", "created_at": "2026-06-25 10:00:00"},
-            {"id": "2", "username": "bob_dev", "email": "bob@sdoqap.io", "role": "developer", "created_at": "2026-06-25 10:05:00"},
-            {"id": "null", "username": "corrupted_user", "email": "null_pk@gmail.com", "role": "user", "created_at": "2026-06-25 10:12:00"},
-            {"id": "4", "username": "charlie", "email": "charlie@gmail.com", "role": "user", "created_at": "2026-06-25 10:15:00"},
-            {"id": "4", "username": "charlie", "email": "charlie@gmail.com", "role": "user", "created_at": "2026-06-25 10:15:00"}
-        ]
-        active_samples = [
-            {"id": "1", "username": "alice_active", "email": "alice@gmail.com", "role": "admin", "created_at": "2026-06-25 10:00:00"},
-            {"id": "2", "username": "bob_dev", "email": "bob@sdoqap.io", "role": "developer", "created_at": "2026-06-25 10:05:00"},
-            {"id": "4", "username": "charlie", "email": "charlie@gmail.com", "role": "user", "created_at": "2026-06-25 10:15:00"}
-        ]
-        quarantine_samples = [
-            {"id": "null", "username": "corrupted_user", "email": "null_pk@gmail.com", "quarantine_reason": "Null Primary Key Constraint", "timestamp": "2026-06-25 15:37:12"},
-            {"id": "4", "username": "charlie", "email": "charlie@gmail.com", "quarantine_reason": "Duplicate Record ID Constraint", "timestamp": "2026-06-25 15:37:12"}
-        ]
-    else:  # default to mbti
-        schema = [
-            {"field": "id", "type": "IntegerType", "nullable": "False", "drift_detected": False},
-            {"field": "text", "type": "StringType", "nullable": "False", "drift_detected": False},
-            {"field": "label", "type": "StringType", "nullable": "True", "drift_detected": False}
-        ]
-        
-        # Sample data states
-        raw_samples = [
-            {"id": "1", "text": "I love writing python code and building microservices.", "label": "INTJ"},
-            {"id": "2", "text": "Meeting new people gives me so much energy!", "label": "ENFP"},
-            {"id": "3", "text": "null", "label": "ISFP"},
-            {"id": "4", "text": "I prefer organizing details and checking facts.", "label": "ISTJ"},
-            {"id": "5", "text": "Building complex architectures is really fun.", "label": "INVALID_LABEL"}
-        ]
-        active_samples = [
-            {"id": "1", "text": "I love writing python code and building microservices.", "label": "INTJ"},
-            {"id": "2", "text": "Meeting new people gives me so much energy!", "label": "ENFP"},
-            {"id": "4", "text": "I prefer organizing details and checking facts.", "label": "ISTJ"}
-        ]
-        quarantine_samples = [
-            {"id": "3", "text": "null", "label": "ISFP", "quarantine_reason": "Crawler Scraper (Missing Text Content)", "timestamp": "2026-06-26 09:20:00"},
-            {"id": "5", "text": "Building complex architectures is really fun.", "label": "INVALID_LABEL", "quarantine_reason": "Classifier Agent (Invalid MBTI Label)", "timestamp": "2026-06-26 09:20:15"}
-        ]
+
+    # No hardcoded samples for dynamic tables
+    raw_samples = []
+    active_samples = []
+    quarantine_samples = []
 
     # Scale metadata values based on actual ES total_records
     file_count = max(1, total_records // 1000) if total_records > 0 else 12
@@ -229,22 +214,12 @@ def get_node_inspection(table_name: str, node_id: str):
             idx = 1
             for reason, count in quarantine_breakdown.items():
                 reason_title = reason.replace("_", " ").title()
-                if table == "users":
-                    quarantine_samples.append({
-                        "id": "null" if "primary" in reason or "null" in reason else str(idx * 4),
-                        "username": "corrupted_user" if "primary" in reason or "null" in reason else "charlie",
-                        "email": "null_pk@gmail.com" if "primary" in reason or "null" in reason else "charlie@gmail.com",
-                        "quarantine_reason": f"{reason_title} ({count} records)",
-                        "timestamp": now_str
-                    })
-                else:  # mbti
-                    quarantine_samples.append({
-                        "id": str(idx * 3),
-                        "text": "null" if "text" in reason or "missing" in reason else "Building complex architectures is really fun.",
-                        "label": "ISFP" if "text" in reason or "missing" in reason else "INVALID_LABEL",
-                        "quarantine_reason": f"{reason_title} ({count} records)",
-                        "timestamp": now_str
-                    })
+                quarantine_samples.append({
+                    "id": f"q_record_{idx}",
+                    "data_preview": "...",
+                    "quarantine_reason": f"{reason_title} ({count} records)",
+                    "timestamp": now_str
+                })
                 idx += 1
                 
         return {

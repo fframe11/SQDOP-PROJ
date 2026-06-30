@@ -2,6 +2,7 @@
 setlocal enabledelayedexpansion
 title SDOQAP Installation & Environment Setup Tool
 cls
+cd /d "%~dp0..\.."
 
 echo =======================================================================
 echo   SDOQAP Platform Installer and Environment Setup

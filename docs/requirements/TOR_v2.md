@@ -7,48 +7,62 @@
 ## 1. หลักการและเหตุผล (Background)
 ในปัจจุบัน องค์กรขับเคลื่อนด้วยข้อมูลขนาดใหญ่ (Big Data) ที่ถูกรวบรวมมาจากแหล่งข้อมูลที่หลากหลายและมีรูปแบบแตกต่างกัน เช่น ฐานข้อมูลเชิงสัมพันธ์, REST API, และไฟล์ข้อมูลดิบ (CSV/JSON/Excel) ปัญหาสำคัญที่มักเกิดขึ้นในกระบวนการจัดการข้อมูลคือความน่าเชื่อถือของข้อมูล (Data Reliability) และความสามารถในการสังเกตการณ์ความเป็นมาของข้อมูล (Data Observability)
 
-ปรากฏการณ์ความผิดพลาดของข้อมูล อาทิ โครงสร้างข้อมูลเปลี่ยนแปลงโดยไม่แจ้งล่วงหน้า (Schema Drift), ข้อมูลสูญหายระหว่างท่อส่ง (Data Dropping), และข้อมูลซ้ำซ้อน ส่งผลกระทบโดยตรงต่อระบบประมวลผลปลายทาง รวมถึงโมเดลวิเคราะห์เชิงธุรกิจและแดชบอร์ดของผู้บริหาร โครงการนี้จึงมุ่งพัฒนาระบบกลางระดับโปรดักชัน (Production-grade Infrastructure) เพื่อทำหน้าที่รับข้อมูล ประมวลผลแบบกระจายศูนย์ ตรวจสอบคุณภาพข้อมูลในระดับแถว (Row-level Quality Validation) และสร้างระบบติดตามเส้นทางข้อมูลต้นน้ำถึงปลายน้ำ (End-to-End Data Lineage) โดยใช้สถาปัตยกรรมที่รองรับการสเกลข้อมูลปริมาณมากเพื่อแก้ปัญหาคอขวดอย่างยั่งยืน
+ปรากฏการณ์ความผิดพลาดของข้อมูล อาทิ โครงสร้างข้อมูลเปลี่ยนแปลงโดยไม่แจ้งล่วงหน้า (Schema Drift), ข้อมูลสูญหายระหว่างท่อส่ง (Data Dropping), และข้อมูลซ้ำซ้อน ส่งผลกระทบโดยตรงต่อระบบประมวลผลปลายทาง รวมถึงระบบการวิเคราะห์ข้อมูลเชิงลึกและแดชบอร์ดของผู้บริหาร โครงการนี้จึงมุ่งพัฒนาระบบกลางระดับโปรดักชัน (Production-grade Infrastructure) เพื่อทำหน้าที่รับข้อมูล ประมวลผลแบบกระจายศูนย์ ตรวจสอบคุณภาพข้อมูลในระดับแถว (Row-level Quality Validation) และสร้างระบบติดตามเส้นทางข้อมูลต้นน้ำถึงปลายน้ำ (End-to-End Data Lineage) โดยใช้สถาปัตยกรรมที่รองรับการสเกลข้อมูลปริมาณมากเพื่อแก้ปัญหาคอขวดอย่างยั่งยืน
 
 ---
 
 ## 2. วัตถุประสงค์ (Objectives)
-1. **ออกแบบและพัฒนาระบบสถาปัตยกรรมข้อมูลขนาดใหญ่ (Big Data Architecture)** ที่รองรับการประมวลผลข้อมูลระดับล้านเรคคอร์ดได้อย่างมีประสิทธิภาพ
-2. **สร้างท่อส่งข้อมูล (Data Pipeline)** ที่มีระบบตรวจสอบคุณภาพข้อมูลอัตโนมัติ (Automated Data Quality Engine) สามารถประเมินและแจ้งเตือนคะแนนความบริสุทธิ์ของข้อมูลได้ทันที
-3. **พัฒนาระบบ Data Observability** ที่สามารถติดตาม ตรวจสอบ และแสดงผลเส้นทางข้อมูล (Data Lineage) แบบเรียลไทม์ และบันทึกประวัติการเปลี่ยนแปลงโครงสร้างข้อมูล
-4. **พัฒนาระบบกักกันและกู้คืนข้อมูล (Quarantine and Autonomous Recovery)** เพื่อให้ท่อส่งข้อมูลหลักทำงานได้อย่างต่อเนื่องแม้เกิดความผิดปกติในบางสเต็ป
+1. **เพื่อออกแบบและพัฒนาระบบสถาปัตยกรรมข้อมูลขนาดใหญ่ (Big Data Architecture)** ที่รองรับการประมวลผลข้อมูลระดับล้านเรคคอร์ดได้อย่างมีประสิทธิภาพ
+2. **เพื่อสร้างท่อส่งข้อมูล (Data Pipeline)** ที่มีระบบตรวจสอบคุณภาพข้อมูลอัตโนมัติ (Automated Data Quality Engine) สามารถประเมินและแจ้งเตือนคะแนนความบริสุทธิ์ของข้อมูลได้ทันที
+3. **เพื่อพัฒนาระบบ Data Observability** ที่สามารถติดตาม ตรวจสอบ และแสดงผลเส้นทางข้อมูล (Data Lineage) แบบเรียลไทม์ และบันทึกประวัติการเปลี่ยนแปลงโครงสร้างข้อมูล (Schema Evolution)
+4. **เพื่อพัฒนาระบบกักกันและกู้คืนข้อมูล (Quarantine and Autonomous Recovery)** เพื่อให้ท่อส่งข้อมูลหลักทำงานได้อย่างต่อเนื่องแม้เกิดความผิดปกติในบางสเต็ป
 
 ---
 
 ## 3. ขอบเขตของโครงการ (Scope of Work)
-การพัฒนาระบบแบ่งออกเป็น 5 ส่วนหลัก ดังนี้:
+โครงการมีระยะเวลาดำเนินงานทั้งสิ้น 3 เดือน (12 สัปดาห์) โดยมีขอบเขตการพัฒนาระบบแบ่งออกเป็น 6 ส่วนหลัก ดังนี้:
 
 ### 3.1 การรับและจัดเก็บข้อมูล (Data Ingestion & Storage Lake)
 - พัฒนาระบบดึงข้อมูลจากแหล่งภายนอกแบบ Micro-batch และ Streaming (รองรับระบบฐานข้อมูล, REST API, และไฟล์สเปรดชีต)
-- จัดตั้งระบบคลังข้อมูลดิบ (Data Lake Storage) บน Apache Hadoop HDFS แบ่งออกเป็น 2 โซน:
-  - **Active Store:** เก็บข้อมูลสะอาดที่ผ่านการตรวจสอบคุณภาพแล้ว
-  - **Quarantine Store:** แยกข้อมูลดิบที่เสียเกณฑ์มาตรฐานออกไปกักกัน
+- จัดตั้งระบบคลังข้อมูลดิบ (Data Lake Storage) บน Apache Hadoop HDFS แบ่งออกเป็น 2 โซนหลัก:
+  - **Active Store:** เก็บข้อมูลสะอาดที่ผ่านการตรวจสอบคุณภาพและได้รับการยืนยันแล้ว
+  - **Quarantine Store:** แยกข้อมูลดิบที่เสียเกณฑ์มาตรฐานออกไปกักกันเพื่อรักษาความสมบูรณ์ของท่อน้ำดีหลัก
 
 ### 3.2 การประมวลผลและตรวจสอบคุณภาพ (Distributed Data Processing & Quality Engine)
-- พัฒนาสคริปต์ประมวลผลขนานด้วย Apache Spark เพื่อทำความสะอาดและตรวจสอบข้อมูลระดับแถว (Row-level Validation)
-- สร้างระบบตรวจสอบกฎเกณฑ์ข้อมูล 5 มิติ (Completeness, Uniqueness, Conformity, Timeliness, Accuracy) และคำนวณออกมาเป็นคะแนนคุณภาพ (Global Quality Score)
-- พัฒนาระบบตรวจจับการเปลี่ยนแปลงของโครงสร้างข้อมูล (Schema Drift Detection)
+- พัฒนาสคริปต์ประมวลผลข้อมูลขนานด้วย Apache Spark เพื่อทำ Data Extraction, Transformation, และ Loading (ETL) ข้อมูลขนาดใหญ่
+- สร้างระบบตรวจสอบกฎเกณฑ์ข้อมูล (Data Validation Rules) ตรวจสอบค่าว่าง (Null Values), ข้อมูลซ้ำซ้อน (Duplicates), รูปแบบข้อมูลไม่ตรงกำหนด (Pattern Mismatch) และการเปลี่ยนแปลงของโครงสร้างข้อมูล (Schema Drift Detection)
+- คำนวณคะแนนรวมคุณภาพข้อมูล (Data Quality Score) เป็นรายชุดข้อมูลและรายฟิลด์เพื่อบันทึกเป็น Metadata
+- พัฒนาระบบพยากรณ์แนวโน้มคุณภาพข้อมูลล่วงหน้า 7 วัน (7-Day Quality Score Projection) โดยใช้แบบจำลองวิเคราะห์การถดถอยเชิงเส้น (Linear Regression Model) ร่วมกับฟังก์ชันแกว่งคลื่นไซน์ (Sine Wave Oscillation Function) เพื่อจำลองความผันผวนตามธรรมชาติ พร้อมคำนวณช่วงความเชื่อมั่น (Confidence Interval: CI High & Low) และหาโอกาสเกิดการละเมิด SLA (SLA Breach Probability) แบบเรียลไทม์
+- พัฒนาระบบจำแนกประเภทและจัดกลุ่มข้อบกพร่องของข้อมูล (Root Cause Error Pattern Clustering) โดยวิเคราะห์สถิติน้ำหนักความถี่การขัดแยกแบบไดนามิก (Quarantine Frequency Mapping Algorithm) เพื่อระบุหาสหสัมพันธ์เชิงลึก (Correlation Analysis) ของคอขวดระบบข้อมูลต้นทาง
 
-### 3.3 ระบบการติดตามเส้นทางข้อมูล (Data Observability & Lineage Visualization)
-- จัดเก็บข้อมูลความสัมพันธ์ของท่อข้อมูล (Metadata Trace) และความเชื่อมโยงของแหล่งข้อมูลต้นทางจนถึงปลายทาง
-- พัฒนาระบบแสดงผลเส้นทางข้อมูลแบบกราฟเครือข่ายสัมพันธ์ (Network Graph) ในหน้าแดชบอร์ดหลัก
+### 3.3 ระบบการติดตามเส้นทางและสเปกข้อมูล (Data Observability & Lineage Visualization)
+- จัดเก็บข้อมูลความสัมพันธ์ของท่อข้อมูล (Metadata Trace) และสถานะการประมวลผลล่าสุด
+- พัฒนาระบบแสดงผลเส้นทางข้อมูล (End-to-End Real-time Data Lineage Map) บน Dashboard ที่อัปเดตแบบเรียลไทม์และซิงก์โดยอัตโนมัติ (Auto-sync)
+- ระบบต้องแสดงผลเส้นเชื่อมโยง (Forks and Connectors) อย่างแม่นยำ และแสดงสถานะด้วยสีแดงเด่นชัดเมื่อพบคอขวดหรือข้อมูลเสีย (Quarantined > 0) ไหลเข้าสู่ Quarantine Store
 
-### 3.4 ระบบกักกันและการกู้คืนข้อมูล (Quarantine & Recovery Loop)
-- พัฒนาระบบคัดแยกและกักเก็บระเบียนข้อมูลที่ชำรุดโดยไม่ทำให้ Pipeline หลักหยุดทำงาน
-- พัฒนาระบบสั่งประมวลผลข้อมูลใหม่ (Pipeline Retry Engine) เพื่อฟื้นฟูข้อมูลที่กู้คืนได้กลับเข้าสู่ Active Store
+### 3.4 ระบบกักกันและการกู้คืนข้อมูล (Quarantine & Recovery)
+- พัฒนาระบบคัดแยกข้อมูลที่มีปัญหา (Data Quarantine) เพื่อป้องกันไม่ให้ท่อส่งข้อมูลหลักหยุดทำงาน
+- พัฒนาระบบพยายามซ้ำสำหรับการรันข้อมูลใหม่ (Pipeline Retry Engine) เพื่อให้วิศวกรข้อมูลสามารถสั่ง Retry Ingest & Audit เพื่อกู้คืนและประมวลผลข้อมูลชุดนั้นใหม่เมื่อแก้ไขโครงสร้างแล้ว
 
-### 3.5 หน้าต่างแผงควบคุมระบบ (SDOQAP Observability Portal UI)
-- พัฒนา Frontend Dashboard (React + Vite) เพื่อติดตามสถานะ Pipeline, ความสมบูรณ์ของเครื่องประมวลผล, คะแนนคุณภาพ, และบันทึกประวัติการขัดข้องแบบเรียลไทม์
+### 3.5 การให้บริการข้อมูลและแผงควบคุมหลัก (FastAPI Backend & Custom UI Dashboard)
+- พัฒนา FastAPI ความเร็วสูงเพื่อดึงประวัติการประมวลผล ข้อมูล Anomaly การจับกลุ่มคอขวด (Error Pattern Clustering) และความสูญเสียเชิงธุรกิจ (Business Financial Impact)
+- พัฒนา UI หน้าต่างแบบเรียบหรูและตอบสนองได้ดีเยี่ยม (React + Vite + Compact Responsive Layout) ที่แสดง KPI สถิติภาพรวม, ระบบการจัดกลุ่มสถิติ, ข้อมูล Error Breakdown, และ Log Stream สดของระบบ
+
+### 3.6 ชั้นข้อมูลสรุปพร้อมใช้เชิงธุรกิจ (Gold Layer Aggregation)
+- พัฒนา Gold Layer Aggregation Engine (spark_gold_layer.py) สำหรับนำข้อมูลจากชั้น Silver (HDFS Active Store) มาสรุปและ Pre-aggregate ลงใน Elasticsearch Gold Indices ทั้ง 4 ชุด ได้แก่:
+  - `sdoqap_gold_daily_quality`: คะแนนคุณภาพสรุปรายวันต่อตาราง (avg/min/max score, quarantine_rate_pct)
+  - `sdoqap_gold_error_patterns`: รูปแบบข้อผิดพลาดที่พบบ่อย (error_type, count, percentage)
+  - `sdoqap_gold_financial_impact`: มูลค่าความเสียหายทางการเงินรายวัน (COPDQ, cumulative_cost_usd)
+  - `sdoqap_gold_schema_drift`: ประวัติการตรวจพบการเปลี่ยนแปลงโครงสร้างข้อมูล (drift_count, affected_columns)
+- ระบบ Gold Layer ช่วยให้ BI Tools และหน้าแดชบอร์ดสำหรับผู้บริหารดึงข้อมูลได้รวดเร็วขึ้น โดยไม่ต้องคำนวณซ้ำทุก Request
+- เปิดให้ทริกเกอร์การ rebuild ผ่าน POST `/api/v1/gold/rebuild` ได้ทันที
 
 ---
 
-## 4. สถาปัตยกรรมระบบ (System Architecture)
+## 4. สถาปัตยกรรมระบบ (System Architecture - Medallion Architecture)
+
 ```mermaid
-graph LR
+graph TD
     subgraph Data Sources
         API[REST API Source]
         DB[Database Source]
@@ -56,62 +70,137 @@ graph LR
     end
 
     subgraph Ingestion Layer
-        Ingest[Kafka & Custom Ingestors]
+        Ingest[Kafka Queue & Python Ingestors]
     end
 
-    subgraph Storage Lake HDFS
-        Active[Active Store - Clean Data]
-        Quar[Quarantine Store - Bad Data]
+    subgraph Bronze Layer
+        Raw[HDFS Raw Store /data/raw/]
     end
 
     subgraph Processing Engine
-        Spark[Apache Spark QA Audit Engine]
+        Spark[Spark Processing Engine: Clean/Audit/Drift]
     end
 
-    subgraph Observability & Serving
-        ES[Elasticsearch Metadata Storage]
-        FastAPI[FastAPI High-performance API]
-        UI[React Custom UI Dashboard]
+    subgraph Silver Layer
+        Active[HDFS Active Store /data/active/]
+    end
+
+    subgraph Quarantine Zone
+        Quar[HDFS Quarantine /data/quarantine/]
+    end
+
+    subgraph Gold Layer
+        Gold[Elasticsearch Gold Indices: aggregated summaries]
+    end
+
+    subgraph Observability Storage
+        ES[Elasticsearch: Logs, Traces & Quality Metadata]
+    end
+
+    subgraph Serving API
+        FastAPI[FastAPI Backend - 18+ Endpoints]
+    end
+
+    subgraph Frontend Dashboard
+        UI[React Dashboard - KPI, Lineage, Anomaly]
     end
 
     API & DB & CSV --> Ingest
-    Ingest --> Spark
-    Spark --> Active & Quar
-    Spark -- Save Metadata --> ES
-    ES --> FastAPI
+    Ingest --> Raw
+    Raw --> Spark
+    Spark --> Active
+    Spark --> Quar
+    Active --> Gold
+    Spark -- Save Logs --> ES
+    Gold & ES --> FastAPI
     FastAPI --> UI
 ```
 
 ---
 
-## 5. เทคโนโลยีที่เลือกใช้ (Technology Stack)
-- **Workflow Ingestion:** Kafka, Python Custom Ingestors
-- **Distributed Storage:** Apache Hadoop HDFS (Active / Quarantine Stores)
-- **Processing Engine:** Apache Spark (Cleansing & Auditing)
-- **Metadata Storage:** Elasticsearch (Logs, Audits & Lineage JSON)
-- **Backend API:** FastAPI (High-performance API Service)
-- **Frontend Observability UI:** React (Vite, CSS Variables, Recharts)
-- **Containerization:** Docker & Docker Compose
+## 5. คุณสมบัติทางเทคนิคของระบบ (System Requirements)
+
+### 5.1 คุณสมบัติเชิงหน้าที่ (Functional Requirements)
+- **FR-01 Automated Ingestion:** ระบบต้องดึงข้อมูลตามกำหนดเวลาโดยอัตโนมัติ และแปลงเข้าสู่ Raw Zone
+- **FR-02 Parallel Processing:** ระบบต้องใช้ Apache Spark ประมวลผลล้างและตรวจคุณภาพระดับแถวพร้อมกันอย่างเสถียร
+- **FR-03 Multi-dimensional Quality:** ระบบต้องตรวจสอบกฎข้อมูล 5 มิติ และแปลงเป็น Quality Score เก็บใน Elasticsearch
+- **FR-04 Live Observability Lineage:** ระบบต้องแสดงเส้นท่อข้อมูลไหลแบบอนิเมชันเรียลไทม์ และทำเส้นเปลี่ยนสีแดง (Danger path) ทันทีเมื่อเกิดข้อมูลตกเกณฑ์
+- **FR-05 Recovery Trigger:** ระบบต้องมีปุ่มสั่งรันและตรวจสอบข้อมูลใหม่ (Retry Ingest & Audit) เพื่อดึงข้อมูลชำรุดที่แก้ไขแล้วกลับมาทำงานต่อได้
+- **FR-06 Error Pattern Clustering & Business Impact:** ระบบต้องวิเคราะห์และจัดกลุ่มลักษณะข้อมูลชำรุดด้วย Quarantine Frequency Mapping Algorithm และพยากรณ์แนวโน้มคุณภาพข้อมูลล่วงหน้าด้วย Linear Regression ร่วมกับ Sine Wave Oscillation รวมถึงคำนวณประเมินมูลค่าความเสียหายสะสมเชิงธุรกิจแบบสากล (Attributed Cost of Poor Data Quality - COPDQ) จากการประมวลผลข้อมูลจริงแบบเรียลไทม์
+- **FR-07 Gold Layer Aggregation:** ระบบต้องสร้างชั้นข้อมูลสรุป (Gold Layer) จาก Silver Layer โดยอัตโนมัติ รวบรวมคะแนนคุณภาพรายวัน รูปแบบข้อผิดพลาด มูลค่า COPDQ สะสม และประวัติ Schema Drift เพื่อรองรับการวิเคราะห์ธุรกิจ (Business Intelligence) โดยตรงโดยไม่ต้องประมวลผลใหม่ทุกครั้ง
+
+### 5.2 คุณสมบัติที่ไม่ใช่เชิงหน้าที่ (Non-Functional Requirements)
+- **Scalability & Performance:** รองรับการประมวลผลระดับล้านแถวโดยใช้เวลาประมวลผลและตรวจคุณภาพไม่เกิน 10 นาที
+- **High Availability & Fault Tolerance:** ตัว UI Dashboard ต้องทำงานได้อย่างมีเสถียรภาพ มีกลไกป้องกันการแครชของหน้าเว็บ (Defensive data rendering) รองรับกรณีข้อมูลแหว่งหรือขาดหาย
+- **Compact UI Layout:** แผนภาพเส้นทางข้อมูลต้องจัดวางระยะห่างและขนาดกล่องพอดีกับหน้าต่าง ไม่เกิดการล้นลอยข้ามขอบ (No overflow overlap) เพื่อความง่ายในการสังเกตการณ์
 
 ---
 
-## 6. แผนการดำเนินงาน 3 เดือน (12 สัปดาห์)
-*แผนดำเนินงานกำหนดให้มีผลสัมฤทธิ์สัปดาห์ละ 1 งานหลัก เพื่อความต่อเนื่องของการติดตามความคืบหน้า:*
+## 6. แผนการดำเนินงานโครงการ 3 เดือน (Project Timeline - 12 สัปดาห์)
+- **สัปดาห์ที่ 1:** ออกแบบสถาปัตยกรรมระบบ (System Architecture Design) และรวบรวมข้อกำหนดเชิงวิศวกรรมของ SDOQAP
+- **สัปดาห์ที่ 2:** ติดตั้งระบบจัดเก็บไฟล์กระจายศูนย์ Apache Hadoop HDFS และแบ่งโซน Active และ Quarantine Stores
+- **สัปดาห์ที่ 3:** พัฒนาระบบรับข้อมูล Ingestion Core (เชื่อมโยง Kafka Queue และ Python Ingestors) จาก API และไฟล์ข้อมูลดิบ
+- **สัปดาห์ที่ 4:** ตั้งค่าคอนฟิกและทดสอบ Apache Spark Node Clusters (Master & Workers) ในสภาพแวดล้อมจำลอง
+- **สัปดาห์ที่ 5:** พัฒนา ETL Cleansing Engine ขนานด้วย Apache Spark เพื่อจัดระเบียบโครงสร้างข้อมูลให้อยู่ในสเปกมาตรฐาน
+- **สัปดาห์ที่ 6:** เขียนสคริปต์ตรวจสอบกฎเกณฑ์ข้อมูลระดับแถว (Null/Duplicate/Conformity Checks) และคำนวณ Quality Score
+- **สัปดาห์ที่ 7:** พัฒนาระบบตรวจจับ Schema Drift และคัดแยกข้อมูลที่เสียหายเข้า Quarantine Store ของ HDFS
+- **สัปดาห์ที่ 8:** ติดตั้งและวางโครงสร้าง Elasticsearch Index สำหรับการจัดเก็บ Logs, Traces และประวัติตรวจสอบคุณภาพ
+- **สัปดาห์ที่ 9:** พัฒนา FastAPI Backend Server เพื่อส่งต่อสถิติ ข้อมูลคอขวดสะสม และบริการประวัติการขัดข้องทาง Endpoint
+- **สัปดาห์ที่ 10:** พัฒนาหน้าแดชบอร์ดหลัก (React Custom UI Dashboard) แสดงสถิติ KPI, ประวัติตรวจสอบ และ Log Stream สด
+- **สัปดาห์ที่ 11:** พัฒนาระบบแผนภาพการตรวจสอบเส้นทางข้อมูลเรียลไทม์ (Real-time Lineage Map) และฟีเจอร์ตรวจจับเส้นท่อเสียสีแดงฉุกเฉิน
+- **สัปดาห์ที่ 12:** ทำการทดสอบระบบแบบบูรณาการ (End-to-End Testing), ตรวจหาและปรับแต่งหน่วยความจำ (Performance Tuning) และเตรียมส่งมอบระบบอย่างเป็นทางการ
 
-### เดือนที่ 1: วางสถาปัตยกรรมข้อมูล และระบบจัดเก็บข้อมูล (Storage & Ingestion)
-- **สัปดาห์ที่ 1:** ออกแบบสถาปัตยกรรมระบบ (System Architecture Design) และรวบรวมความต้องการเชิงระบบของ SDOQAP
-- **สัปดาห์ที่ 2:** ติดตั้งและเปิดใช้งานพื้นที่จัดเก็บไฟล์กระจายศูนย์ (Apache Hadoop HDFS) พร้อมทั้งวางโครงสร้างโฟลเดอร์ Active และ Quarantine Store
-- **สัปดาห์ที่ 3:** พัฒนาระบบรับข้อมูล Ingestion Core (เชื่อมโยง Kafka Queue และ Python Ingestors) เพื่อรับข้อมูลจาก API และ CSV เข้าสู่ Raw Zone
-- **สัปดาห์ที่ 4:** ติดตั้งและทดสอบเครื่องประมวลผลข้อมูลขนาน Apache Spark (Master & Worker Cluster Nodes) ในสภาพแวดล้อมจำลอง
+---
 
-### เดือนที่ 2: เขียนโปรแกรมล้างข้อมูล ตรวจคุณภาพ และจัดเก็บ Metadata (Spark Engine & Observability Store)
-- **สัปดาห์ที่ 5:** พัฒนาระบบทำความสะอาดข้อมูลขนาน (ETL Cleansing Engine) ด้วย Apache Spark เพื่อแปลงสเปกข้อมูลให้อยู่ในโครงสร้างมาตรฐาน
-- **สัปดาห์ที่ 6:** เขียนโปรแกรมตรวจสอบกฎเกณฑ์ข้อมูลระดับแถว (Null Check, Conformity Check, Duplicate Check) และระบบประเมิน Quality Score
-- **สัปดาห์ที่ 7:** เขียนโปรแกรมตรวจจับการเปลี่ยนแปลงโครงสร้างข้อมูล (Schema Drift Detection) และคัดแยกข้อมูลเสียเข้าจุดกักกัน (Quarantine Store)
-- **สัปดาห์ที่ 8:** ออกแบบดัชนี (Index Mapping) และติดตั้งระบบฐานข้อมูลความสัมพันธ์/Observability Store (Elasticsearch) เพื่อบันทึกประวัติการประมวลผล
+## 7. ตัวชี้วัดความสำเร็จ (Key Performance Indicators: KPIs)
+- **KPI-01:** MTTD (Mean Time to Detection) ระบบตรวจพบข้อผิดพลาดของท่อและสเปกข้อมูลต่ำกว่า 5 นาที
+- **KPI-02:** Lineage Accuracy ระบบแสดงเส้นทิศทางและตำแหน่งข้อมูลเสียหายย้อนกลับหาต้นตอตารางได้ถูกต้องไม่ต่ำกว่า 95%
+- **KPI-03:** Zero-Crash Frontend อัตราความล้มเหลวหน้าเว็บแอปพลิเคชันค้างขาวในสภาพข้อมูลไม่สมบูรณ์เป็น 0%
+- **KPI-04:** Scalability Benchmark ระบบประมวลผล Spark และ HDFS รองรับปริมาณข้อมูลสะสมโดยไม่มีปัญหา Out of Memory
 
-### เดือนที่ 3: พัฒนาระบบเบื้องหลัง หน้าต่างแดชบอร์ด และแผนผัง Lineage (Backend API, React UI & Testing)
-- **สัปดาห์ที่ 9:** พัฒนาระบบเบื้องหลัง (FastAPI Backend API) เพื่อสืบค้นข้อมูล Metadata, สถานะ Service, ข้อมูลสถิติ KPI และประวัติ Log ล่าสุด
-- **สัปดาห์ที่ 10:** พัฒนาระบบหน้าต่างแผงควบคุมหลัก (React Custom UI) แสดงผลสถานะระบบ, สถิติ KPI และประวัติประมวลผล
-- **สัปดาห์ที่ 11:** พัฒนาระบบแผนผังตรวจสอบทิศทางข้อมูลแบบเรียลไทม์ (End-to-End Real-time Data Lineage Map) พร้อมระบบแจ้งเตือนเส้นทางสีแดง (Danger path) เมื่อเกิดข้อมูลเสีย
-- **สัปดาห์ที่ 12:** ทำการทดสอบระบบแบบบูรณาการ (End-to-End Integration Test), ปรับแต่งทรัพยากร Spark/ES (Performance Tuning) และส่งมอบระบบอย่างเป็นทางการ
+---
+
+## 8. เทคโนโลยีที่เลือกใช้ (Technology Stack)
+- **Workflow Ingestion:** Kafka Queue & Python Ingestors
+- **Distributed Storage:** Apache Hadoop HDFS
+- **Processing Engine:** Apache Spark
+- **Metadata & Logs:** Elasticsearch
+- **Backend API:** FastAPI
+- **Frontend UI Portal:** React (Vite & CSS Variables & Recharts)
+- **Environment Setup:** Docker & Docker Compose
+- **Gold Layer Engine:** `spark_gold_layer.py` (Python + requests — รัน inside Spark container)
+- **Gold Layer Storage:** Elasticsearch Gold Indices (4 indices: `daily_quality`, `error_patterns`, `financial_impact`, `schema_drift`)
+- **Gold Layer API:** FastAPI `/api/v1/gold/*` (5 endpoints)
+
+---
+
+## 9. ความเป็นนวัตกรรมของระบบตามกรอบแนวคิดวิศวกรรมข้อมูล (Innovation Assessment)
+
+### 9.1 การประเมินตาม Medallion Architecture (Databricks Standard)
+ระบบ SDOQAP ใช้ Medallion Architecture ครบ 4 ชั้น:
+- **Bronze Layer:** HDFS `/data/raw/` — เก็บข้อมูลดิบไม่แตะต้อง
+- **Silver Layer:** HDFS `/data/active/` — ผ่านการล้างและตรวจสอบคุณภาพโดย Spark
+- **Quarantine Zone:** HDFS `/data/quarantine/` — ชั้นพิเศษที่เกินกว่ามาตรฐาน Medallion ปกติ (นวัตกรรม)
+- **Gold Layer:** Elasticsearch `sdoqap_gold_*` — ข้อมูลสรุปพร้อมใช้เชิงธุรกิจ
+
+### 9.2 การประเมินตาม Data Observability 5 เสาหลัก (Monte Carlo Framework)
+ระบบ SDOQAP ครอบคลุมครบทั้ง 5 เสาหลัก:
+- **Freshness:** บันทึก `freshness_lag_hours` ทุก pipeline run
+- **Volume:** บันทึก `total_records`, `clean_records` ทุก run เพื่อเปรียบเทียบ
+- **Schema:** ตรวจจับ Schema Drift ระดับ column และ type mismatch อัตโนมัติ
+- **Lineage:** แสดง End-to-End Data Lineage Map แบบ Real-time พร้อม Color Alert
+- **Distribution:** วิเคราะห์ Class Balance และ Cardinality Detection อัตโนมัติ
+
+### 9.3 การประเมินตาม DataOps Principles (DataKitchen DataOps Manifesto)
+- **Automated Quality Gate:** Quarantine บล็อกข้อมูลเสียก่อนเข้า Silver Layer
+- **Closed-loop Recovery:** Retry Ingest & Audit วนกลับโดยไม่ต้องแทรกแซงระบบ
+- **Proactive Detection:** Quality Forecast 7 วัน ด้วย Linear Regression + Sine Wave
+- **Financial Accountability:** COPDQ (Cost of Poor Data Quality) คำนวณเป็นมูลค่าจริง
+- **Pre-aggregated Reporting:** Gold Layer ลด Query latency สำหรับ Business dashboards
+
+### 9.4 ระดับวุฒิภาวะของระบบ (Data Engineering Maturity Level)
+ระบบ SDOQAP อยู่ในระดับ Level 4: Full Data Observability Platform ซึ่งเกินกว่า ETL ธรรมดา (Level 1-2) และ Data Quality Validation (Level 3) อย่างชัดเจน
+(รวมถึงมีระบบ Push Alerting ผ่าน n8n และ Auto Schema Evolution ที่พัฒนาสำเร็จแล้ว)
+ระบบพร้อมขยายต่อสู่ Level 5 (Autonomous DataOps) ด้วยการเพิ่ม:
+- Data Catalog (OpenMetadata/Apache Atlas)
+- Real-time Streaming Quality Validation (Spark Structured Streaming)

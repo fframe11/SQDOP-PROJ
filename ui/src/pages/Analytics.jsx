@@ -35,20 +35,20 @@ export default function Analytics() {
   return (
     <div className="page-container">
       <div className="page-header">
-        <h1>📊 Analytics</h1>
-        <p>การวิเคราะห์ข้อมูลความสมบูรณ์ ทฤษฎีความน่าจะเป็น และผลกระทบต่อ KPI เชิงธุรกิจด้วย AI</p>
+        <h1>Analytics</h1>
+        <p>Data Quality Analysis, Prediction & Business Impact</p>
       </div>
 
       {/* Quality Projection */}
       <div className="chart-container animate-in" style={{ marginBottom: '1.5rem' }}>
-        <h3 className="chart-title">🔮 Data Quality Forecasting (7 Days Projection)</h3>
+        <h3 className="chart-title">7-Day Quality Forecast</h3>
         {projection.loading ? (
           <div className="loading-state">
             <div className="loading-spinner"></div>
-            <span>กำลังรันโมเดลทำนายล่วงหน้า...</span>
+            <span>Running predictive model...</span>
           </div>
         ) : projection.error ? (
-          <div className="alert-box critical">ไม่สามารถประมวลผลข้อมูลโมเดลทำนายได้</div>
+          <div className="alert-box critical">Failed to process predictive model data</div>
         ) : projection.data ? (
           <>
             <div style={{ width: '100%', height: 260 }}>
@@ -76,22 +76,22 @@ export default function Analytics() {
             <div className="stats-bar" style={{ margin: '1rem 0 0 0' }}>
               <div className="stat-item">
                 <div className="stat-value" style={{ color: '#10b981' }}>{projection.data.stability_index}</div>
-                <div className="stat-label">ดัชนีความเสถียร (Stability Index)</div>
+                <div className="stat-label">Data Stability Index</div>
               </div>
               <div className="stat-item">
                 <div className="stat-value" style={{ color: '#f43f5e' }}>{projection.data.sla_breach_probability}</div>
-                <div className="stat-label">โอกาสละเมิด SLA คุณภาพข้อมูล</div>
+                <div className="stat-label">SLA Breach Probability</div>
               </div>
             </div>
 
             <p style={{ marginTop: '0.75rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-              📌 <strong>เทรนด์ประวัติย้อนหลัง:</strong> {projection.data.historical_trend}
+              <strong>Historical Trend:</strong> {projection.data.historical_trend}
             </p>
 
             {projection.data.crisis_forecast && projection.data.crisis_forecast.severity !== 'LOW' && (
               <div className={`alert-box ${projection.data.crisis_forecast.severity === 'CRITICAL' ? 'critical' : 'warning'}`} style={{ marginTop: '1rem' }}>
                 <span>
-                  🚨 <strong>การแจ้งเตือนวิกฤตคุณภาพข้อมูลล่วงหน้า ({projection.data.crisis_forecast.severity}):</strong> ระบบคาดการณ์ว่าคุณภาพจะตกต่ำลงต่ำกว่าเกณฑ์ 90% ภายใน <strong>{projection.data.crisis_forecast.days_until_crisis} วัน</strong> ในส่วนประกอบ <em>{projection.data.crisis_forecast.impacted_component}</em> เนื่องจาก: {projection.data.crisis_forecast.reason}
+                  <strong>Predictive Alert ({projection.data.crisis_forecast.severity}):</strong> System predicts quality will drop below 90% in <strong>{projection.data.crisis_forecast.days_until_crisis} days</strong> on <em>{projection.data.crisis_forecast.impacted_component}</em>. Reason: {projection.data.crisis_forecast.reason}
                 </span>
               </div>
             )}
@@ -103,15 +103,15 @@ export default function Analytics() {
         
         {/* Error Pattern Clustering */}
         <div className="glass-card animate-in">
-          <h3 className="section-title">📊 Error Pattern Clustering</h3>
-          <p className="section-subtitle">วิเคราะห์การจับกลุ่มของโครงสร้างข้อผิดพลาดที่เกิดขึ้นใน Pipeline</p>
+          <h3 className="section-title">Error Pattern Clustering</h3>
+          <p className="section-subtitle">Frequent Pipeline Error Patterns</p>
           {clustering.loading ? (
             <div className="loading-state">
               <div className="loading-spinner"></div>
-              <span>กำลังประมวลผลการจัดกลุ่มความผิดพลาด...</span>
+              <span>Clustering errors...</span>
             </div>
           ) : clustering.error ? (
-            <div className="alert-box critical">ไม่สามารถประมวลผลการจัดกลุ่มได้</div>
+            <div className="alert-box critical">Failed to cluster errors</div>
           ) : clusteringData.length > 0 ? (
             <>
               <div style={{ width: '100%', height: 200 }}>
@@ -134,13 +134,13 @@ export default function Analytics() {
                 {clustering.data.clusters.map((c, i) => (
                   <div key={i} style={{ fontSize: '0.78rem', marginBottom: '0.5rem', display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.04)', paddingBottom: '0.25rem' }}>
                     <span style={{ color: clusterColors[i % clusterColors.length] }}>● <strong>{c.source}</strong>: {c.pattern}</span>
-                    <span style={{ color: 'var(--text-secondary)' }}>{c.errors_count.toLocaleString()} รายการ ({c.percentage}%)</span>
+                    <span style={{ color: 'var(--text-secondary)' }}>{c.errors_count.toLocaleString()} events ({c.percentage}%)</span>
                   </div>
                 ))}
               </div>
 
               <div className="alert-box info" style={{ marginTop: '1rem', fontSize: '0.75rem' }}>
-                💡 <strong>บทวิเคราะห์ความสัมพันธ์ (Correlation):</strong> {clustering.data.correlation_analysis}
+                <strong>Correlation Analysis:</strong> {clustering.data.correlation_analysis}
               </div>
             </>
           ) : null}
@@ -148,15 +148,15 @@ export default function Analytics() {
 
         {/* Business KPI Impact */}
         <div className="glass-card animate-in">
-          <h3 className="section-title">💼 Business KPI Impact Analysis</h3>
-          <p className="section-subtitle">ความเสียหายและผลกระทบของปัญหาข้อมูลเสียต่อชี้วัดทางธุรกิจหลัก</p>
+          <h3 className="section-title">Business KPI Impact Analysis</h3>
+          <p className="section-subtitle">Business KPI Impact Assessment</p>
           {impact.loading ? (
             <div className="loading-state">
               <div className="loading-spinner"></div>
-              <span>กำลังประเมินผลกระทบทางธุรกิจ...</span>
+              <span>Assessing business impact...</span>
             </div>
           ) : impact.error ? (
-            <div className="alert-box critical">ไม่สามารถประเมินผลกระทบได้</div>
+            <div className="alert-box critical">Failed to assess business impact</div>
           ) : impact.data ? (
             <>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
@@ -171,7 +171,7 @@ export default function Analytics() {
                       <div>
                         <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>{kpi.kpi_name}</div>
                         <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>
-                          ผลกระทบ: {kpi.impact_pct}% | ประเมินความเสียหาย: <span style={{ color: kpi.monetary_loss_usd > 0 ? 'var(--accent-rose)' : 'inherit' }}>${kpi.monetary_loss_usd.toLocaleString()}</span>
+                          Impact: {kpi.impact_pct}% | Estimated Loss: <span style={{ color: kpi.monetary_loss_usd > 0 ? 'var(--accent-rose)' : 'inherit' }}>${kpi.monetary_loss_usd.toLocaleString()}</span>
                         </div>
                       </div>
                       <span className={`badge ${badgeMap[kpi.status]}`}>{kpi.status}</span>
@@ -181,7 +181,7 @@ export default function Analytics() {
               </div>
 
               <div style={{ marginTop: '1rem', padding: '1rem', background: 'rgba(244,63,94,0.06)', borderRadius: '8px', border: '1px solid rgba(244,63,94,0.15)', textAlign: 'center' }}>
-                <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>ประมาณการความเสียหายทางการเงินทั้งหมดล่วงหน้า:</span>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Total Estimated Financial Impact:</span>
                 <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--accent-rose)', fontFamily: 'var(--font-mono)', marginTop: '0.25rem' }}>
                   ${impact.data.total_financial_impact_usd.toLocaleString()} USD
                 </div>
@@ -189,10 +189,10 @@ export default function Analytics() {
 
               {impact.data.active_lineage_degradations && impact.data.active_lineage_degradations.length > 0 && (
                 <div style={{ marginTop: '1rem' }}>
-                  <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.35rem' }}>ผลกระทบเชิง Data Lineage:</div>
+                  <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.35rem' }}>Data Lineage Impact:</div>
                   {impact.data.active_lineage_degradations.map((deg, i) => (
                     <div key={i} style={{ fontSize: '0.72rem', color: 'var(--accent-amber)', background: 'rgba(245,158,11,0.05)', padding: '0.4rem', borderRadius: '4px', marginBottom: '0.25rem' }}>
-                      ⚠️ <strong>{deg.node}:</strong> {deg.impact}
+                      <strong>{deg.node}:</strong> {deg.impact}
                     </div>
                   ))}
                 </div>
@@ -205,15 +205,15 @@ export default function Analytics() {
 
       {/* AI Recommendations */}
       <div className="glass-card animate-in" style={{ marginTop: '1.5rem' }}>
-        <h3 className="section-title">🤖 AI Automated Decision Recommendations</h3>
-        <p className="section-subtitle">คำแนะนำการดำเนินการแก้ไขปัญหาข้อมูลอัตโนมัติสร้างจาก Machine Learning</p>
+        <h3 className="section-title">AI-Driven Actionable Recommendations</h3>
+        <p className="section-subtitle">AI Recommendations</p>
         {recommendations.loading ? (
           <div className="loading-state">
             <div className="loading-spinner"></div>
-            <span>กำลังประมวลผลคำแนะนำ...</span>
+            <span>Generating recommendations...</span>
           </div>
         ) : recommendations.error ? (
-          <div className="alert-box critical">ไม่สามารถประมวลผลคำแนะนำได้</div>
+          <div className="alert-box critical">Failed to generate recommendations</div>
         ) : recommendations.data ? (
           <div className="rec-grid">
             {recommendations.data.recommendations.map((rec) => {
@@ -236,7 +236,7 @@ export default function Analytics() {
                   <h4 className="rec-title">{rec.title}</h4>
                   <p className="rec-desc">{rec.description}</p>
                   <div style={{ marginTop: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>สถานะการแนะนำ:</span>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Status:</span>
                     <span className={`badge ${statusColorMap[rec.status] || 'badge-muted'}`}>{rec.status}</span>
                   </div>
                 </div>

@@ -19,7 +19,7 @@ export default function Dashboard() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSourceFilter, setSelectedSourceFilter] = useState('All');
   const [selectedRun, setSelectedRun] = useState(null);
-  
+
   const [leftTab, setLeftTab] = useState('Ratio'); // Ratio, Quarantine, Insights
   const [centerTab, setCenterTab] = useState('Trends'); // Trends, RootCause, Impact, Actionable
 
@@ -33,13 +33,13 @@ export default function Dashboard() {
   // 3. PowerBI Style CSV Export Utility
   const handleExportCSV = (jsonData, filename) => {
     if (!jsonData || !jsonData.length) {
-      alert("ไม่มีข้อมูลสำหรับการดาวน์โหลด");
+      alert("No data available to export");
       return;
     }
     const headers = Object.keys(jsonData[0]);
     const csvContent = [
       headers.join(','),
-      ...jsonData.map(row => 
+      ...jsonData.map(row =>
         headers.map(field => {
           let val = row[field];
           if (val === null || val === undefined) val = '';
@@ -63,31 +63,44 @@ export default function Dashboard() {
     document.body.removeChild(link);
   };
 
-  // 4. Interactive Filters logic
+  // 4. Dynamic unique tables for filter dropdown
+  const availableTables = useMemo(() => {
+    if (!qualityHistory.data || !Array.isArray(qualityHistory.data)) return [];
+    const tables = qualityHistory.data.map(run => run.table_name).filter(Boolean);
+    return Array.from(new Set(tables)).sort();
+  }, [qualityHistory.data]);
+
+  // 5. Interactive Filters logic
   const filteredRuns = useMemo(() => {
     if (!qualityHistory.data || !Array.isArray(qualityHistory.data)) return [];
     return qualityHistory.data.filter(run => {
-      const matchSearch = 
+      const matchSearch =
         (run.run_id || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (run.table_name || '').toLowerCase().includes(searchTerm.toLowerCase());
-      
-      const matchSource = 
-        selectedSourceFilter === 'All' || 
+
+      const matchSource =
+        selectedSourceFilter === 'All' ||
         (run.table_name || '').toLowerCase() === selectedSourceFilter.toLowerCase();
-      
+
       return matchSearch && matchSource;
     });
   }, [qualityHistory.data, searchTerm, selectedSourceFilter]);
 
   // 5. Data transformers for Recharts area visualization
+  const seriesKeys = useMemo(() => {
+    if (!anomaly.data || !anomaly.data.series) return [];
+    return Object.keys(anomaly.data.series);
+  }, [anomaly.data]);
+
   const qualityTrendData = useMemo(() => {
-    if (!anomaly.data || !anomaly.data.timestamps) return [];
-    return anomaly.data.timestamps.map((ts, i) => ({
-      time: ts,
-      API: anomaly.data.api ? anomaly.data.api[i] : 100,
-      Database: anomaly.data.database ? anomaly.data.database[i] : 100,
-      CSV: anomaly.data.csv ? anomaly.data.csv[i] : 100,
-    }));
+    if (!anomaly.data || !anomaly.data.timestamps || !anomaly.data.series) return [];
+    return anomaly.data.timestamps.map((ts, i) => {
+      let pt = { time: ts };
+      Object.keys(anomaly.data.series).forEach(k => {
+         pt[k] = anomaly.data.series[k][i];
+      });
+      return pt;
+    });
   }, [anomaly.data]);
 
   const forecastData = useMemo(() => {
@@ -107,12 +120,12 @@ export default function Dashboard() {
     setRetrying(true);
     try {
       await postApi(`/pipeline/retry/${runId}`);
-      alert("🔄 คัดลอกและเริ่มประมวลผลท่อข้อมูลใหม่อีกครั้งสำเร็จ!");
+      alert("Pipeline retry triggered successfully.");
       qualityHistory.refetch();
       kpi.refetch();
       activity.refetch();
     } catch (err) {
-      alert("❌ เกิดความล้มเหลวในการส่งข้อมูลเข้าระบบใหม่: " + err.message);
+      alert("Failed to trigger pipeline retry: " + err.message);
     } finally {
       setRetrying(false);
     }
@@ -130,9 +143,9 @@ export default function Dashboard() {
       <header className="sdoqap-header">
         <div className="logo-area">
           <h1>SDOQAP Observability Portal</h1>
-          <p>ระบบสังเกตการณ์คุณภาพและความถูกต้องของข้อมูลขนาดใหญ่แบบรวมศูนย์</p>
+          <p>Centralized Data Observability & QA Platform</p>
         </div>
-        
+
         {/* Service Hub Connection Pills */}
         <div className="service-hub">
           {services.data ? (
@@ -143,9 +156,9 @@ export default function Dashboard() {
               </div>
             ))
           ) : (
-            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>กำลังตรวจวัดสถานะบริการระบบ...</span>
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Checking service health...</span>
           )}
-          
+
           <div className={`overall-status ${services.error ? 'offline' : ''}`}>
             <span className={`status-dot ${services.error ? 'offline' : 'online'}`} />
             <span>{services.error ? 'SYSTEM CONNECTION LOST' : 'System Connection Active'}</span>
@@ -162,7 +175,7 @@ export default function Dashboard() {
             </span>
             <span className="kpi-label">TOTAL RECORDS INGESTED</span>
           </div>
-          <span className="kpi-icon">📊</span>
+          <span className="kpi-icon">Bar</span>
         </div>
         <div className="kpi-card quality-kpi animate-in">
           <div className="kpi-card-left">
@@ -171,7 +184,7 @@ export default function Dashboard() {
             </span>
             <span className="kpi-label">GLOBAL QUALITY SCORE</span>
           </div>
-          <span className="kpi-icon">🛡️</span>
+          <span className="kpi-icon">Shld</span>
         </div>
         <div className="kpi-card quarantine-kpi animate-in">
           <div className="kpi-card-left">
@@ -180,7 +193,7 @@ export default function Dashboard() {
             </span>
             <span className="kpi-label">QUARANTINED RECORDS</span>
           </div>
-          <span className="kpi-icon">⚠️</span>
+          <span className="kpi-icon">Warn</span>
         </div>
         <div className="kpi-card amber animate-in">
           <div className="kpi-card-left">
@@ -189,51 +202,50 @@ export default function Dashboard() {
             </span>
             <span className="kpi-label">MTTD (MEAN TIME TO DETECT)</span>
           </div>
-          <span className="kpi-icon">⏱️</span>
+          <span className="kpi-icon">Time</span>
         </div>
       </div>
 
       {/* 3. Main Analytical Grid */}
       <div className="main-grid">
-        
+
         {/* ================= COLUMN LEFT ================= */}
         <div className="col-left">
-          
+
           {/* Card 1: Scorecard History */}
           <div className="glass-card animate-in">
             <div className="card-header">
               <div>
-                <h3 className="card-title"><span className="icon">📋</span> Scorecard History</h3>
-                <p className="card-subtitle">ประวัติการรันและคัดกรองข้อมูลจาก Elasticsearch</p>
+                <h3 className="card-title"><span className="icon">List</span> Scorecard History</h3>
+                <p className="card-subtitle">Pipeline Run History & QA Results</p>
               </div>
-              
+
               <div className="powerbi-actions">
-                <select 
+                <select
                   className="filter-select"
                   value={selectedSourceFilter}
                   onChange={(e) => setSelectedSourceFilter(e.target.value)}
                 >
-                  <option value="All">ทุกแหล่งข้อมูล</option>
-                  <option value="users">users (API)</option>
-                  <option value="products">products (DB)</option>
-                  <option value="mbti">mbti (CSV)</option>
-                  <option value="sales_records">sales (CSV)</option>
+                  <option value="All">All Sources</option>
+                  {availableTables.map(table => (
+                    <option key={table} value={table}>{table}</option>
+                  ))}
                 </select>
-                <button 
-                  className="btn-export" 
+                <button
+                  className="btn-export"
                   onClick={() => handleExportCSV(filteredRuns, "SDOQAP_Pipeline_Runs")}
-                  title="Export to CSV สำหรับนำไปประมวลผลต่อใน Excel / Pandas"
+                  title="Export to CSV"
                 >
-                  📥 Export
+                  Export
                 </button>
               </div>
             </div>
 
             <div className="search-container">
-              <span className="search-icon">🔍</span>
-              <input 
-                type="text" 
-                placeholder="พิมพ์ค้นหา ID หรือตารางประมวลผลข้อมูล..." 
+              <span className="search-icon">Srch</span>
+              <input
+                type="text"
+                placeholder="Search by ID or Table..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
@@ -241,9 +253,9 @@ export default function Dashboard() {
 
             <div className="table-wrapper">
               {qualityHistory.loading ? (
-                <div className="loading-state"><span>กำลังดึงข้อมูลประวัติ...</span></div>
+                <div className="loading-state"><span>Fetching history...</span></div>
               ) : filteredRuns.length === 0 ? (
-                <div className="loading-state" style={{ color: 'var(--text-muted)' }}>ไม่พบข้อมูลประวัติการตรวจสอบ</div>
+                <div className="loading-state" style={{ color: 'var(--text-muted)' }}>No run history found</div>
               ) : (
                 <table>
                   <thead>
@@ -257,8 +269,8 @@ export default function Dashboard() {
                   </thead>
                   <tbody>
                     {filteredRuns.map((run) => (
-                      <tr 
-                        key={run.run_id} 
+                      <tr
+                        key={run.run_id}
                         className={`clickable-row ${selectedRun && selectedRun.run_id === run.run_id ? 'selected' : ''}`}
                         onClick={() => setSelectedRun(run)}
                       >
@@ -281,8 +293,8 @@ export default function Dashboard() {
           <div className="glass-card animate-in">
             <div className="card-header">
               <div>
-                <h3 className="card-title"><span className="icon">🎯</span> Selected Run Analysis</h3>
-                <p className="card-subtitle">ข้อมูลวิเคราะห์เชิงลึกและอัตราการกักกันข้อมูล</p>
+                <h3 className="card-title"><span className="icon">Trgt</span> Selected Run Analysis</h3>
+                <p className="card-subtitle">Data Filtering Details (Clean vs Quarantined)</p>
               </div>
               <div className="tab-btn-group">
                 <button className={`btn-tab ${leftTab === 'Ratio' ? 'active' : ''}`} onClick={() => setLeftTab('Ratio')}>Ratio</button>
@@ -297,7 +309,7 @@ export default function Dashboard() {
                   <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' }}>
                     Dataset: <strong>{selectedRun.table_name}</strong> | ID: <strong>{selectedRun.run_id}</strong>
                   </div>
-                  
+
                   {leftTab === 'Ratio' && (
                     <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '4px' }}>
@@ -309,9 +321,9 @@ export default function Dashboard() {
                         <div style={{ width: `${(selectedRun.quarantined_records / selectedRun.total_records) * 100}%`, backgroundColor: 'var(--accent-red)' }} />
                       </div>
                       <div className="stat-card" style={{ marginTop: '12px' }}>
-                        <span className="stat-label">สถานะการคัดกรองข้อมูล</span>
+                        <span className="stat-label">QA Status</span>
                         <span className={`quality-badge ${getQualityBadgeClass(selectedRun.quality_score)}`} style={{ textAlign: 'center', marginTop: '4px' }}>
-                          {selectedRun.quality_score >= 95 ? '🟢 HEALTHY PIPELINE' : selectedRun.quality_score >= 85 ? '🟡 WARNING DRIFT' : '🔴 CRITICAL ANOMALY'}
+                          {selectedRun.quality_score >= 95 ? 'HEALTHY PIPELINE' : selectedRun.quality_score >= 85 ? 'WARNING DRIFT' : 'CRITICAL ANOMALY'}
                         </span>
                       </div>
                     </div>
@@ -319,16 +331,16 @@ export default function Dashboard() {
 
                   {leftTab === 'Quarantine' && (
                     <div style={{ flexGrow: 1, overflowY: 'auto' }}>
-                      <div style={{ fontSize: '11px', fontWeight: 'bold', marginBottom: '6px', color: 'var(--accent-red)' }}>สาเหตุการคัดกรองข้อมูลผิดกฎเข้า Quarantine:</div>
+                      <div style={{ fontSize: '11px', fontWeight: 'bold', marginBottom: '6px', color: 'var(--accent-red)' }}>Quarantine Reasons:</div>
                       {selectedRun.quarantine_breakdown && Object.keys(selectedRun.quarantine_breakdown).length > 0 ? (
                         Object.entries(selectedRun.quarantine_breakdown).map(([reason, count]) => (
                           <div key={reason} style={{ fontSize: '11px', padding: '4px 6px', background: 'rgba(244,63,94,0.04)', border: '1px solid rgba(244,63,94,0.12)', borderRadius: '4px', marginBottom: '4px', display: 'flex', justifyContent: 'space-between' }}>
-                            <span>❌ {reason}</span>
-                            <span style={{ fontFamily: 'var(--font-mono)' }}>{(count || 0).toLocaleString()} แถว</span>
+                            <span>[X] {reason}</span>
+                            <span style={{ fontFamily: 'var(--font-mono)' }}>{(count || 0).toLocaleString()} rows</span>
                           </div>
                         ))
                       ) : (
-                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center', marginTop: '10px' }}>ผ่านฉลุย 100% ไม่มีข้อมูลตกเกณฑ์</div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center', marginTop: '10px' }}>100% Clean! No bad records found</div>
                       )}
                     </div>
                   )}
@@ -336,33 +348,33 @@ export default function Dashboard() {
                   {leftTab === 'Insights' && (
                     <div style={{ flexGrow: 1, overflowY: 'auto', fontSize: '11.5px', lineHeight: '1.45', color: 'var(--text-secondary)' }}>
                       {selectedRun.quality_score === 100 ? (
-                        <div>🟢 ข้อมูลผ่านการตรวจอย่างสมบูรณ์ ข้อมูลสะอาดครบถ้วน ไม่มีปัญหา Type Mismatch หรือ Null Constraint ตรวจพบใน HDFS Active Store</div>
+                        <div>100% Clean data. No Type Mismatch or Null Constraint issues detected.</div>
                       ) : (
                         <div>
-                          ⚠️ พบคลิปเปอร์ข้อมูลเสียอัตรา {(((selectedRun.quarantined_records || 0) / (selectedRun.total_records || 1)) * 100).toFixed(1)}% (คิดเป็น <strong>{(selectedRun.quarantined_records || 0).toLocaleString()} rows</strong>)
-                          ถูกกักแยกไว้ที่ HDFS Quarantine Store เพื่อป้องกันความสมบูรณ์ของท่อข้อมูลปลายทาง
+                          Found bad records at {(((selectedRun.quarantined_records || 0) / (selectedRun.total_records || 1)) * 100).toFixed(1)}% (<strong>{(selectedRun.quarantined_records || 0).toLocaleString()} rows</strong>)
+                          Isolated to HDFS Quarantine to protect downstream pipelines.
                           <br /><br />
-                          💡 <strong>AI Suggestion:</strong> ตรวจสอบว่าโครงสร้างคอลัมน์จาก API หรือ CSV ต้นทางมี Schema Drift หรือไม่
+                          <strong>AI Suggestion:</strong> Check if source API or CSV has Schema Drift.
                         </div>
                       )}
                     </div>
                   )}
 
                   <div style={{ marginTop: 'auto', display: 'flex', gap: '8px' }}>
-                    <button 
-                      className="btn-tab" 
+                    <button
+                      className="btn-tab"
                       style={{ flexGrow: 1, backgroundColor: 'rgba(56, 189, 248, 0.1)', color: 'var(--accent-blue)', borderColor: 'rgba(56, 189, 248, 0.3)', padding: '5px' }}
                       onClick={() => triggerPipelineRetry(selectedRun.run_id)}
                       disabled={retrying}
                     >
-                      {retrying ? 'กำลังดำเนินการ...' : '🔄 Retry Ingest & Audit'}
+                      {retrying ? 'Retrying...' : 'Retry Ingest & Audit'}
                     </button>
-                    <button 
+                    <button
                       className="btn-tab"
                       style={{ padding: '5px 10px' }}
                       onClick={() => handleExportCSV([selectedRun], `Selected_Run_${selectedRun.run_id}`)}
                     >
-                      📥 Export
+                      Export
                     </button>
                   </div>
                 </div>
@@ -395,7 +407,7 @@ export default function Dashboard() {
                 </div>
               </div>
             ) : (
-              <div className="loading-state"><span>กรุณาเลือกประวัติรอบการทำงานเพื่อตรวจสอบ</span></div>
+              <div className="loading-state"><span>Select a run history to inspect</span></div>
             )}
           </div>
 
@@ -403,49 +415,51 @@ export default function Dashboard() {
 
         {/* ================= COLUMN CENTER ================= */}
         <div className="col-center">
-          
+
           {/* Card 1: System Health (Quality Trend Chart) */}
           <div className="glass-card animate-in">
             <div className="card-header">
               <div>
-                <h3 className="card-title"><span className="icon">🛡️</span> System Health: Data Quality Anomaly Detection</h3>
-                <p className="card-subtitle">เทรนด์ดัชนีคะแนนตรวจสอบคุณภาพข้อมูลของแต่ละแหล่งส่งเข้าท่อระบายข้อมูล</p>
+                <h3 className="card-title"><span className="icon">Line</span> System Health: Data Quality Anomaly Detection</h3>
+                <p className="card-subtitle">Data Quality Trend by Source</p>
               </div>
-              <button 
-                className="btn-export" 
+              <button
+                className="btn-export"
                 onClick={() => handleExportCSV(qualityTrendData, "SDOQAP_Time_Series_Quality")}
               >
-                📥 Export Trend
+                Export Trend
               </button>
             </div>
 
             <div style={{ flexGrow: 1, minHeight: 0, width: '100%', height: '100%' }}>
               {anomaly.loading ? (
-                <div className="loading-state"><span>กำลังดึงสถิติ Anomaly...</span></div>
+                <div className="loading-state"><span>Fetching anomaly stats...</span></div>
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={qualityTrendData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
                     <defs>
-                      <linearGradient id="cApi" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#38bdf8" stopOpacity={0.15}/>
-                        <stop offset="95%" stopColor="#38bdf8" stopOpacity={0}/>
-                      </linearGradient>
-                      <linearGradient id="cDb" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.15}/>
-                        <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                      </linearGradient>
-                      <linearGradient id="cCsv" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#fbbf24" stopOpacity={0.15}/>
-                        <stop offset="95%" stopColor="#fbbf24" stopOpacity={0}/>
-                      </linearGradient>
+                      {seriesKeys.map((k, idx) => {
+                        const colors = ["#38bdf8", "#10b981", "#fbbf24", "#f43f5e", "#a855f7"];
+                        const color = colors[idx % colors.length];
+                        return (
+                          <linearGradient key={k} id={`color-${k}`} x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor={color} stopOpacity={0.15}/>
+                            <stop offset="95%" stopColor={color} stopOpacity={0}/>
+                          </linearGradient>
+                        );
+                      })}
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" />
                     <XAxis dataKey="time" stroke="#64748b" tick={{ fontSize: 9.5 }} />
                     <YAxis domain={[0, 100]} stroke="#64748b" tick={{ fontSize: 9.5 }} />
                     <Tooltip contentClassName="custom-tooltip" />
-                    <Area type="monotone" dataKey="API" stroke="var(--accent-blue)" fillOpacity={1} fill="url(#cApi)" strokeWidth={1.8} />
-                    <Area type="monotone" dataKey="Database" stroke="var(--accent-green)" fillOpacity={1} fill="url(#cDb)" strokeWidth={1.8} />
-                    <Area type="monotone" dataKey="CSV" stroke="var(--accent-yellow)" fillOpacity={1} fill="url(#cCsv)" strokeWidth={1.8} />
+                    {seriesKeys.map((k, idx) => {
+                        const colors = ["#38bdf8", "#10b981", "#fbbf24", "#f43f5e", "#a855f7"];
+                        const color = colors[idx % colors.length];
+                        return (
+                          <Area key={k} type="monotone" dataKey={k} stroke={color} fillOpacity={1} fill={`url(#color-${k})`} strokeWidth={1.8} />
+                        );
+                    })}
                   </AreaChart>
                 </ResponsiveContainer>
               )}
@@ -456,8 +470,8 @@ export default function Dashboard() {
           <div className="glass-card animate-in" style={{ flex: 'none', height: '120px' }}>
             <div className="card-header">
               <div>
-                <h3 className="card-title" style={{ color: 'var(--accent-red)' }}><span className="icon">🔔</span> Live Alerts Log</h3>
-                <p className="card-subtitle">แจ้งเตือนความล้มเหลว โครงสร้างดริฟต์ และคอขวดระบบแบบเรียลไทม์</p>
+                <h3 className="card-title" style={{ color: 'var(--accent-red)' }}><span className="icon">Bell</span> Live Alerts Log</h3>
+                <p className="card-subtitle">Real-time Alerts (Failures & Schema Drifts)</p>
               </div>
             </div>
             <div className="alerts-log-container">
@@ -465,17 +479,17 @@ export default function Dashboard() {
                 <>
                   <div className="alert-item">
                     <span className="alert-time">[{anomaly.data.anomaly.time}]</span>
-                    <span>⚠️ <strong>[ดริฟต์ขัดข้อง - {anomaly.data.anomaly.source}]</strong> {anomaly.data.anomaly.reason} (คะแนนตกลงที่ {anomaly.data.anomaly.score}%)</span>
+                    <span>[!] <strong>[Drift Detected - {anomaly.data.anomaly.source}]</strong> {anomaly.data.anomaly.reason} (Score dropped to {anomaly.data.anomaly.score}%)</span>
                   </div>
                   <div className="alert-item info">
                     <span className="alert-time">[{anomaly.data.anomaly.time}]</span>
-                    <span>ℹ️ <strong>System Automation:</strong> ดำเนินการแยกข้อมูลดิบที่มีปัญหาลง HDFS Quarantine โดยไม่หยุดระบบหลัก</span>
+                    <span>[i] <strong>System Automation:</strong> Isolated problematic raw data to HDFS Quarantine without blocking the main pipeline.</span>
                   </div>
                 </>
               ) : (
                 <div className="alert-item info">
-                  <span className="alert-time">[สตรีมปกติ]</span>
-                  <span>🟢 ข้อมูลไหลเข้าอย่างสม่ำเสมอ ไม่มีการละเมิดเกณฑ์คุณลักษณะหรือโครงสร้างข้อมูลดริฟต์</span>
+                  <span className="alert-time">[Stream Normal]</span>
+                  <span>[OK] Data streaming consistently. No quality violations or schema drifts detected.</span>
                 </div>
               )}
             </div>
@@ -485,11 +499,11 @@ export default function Dashboard() {
           <div className="glass-card animate-in">
             <div className="card-header" style={{ paddingBottom: '0', borderBottom: 'none' }}>
               <div>
-                <h3 className="card-title"><span className="icon">🧠</span> Global Analytical Blueprint</h3>
-                <p className="card-subtitle">ผลวิเคราะห์เชิงลึกระดับองค์รวมจากทุก Data Pipeline</p>
+                <h3 className="card-title"><span className="icon">Brain</span> Global Analytical Blueprint</h3>
+                <p className="card-subtitle">Global Pipeline Overview</p>
               </div>
-              <button 
-                className="btn-export" 
+              <button
+                className="btn-export"
                 onClick={() => {
                   let dataToExport = [];
                   if (centerTab === 'Trends') dataToExport = forecastData;
@@ -499,7 +513,7 @@ export default function Dashboard() {
                   handleExportCSV(dataToExport, `Analysis_${centerTab}`);
                 }}
               >
-                📥 Export Analytics
+                Export Analytics
               </button>
             </div>
 
@@ -515,7 +529,7 @@ export default function Dashboard() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '12px', height: '100%', minHeight: 0 }}>
                   <div style={{ height: '100%', minHeight: 0 }}>
                     {projection.loading ? (
-                      <div className="loading-state"><span>กำลังประมวลผลโมเดลทำนาย...</span></div>
+                      <div className="loading-state"><span>Processing predictive model...</span></div>
                     ) : (
                       <ResponsiveContainer width="100%" height="100%">
                         <AreaChart data={forecastData} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
@@ -531,15 +545,15 @@ export default function Dashboard() {
                     )}
                   </div>
                   <div style={{ fontSize: '11px', display: 'flex', flexDirection: 'column', gap: '6px', overflowY: 'auto' }}>
-                    <div style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '4px', fontWeight: 'bold', color: 'var(--accent-blue)' }}>🔮 พยากรณ์ระดับคุณภาพ 7 วัน:</div>
-                    <div>• <strong>ดัชนีความเสถียรข้อมูล:</strong> <span style={{ color: 'var(--accent-green)' }}>{projection.data?.stability_index || '78.4%'}</span></div>
-                    <div>• <strong>โอกาสเสียเกณฑ์ SLA:</strong> <span style={{ color: 'var(--accent-red)' }}>{projection.data?.sla_breach_probability || '45.2%'}</span></div>
+                    <div style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '4px', fontWeight: 'bold', color: 'var(--accent-blue)' }}>7-Day Quality Forecast:</div>
+                    <div>• <strong>Data Stability Index:</strong> <span style={{ color: 'var(--accent-green)' }}>{projection.data?.stability_index || '78.4%'}</span></div>
+                    <div>• <strong>SLA Breach Probability:</strong> <span style={{ color: 'var(--accent-red)' }}>{projection.data?.sla_breach_probability || '45.2%'}</span></div>
                     <div style={{ color: 'var(--text-muted)', fontSize: '10.5px' }}>{projection.data?.historical_trend}</div>
-                    
+
                     {projection.data?.crisis_forecast && projection.data.crisis_forecast.severity !== 'LOW' && (
                       <div className="bp-alert">
                         <strong>Predicted Quality Crisis Alert</strong>
-                        <div>วิกฤตคุณภาพใน {projection.data.crisis_forecast.days_until_crisis} วันที่ส่วน "{projection.data.crisis_forecast.impacted_component}"</div>
+                        <div>Quality crisis predicted in {projection.data.crisis_forecast.days_until_crisis} days on "{projection.data.crisis_forecast.impacted_component}"</div>
                       </div>
                     )}
                   </div>
@@ -548,20 +562,20 @@ export default function Dashboard() {
 
               {centerTab === 'RootCause' && (
                 <div style={{ overflowY: 'auto', height: '100%', fontSize: '11.5px' }}>
-                  <div style={{ fontWeight: 'bold', marginBottom: '6px', color: 'var(--accent-purple)' }}>วิเคราะห์จับกลุ่มปัญหา (Error Pattern Clustering):</div>
+                  <div style={{ fontWeight: 'bold', marginBottom: '6px', color: 'var(--accent-purple)' }}>Error Pattern Clustering:</div>
                   {clustering.loading ? (
-                    <div>กำลังจัดกลุ่มสาเหตุหลัก...</div>
+                    <div>Clustering root causes...</div>
                   ) : clustering.data?.clusters?.map((cluster) => (
                     <div key={cluster.id} style={{ padding: '6px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '6px', marginBottom: '6px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold' }}>
-                        <span>แหล่งที่มา: {cluster.source}</span>
+                        <span>Source: {cluster.source}</span>
                         <span style={{ color: 'var(--accent-red)' }}>{cluster.percentage}% (N={cluster.errors_count})</span>
                       </div>
-                      <div style={{ color: 'var(--text-muted)', fontSize: '11px', marginTop: '2px' }}>ลักษณะข้อเสีย: {cluster.pattern}</div>
+                      <div style={{ color: 'var(--text-muted)', fontSize: '11px', marginTop: '2px' }}>Pattern: {cluster.pattern}</div>
                     </div>
                   ))}
                   <div className="alert-item info" style={{ marginTop: '8px' }}>
-                    💡 <strong>สหสัมพันธ์เชิงลึก (Correlation):</strong> {clustering.data?.correlation_analysis}
+                    <strong>Correlation Analysis:</strong> {clustering.data?.correlation_analysis}
                   </div>
                 </div>
               )}
@@ -580,7 +594,7 @@ export default function Dashboard() {
                     ))}
                   </div>
                   <div style={{ padding: '8px', background: 'rgba(244,63,94,0.06)', border: '1px solid rgba(244,63,94,0.12)', borderRadius: '6px', fontSize: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span>ความสูญเสียทางการเงินเชิงธุรกิจสะสมล่วงหน้า:</span>
+                    <span>Cumulative Projected Business Financial Loss:</span>
                     <strong style={{ color: 'var(--accent-red)', fontSize: '14px', fontFamily: 'var(--font-mono)' }}>
                       ${(impact.data?.total_financial_impact_usd || 0).toLocaleString()} USD
                     </strong>
@@ -604,7 +618,7 @@ export default function Dashboard() {
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <span className={`actionable-badge ${badgeMap[rec.status]}`}>{rec.status}</span>
-                          <button className="btn-action" onClick={() => alert(`ดำเนินการคำสั่งฟังก์ชัน: ${rec.action_type}`)}>Run</button>
+                          <button className="btn-action" onClick={() => alert(`Executing action: ${rec.action_type}`)}>Run</button>
                         </div>
                       </div>
                     );
@@ -618,13 +632,13 @@ export default function Dashboard() {
 
         {/* ================= COLUMN RIGHT ================= */}
         <div className="col-right">
-          
+
           {/* Card 1: End-to-End Data Lineage Map */}
           <div className="glass-card animate-in">
             <div className="card-header">
               <div>
-                <h3 className="card-title"><span className="icon">🕸️</span> Real-time Data Lineage Map</h3>
-                <p className="card-subtitle">ตรวจสอบทิศทางของข้อมูลและจุดกักกันแบบเรียลไทม์ (Auto-sync)</p>
+                <h3 className="card-title"><span className="icon">Net</span> Real-time Data Lineage Map</h3>
+                <p className="card-subtitle">Real-time Data Flow & Quarantine Map</p>
               </div>
             </div>
             {(() => {
@@ -638,18 +652,18 @@ export default function Dashboard() {
               <div className="lineage-path">
                 {/* Node 1 */}
                 <div className="lineage-node source">
-                  <div className="node-icon">📡</div>
+                  <div className="node-icon">IN</div>
                   <div className="node-content">
                     <h4>{activeRun ? activeRun.data_source : 'Ingest Source'}</h4>
                     <span className="node-stat">{activeRun ? `${totalRecs.toLocaleString()} rows` : 'Waiting for data...'}</span>
                   </div>
                 </div>
-                
+
                 <div className={`lineage-connector ${hasError ? 'danger' : (activeRun ? 'active' : '')}`}></div>
 
                 {/* Node 2 */}
                 <div className="lineage-node audit">
-                  <div className="node-icon">⚡</div>
+                  <div className="node-icon">PR</div>
                   <div className="node-content">
                     <h4>Spark QA Audit</h4>
                     <span className="node-stat">Processing Engine</span>
@@ -665,19 +679,19 @@ export default function Dashboard() {
                     <div style={{ height: '45px', borderLeft: '2px solid var(--accent-indigo)', borderTop: '2px solid var(--accent-indigo)', borderTopLeftRadius: '6px' }}></div>
                     <div style={{ height: '45px', borderLeft: `2px solid ${hasError ? 'var(--accent-red)' : 'var(--accent-indigo)'}`, borderBottom: `2px solid ${hasError ? 'var(--accent-red)' : 'var(--accent-indigo)'}`, borderBottomLeftRadius: '6px' }}></div>
                   </div>
-                  
+
                   {/* Branch Items */}
                   <div className="lineage-branches" style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem', margin: '0 10px', flexShrink: 0 }}>
                     <div className={`lineage-node hdfs-active ${hasClean ? 'highlight' : ''}`}>
-                      <div className="node-icon">✅</div>
+                      <div className="node-icon">OK</div>
                       <div className="node-content">
                         <h4>Active Store</h4>
                         <span className="node-stat">{activeRun ? `${(totalRecs - quarRecs).toLocaleString()} clean` : 'Verified Data'}</span>
                       </div>
                     </div>
-                    
+
                     <div className={`lineage-node hdfs-quarantine ${hasError ? 'highlight-danger' : ''}`}>
-                      <div className="node-icon">🚨</div>
+                      <div className="node-icon">QA</div>
                       <div className="node-content">
                         <h4>Quarantine</h4>
                         <span className="node-stat">{activeRun ? `${quarRecs.toLocaleString()} isolated` : 'Bad Data'}</span>
@@ -696,7 +710,7 @@ export default function Dashboard() {
 
                 {/* Node 4 */}
                 <div className="lineage-node serving">
-                  <div className="node-icon">📊</div>
+                  <div className="node-icon">API</div>
                   <div className="node-content">
                     <h4>Serving API</h4>
                     <span className="node-stat">BI & Analytics</span>
@@ -713,18 +727,18 @@ export default function Dashboard() {
           <div className="glass-card animate-in">
             <div className="card-header">
               <div>
-                <h3 className="card-title"><span className="icon">⚡</span> Performance & Scalability</h3>
-                <p className="card-subtitle">ประสิทธิภาพการประมวลผลและการใช้ทรัพยากร Spark Cluster</p>
+                <h3 className="card-title"><span className="icon">CPU</span> Performance & Scalability</h3>
+                <p className="card-subtitle">Spark Cluster Performance Metrics</p>
               </div>
-              
-              <button 
-                className="btn-export" 
+
+              <button
+                className="btn-export"
                 onClick={() => handleExportCSV([perf.data], "SDOQAP_Performance_Metrics")}
               >
-                📥 Export Metrics
+                Export Metrics
               </button>
             </div>
-            
+
             {perf.data ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flexGrow: 1, justifyContent: 'center' }}>
                 <div style={{ display: 'flex', gap: '12px' }}>
@@ -743,7 +757,7 @@ export default function Dashboard() {
                 </div>
               </div>
             ) : (
-              <div className="loading-state"><span>กำลังคำนวณทรัพยากร...</span></div>
+              <div className="loading-state"><span>Calculating resource usage...</span></div>
             )}
           </div>
 
@@ -751,17 +765,17 @@ export default function Dashboard() {
           <div className="glass-card animate-in">
             <div className="card-header">
               <div>
-                <h3 className="card-title"><span className="icon">💻</span> Activity Log & Distribution</h3>
-                <p className="card-subtitle">ประวัติ Log ล่าสุดของ Pipeline ดึงตรงจาก Elasticsearch</p>
+                <h3 className="card-title"><span className="icon">Log</span> Activity Log & Distribution</h3>
+                <p className="card-subtitle">Pipeline Logs (Elasticsearch Stream)</p>
               </div>
-              <button 
-                className="btn-export" 
+              <button
+                className="btn-export"
                 onClick={() => handleExportCSV(activity.data || [], "SDOQAP_System_Logs")}
               >
-                📥 Export Logs
+                Export Logs
               </button>
             </div>
-            
+
             <div className="terminal-window">
               <div className="terminal-header">
                 <div className="term-controls">
@@ -771,17 +785,17 @@ export default function Dashboard() {
                 </div>
                 <span className="terminal-title">sdoqap@observability-node:~</span>
               </div>
-              
+
               <div className="terminal-body">
                 {activity.loading ? (
-                  <div className="log-line info">กำลังเชื่อมต่อ Log Stream...</div>
+                  <div className="log-line info">Connecting to Log Stream...</div>
                 ) : activity.data && activity.data.length > 0 ? (
                   activity.data.map((act, i) => {
                     let logClass = 'info';
                     if (act.level === 'error') logClass = 'error';
                     else if (act.level === 'warning') logClass = 'warning';
                     else if (act.level === 'success') logClass = 'success';
-                    
+
                     return (
                       <div key={i} className={`log-line ${logClass}`}>
                         <span className="log-time">[{new Date(act.timestamp).toLocaleTimeString([], { hour12: false })}]</span>

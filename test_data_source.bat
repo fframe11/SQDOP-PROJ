@@ -2,6 +2,7 @@
 setlocal enabledelayedexpansion
 title SDOQAP Dataset/API Test Runner
 cls
+cd /d "%~dp0"
 
 echo =======================================================================
 echo   SDOQAP Dataset/API Test Runner
@@ -175,7 +176,7 @@ pause
 goto menu
 
 :open_portal
-start http://localhost:!API_PORT!/
+start http://localhost/
 goto menu
 
 :show_hdfs
@@ -269,5 +270,5 @@ if %errorlevel% neq 0 (
 echo.
 echo [DONE] Quality check completed for '%table%'.
 echo Open the central portal:
-echo   http://localhost:!API_PORT!/
+echo   http://localhost/
 exit /b 0

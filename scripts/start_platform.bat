@@ -3,6 +3,7 @@ rem ---------------------------------------------------------------
 rem  Start Data Engineering Platform (Docker Compose)
 rem ---------------------------------------------------------------
 setlocal
+cd /d "%~dp0.."
 
 rem Build all images first
 docker compose -f docker-compose.yml build

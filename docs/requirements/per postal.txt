@@ -1,0 +1,66 @@
+# SDOQAP: Scalable Data Observability & Quality Assurance Platform
+**"ปลดล็อกศักยภาพ Data Pipeline ที่มั่นคงและเชื่อถือได้ด้วย AI-Driven Data Observability"**
+
+---
+
+## ⚠️ ปัญหาของระบบ Data Pipeline ในองค์กร (The Pain Points)
+ในปัจจุบัน องค์กรที่ขับเคลื่อนด้วยข้อมูล (Data-Driven) มักจะเจอกับปัญหา Data Pipeline แตกหัก (Broken Pipelines) หรือ ข้อมูลที่ไหลเข้ามาเน่าเสีย (Bad Data) ซึ่งส่งผลกระทบมหาศาลต่อธุรกิจ:
+1. **Garbage In, Garbage Out:** เอาข้อมูลที่ผิดพลาดไปทำ BI Dashboard หรือ Train ML ทำให้การตัดสินใจทางธุรกิจผิดพลาด
+2. **Schema Drift:** ระบบต้นทางแอบเปลี่ยนโครงสร้างตาราง (ลบคอลัมน์, เปลี่ยนชื่อคอลัมน์) ทำให้ Pipeline พังทั้งระบบ
+3. **High MTTD (Mean Time To Detect):** ใช้เวลานานมากในการหาว่าบั๊กเกิดจากข้อมูลตรงไหน
+4. **Blind Spots:** ขาดความสามารถในการมองเห็น (Observability) ข้อมูลที่ไหลอยู่ข้างในระบบ
+
+---
+
+## 🎯 โซลูชัน: SDOQAP Platform
+SDOQAP (อ่านว่า ซา-โด-แคป) คือ **แพลตฟอร์มสังเกตการณ์และรับประกันคุณภาพข้อมูลขนาดใหญ่แบบรวมศูนย์** ที่เกิดมาเพื่อแก้ปัญหาเหล่านี้โดยเฉพาะ แพลตฟอร์มนี้ครอบคลุมการตรวจสอบคุณภาพ (Quality Assurance) และการมอนิเตอร์ (Observability) ตั้งแต่ต้นน้ำยันปลายน้ำ
+
+### ✨ นวัตกรรมเด่น (Key Innovations)
+
+#### 1. Auto Schema Evolution (ความยืดหยุ่นขั้นสุด)
+เมื่อ Data Source ต้นทางมีการเปลี่ยนโครงสร้าง ระบบจะไม่พัง!
+- **Missing Columns:** ถ้าระบบต้นทางไม่ได้ส่งคอลัมน์มา SDOQAP จะทำการอุดรอยรั่วด้วยค่า `NULL` อัตโนมัติ
+- **New Columns:** ถ้ามีคอลัมน์ใหม่เพิ่มเข้ามา SDOQAP จะรับรู้และจดจำ (Evolve) คอลัมน์นั้นใส่ลง Data Lake ให้ทันที
+- พร้อมทั้งอัปเดต Schema Registry และยิงแจ้งเตือน (Alert) แบบ Real-time เพื่อให้ Data Engineer เข้ามาตรวจสอบ
+
+#### 2. AI-Driven Quality Audit (ตรวจจับความผิดปกติอัจฉริยะ)
+ทำงานอยู่บนสถาปัตยกรรม Apache Spark แบบ Distributed ช่วยให้ตรวจสอบข้อมูลระดับ Terabytes ได้อย่างรวดเร็ว
+- ตรวจจับความถูกต้องของข้อมูล (Missing, Duplicates, Mismatches) แบบแถวต่อแถว
+- สกัดและแยก "ข้อมูลที่เสีย (Bad Data)" โยนเข้า **Quarantine Zone** อัตโนมัติ เพื่อป้องกันไม่ให้ไปปนเปื้อนข้อมูลดี (Active Zone)
+- วิเคราะห์ Data Pattern เพื่อสรุปสาเหตุรากเหง้า (Root Cause) ของข้อผิดพลาด
+
+#### 3. Real-time Push Alerting (แจ้งเตือนทะลุมิติ)
+ลดระยะเวลา MTTD (Mean Time to Detect) ให้เหลือเพียงไม่กี่นาที
+- เมื่อคะแนน Data Quality Drop หรือเกิด Schema Drift ระบบจะยิง Webhook ไปที่เครื่องมือ Workflow Automation (n8n)
+- ทำให้ผู้ดูแลระบบสามารถรับข้อความแจ้งเตือนผ่าน **LINE Notify** หรือ **Slack** ได้ทันทีโดยไม่ต้องเปิดหน้า Dashboard ทิ้งไว้
+
+#### 4. Business Impact Analytics (เชื่อมโยงคุณภาพสู่มูลค่าธุรกิจ)
+ไม่ใช่แค่มอนิเตอร์ทางเทคนิค แต่ประเมินไปถึง "เงิน"
+- มี Predictive Analytics พยากรณ์ล่วงหน้า 7 วัน ว่าคุณภาพข้อมูลมีโอกาสตกลงจนเสีย SLA หรือไม่
+- ระบบสามารถตีค่าว่า Data Issue ในตารางนี้ จะสร้างความเสียหายทางการเงินกับ KPI ทางธุรกิจประมาณเท่าไหร่ (Financial Impact)
+
+---
+
+## 🏗️ สถาปัตยกรรมของระบบ (Architecture - Medallion standard)
+ระบบถูกจัดเรียงตามสถาปัตยกรรม Medallion Architecture เพื่อความบริสุทธิ์และพร้อมใช้งานของข้อมูล:
+- **Bronze Layer (Raw):** จัดเก็บข้อมูลดิบดั้งเดิมจากแหล่งข้อมูลต่างๆ บน HDFS `/data/raw/` เพื่อการทำซ้ำย้อนหลัง (Replayability)
+- **Silver Layer (Active):** ข้อมูลที่ผ่านการล้างและรับประกันคุณภาพระดับแถวโดย Spark Cluster พร้อมใช้ประมวลผลต่อ อยู่บน HDFS `/data/active/`
+- **Quarantine Zone (กักกันข้อมูลเสีย):** แยกระเบียนข้อมูลที่ตกเกณฑ์คุณภาพส่งไปเก็บใน HDFS `/data/quarantine/` อัตโนมัติ เพื่อไม่ให้รบกวนท่อส่งข้อมูลหลัก
+- **Gold Layer (Summary Data):** รวบรวมสถิติรายวัน รูปแบบความบกพร่องสะสม และประวัติ Schema Drift นำมา Pre-aggregate ลงสู่ Elasticsearch sdoqap_gold_* ช่วยให้แดชบอร์ดและ BI Tools ค้นหาได้เร็วสูงสุดโดยไม่ต้องคำนวณใหม่
+
+### เทคโนโลยีที่เลือกใช้ (Technology Stack)
+1. **Data Lake:** ใช้ **Hadoop HDFS** เป็นบ่อพักข้อมูลหลัก รองรับความจุที่สามารถสเกลได้ไม่จำกัด
+2. **Processing Engine:** ใช้ **Apache Spark Cluster (Master-Worker)** สำหรับประมวลผลกฎเกณฑ์ Data Quality และสร้าง Gold Layer แบบขนาน
+3. **Observability Store:** ใช้ **Elasticsearch** เป็นฐานข้อมูลจัดเก็บ Metadata, Audit Logs, Quality Scores และ Gold aggregates เพื่อความรวดเร็วในการค้นหา
+4. **API & Orchestration:** ใช้ **FastAPI** (18+ Endpoints) เป็น Backend ประสานงาน และเชื่อมต่อกับ **n8n** สำหรับ Alerting
+5. **Central Dashboard:** หน้าต่าง UI ที่สร้างด้วย **React + Recharts** พร้อมแสดงผล Data Lineage, Anomaly Detection และ Gold Reports แบบสวยงามล้ำสมัย
+
+---
+
+## 📈 มูลค่าทางธุรกิจที่ส่งมอบ (Business Value)
+* **Trust in Data:** เพิ่มความน่าเชื่อถือให้กับตัวชี้วัด (BI Dashboards) และผลลัพธ์ของ AI/ML
+* **Reduce Downtime:** ลดอัตราการล่มของ Data Pipeline และ Data Warehouse
+* **Proactive Management:** เปลี่ยนจากการ "แก้ปัญหาเมื่อมีคนบ่น" เป็น "ระบบแจ้งเตือนให้แก้ล่วงหน้าก่อนที่ Business User จะรู้ตัว"
+
+> [!NOTE]
+> *SDOQAP ไม่ใช่แค่เครื่องมือทางเทคนิค แต่เป็นผู้ช่วยรักษาความปลอดภัยให้กับ "น้ำมัน (ข้อมูล)" ขององค์กร*

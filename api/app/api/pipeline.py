@@ -110,14 +110,11 @@ def retry_pipeline_run(run_id: str):
         if not hits:
             raise HTTPException(status_code=404, detail=f"Pipeline run '{run_id}' not found.")
         run_doc = hits[0]["_source"]
-        table_name = run_doc.get("table_name", "users")
+        table_name = run_doc.get("table_name")
+        if not table_name:
+            raise HTTPException(status_code=400, detail="Cannot retry: Pipeline run document does not contain 'table_name'.")
         
-        # Simulate Ingestion via WebHDFS write
-        try:
-            csv_content = "id,username,email,role,created_at,updated_at\n1,john_doe,john@example.com,admin,2026-06-25 08:00:00,2026-06-25 08:00:00"
-            requests.put(f"http://namenode:9870/webhdfs/v1/data/raw/{table_name}/{table_name}.csv?op=CREATE&overwrite=true", data=csv_content, headers={"Content-Type": "text/csv"}, timeout=5)
-        except Exception as ex:
-            print(f"Warning: WebHDFS retry call failed: {ex}")
+        # Do not overwrite raw file during retry. We simulate a re-run of existing data.
 
         # Create a new rerun run ID
         new_run_id = f"run_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
@@ -144,15 +141,8 @@ def retry_pipeline_run(run_id: str):
             print(f"Warning: Failed to fetch previous run for simulation: {ex}")
             
         if not sim_class_balance_col:
-            if table_name == "mbti":
-                sim_class_balance_col = "label"
-                sim_class_balance = {"INFP": 3, "INTP": 2}
-            elif table_name == "users":
-                sim_class_balance_col = "role"
-                sim_class_balance = {"admin": 2, "user": 3}
-            else:
-                sim_class_balance_col = "category"
-                sim_class_balance = {"group_A": 3, "group_B": 2}
+            sim_class_balance_col = "category"
+            sim_class_balance = {"group_A": 3, "group_B": 2}
 
         # Calculate sum dynamically to ensure mathematical consistency
         sim_total = sum(sim_class_balance.values()) if sim_class_balance else 5
