@@ -7,11 +7,21 @@ router = APIRouter(
     tags=["lineage"]
 )
 
-ELASTICSEARCH_URL = os.getenv("ELASTICSEARCH_URL", "http://elastic:sdoqap_secure@elasticsearch:9200")
+def get_elasticsearch_url():
+    es_user = os.getenv("ELASTICSEARCH_USER", "elastic")
+    es_pass = os.getenv("ELASTICSEARCH_PASSWORD", "sdoqap_secure")
+    es_host = os.getenv("ELASTICSEARCH_HOST", "elasticsearch")
+    es_port = os.getenv("ELASTICSEARCH_PORT", "9200")
+    if "ELASTICSEARCH_HOST" not in os.environ and "ELASTICSEARCH_URL" not in os.environ:
+        es_host = "localhost"
+    es_url = os.getenv("ELASTICSEARCH_URL")
+    if not es_url:
+        es_url = f"http://{es_user}:{es_pass}@{es_host}:{es_port}"
+    return es_url
 
 def get_es_client():
     try:
-        return Elasticsearch(ELASTICSEARCH_URL)
+        return Elasticsearch(get_elasticsearch_url())
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to connect to Elasticsearch: {str(e)}")
 

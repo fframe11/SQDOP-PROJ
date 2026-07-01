@@ -34,7 +34,19 @@ app.include_router(pipeline_router)
 app.include_router(quality_router)
 app.include_router(schema_router)  # Fix 2B: Schema Governance API
 
-ELASTICSEARCH_URL = os.getenv("ELASTICSEARCH_URL", "http://elastic:sdoqap_secure@elasticsearch:9200")
+def get_elasticsearch_url():
+    es_user = os.getenv("ELASTICSEARCH_USER", "elastic")
+    es_pass = os.getenv("ELASTICSEARCH_PASSWORD", "sdoqap_secure")
+    es_host = os.getenv("ELASTICSEARCH_HOST", "elasticsearch")
+    es_port = os.getenv("ELASTICSEARCH_PORT", "9200")
+    if "ELASTICSEARCH_HOST" not in os.environ and "ELASTICSEARCH_URL" not in os.environ:
+        es_host = "localhost"
+    es_url = os.getenv("ELASTICSEARCH_URL")
+    if not es_url:
+        es_url = f"http://{es_user}:{es_pass}@{es_host}:{es_port}"
+    return es_url
+
+ELASTICSEARCH_URL = get_elasticsearch_url()
 
 # Global executor to avoid thread join blocks on request exit
 executor = ThreadPoolExecutor(max_workers=20)
@@ -51,10 +63,12 @@ def get_services_status():
         except Exception:
             return "offline"
 
+    es_user = os.getenv("ELASTICSEARCH_USER", "elastic")
+    es_pass = os.getenv("ELASTICSEARCH_PASSWORD", "sdoqap_secure")
     services = {
         "HDFS Namenode": {"host": "namenode", "port": 9870, "url": "http://localhost:9870"},
         "HDFS Datanode": {"host": "datanode", "port": 9864, "url": None},
-        "Elasticsearch": {"host": "elasticsearch", "port": 9200, "url": "http://elastic:sdoqap_secure@localhost:9200"},
+        "Elasticsearch": {"host": "elasticsearch", "port": 9200, "url": f"http://{es_user}:{es_pass}@localhost:9200"},
         "Kibana": {"host": "kibana", "port": 5601, "url": "http://localhost:5601"},
         "Grafana": {"host": "grafana", "port": 3000, "url": "http://localhost:3000"},
         "n8n Orchestrator": {"host": "n8n", "port": 5678, "url": "http://localhost:5678"},

@@ -19,7 +19,19 @@ import re
 from datetime import datetime, timezone, timedelta
 from collections import defaultdict
 
-ELASTICSEARCH_URL = os.getenv("ELASTICSEARCH_URL", "http://elastic:sdoqap_secure@elasticsearch:9200")
+def get_elasticsearch_url():
+    es_user = os.getenv("ELASTICSEARCH_USER", "elastic")
+    es_pass = os.getenv("ELASTICSEARCH_PASSWORD", "sdoqap_secure")
+    es_host = os.getenv("ELASTICSEARCH_HOST", "elasticsearch")
+    es_port = os.getenv("ELASTICSEARCH_PORT", "9200")
+    if "ELASTICSEARCH_HOST" not in os.environ and "ELASTICSEARCH_URL" not in os.environ:
+        es_host = "localhost"
+    es_url = os.getenv("ELASTICSEARCH_URL")
+    if not es_url:
+        es_url = f"http://{es_user}:{es_pass}@{es_host}:{es_port}"
+    return es_url
+
+ELASTICSEARCH_URL = get_elasticsearch_url()
 HEADERS = {"Content-Type": "application/json"}
 
 # Financial model constants (IBM / Gartner COPDQ benchmark)
