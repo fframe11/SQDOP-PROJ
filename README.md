@@ -223,6 +223,47 @@ reset volume ทั้งหมด:
 docker compose down -v
 ```
 
+## การกำหนดเงื่อนไขและคะแนนคุณภาพ (Config-Driven Rules Engine)
+
+สามารถกำหนดเกณฑ์ตัดสินคุณภาพข้อมูลแยกตามรายตารางได้ใน:
+```text
+spark/rules_config.json
+```
+หากต้องการเปิด/ปิด หรือกำหนดระดับความรุนแรง (severity: critical/warning) หรือเกณฑ์ขั้นต่ำของคุณภาพที่รับได้ (`quality_score_threshold`) สามารถปรับเปลี่ยนที่ไฟล์นี้ได้ทันทีโดยไม่ต้องแก้โค้ดหลักของ Spark
+
+## การทดสอบความถูกต้องเชิงบูรณาการ (Integration Tests)
+
+ระบบมาพร้อมกับสคริปต์รันการทดสอบระบบและคุณภาพแบบอัตโนมัติ (Automated Pipeline Validation) สามารถรันจากฝั่ง Host ได้โดยตรง:
+```cmd
+python spark/tests/run_integration_test.py
+```
+สคริปต์นี้จะอัปโหลดชุดข้อมูลจำลอง `benchmark_dataset.csv` (30 แถว มีข้อบกพร่องสะสม 10 แถว) และทดสอบความเสถียรของ Lock, Data Casting, Quarantine logic และส่งสรุปผลการพยากรณ์รวมทั้งบันทึกข้อมูลและตรวจสอบความถูกต้องกลับจาก Elasticsearch โดยอัตโนมัติ
+
+## ระบบควบคุมเวอร์ชันโครงสร้างข้อมูล (Schema Approval Gate)
+
+เมื่อระบบตรวจพบการเปลี่ยนแปลงโครงสร้างข้อมูล (Schema Drift) ระบบจะบล็อกการแก้ไขสเปกบน HDFS/Registry โดยอัตโนมัติ และจะทำการส่งข้อเสนอโครงสร้างข้อมูลใหม่เข้าไปรออนุมัติที่สถานะ `PENDING` บน Elasticsearch:
+* สามารถเรียกดูรายการค้างอนุมัติผ่าน API: `GET /api/v1/schema/proposals`
+* ทำการยืนยันโครงสร้างใหม่เพื่อนำไปใช้จริง: `POST /api/v1/schema/proposals/{proposal_id}/approve`
+* ปฏิเสธการเปลี่ยนโครงสร้างข้อมูล: `POST /api/v1/schema/proposals/{proposal_id}/reject`
+
+## การตรวจสอบความปลอดภัยข้อมูลก่อนนำไปใช้ (Trust-Check API)
+
+ระบบที่ดึงข้อมูลปลายทาง (BI/ML/Analytics) สามารถส่งคำขอเข้ามาตรวจสอบว่าตารางข้อมูลที่ต้องการนั้นมีความพร้อมหรือปลอดภัยในการบริโภคหรือไม่ ผ่าน REST API:
+```text
+GET http://localhost:8002/api/v1/lineage/{table_name}/trust-check
+```
+ตัวอย่างผลลัพธ์ตอบกลับ:
+```json
+{
+  "table": "benchmark_test",
+  "is_safe_to_consume": true,
+  "quality_score": 98.5,
+  "quality_threshold": 90.0,
+  "pending_schema_proposals": 0,
+  "recommendation": "SAFE"
+}
+```
+
 ## License
 
 MIT © 2024-2026 fframe11
