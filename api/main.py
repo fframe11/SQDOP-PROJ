@@ -32,7 +32,7 @@ app.include_router(lineage_router)
 app.include_router(pipeline_router)
 app.include_router(quality_router)
 
-ELASTICSEARCH_URL = os.getenv("ELASTICSEARCH_URL", "http://elasticsearch:9200")
+ELASTICSEARCH_URL = os.getenv("ELASTICSEARCH_URL", "http://elastic:sdoqap_secure@elasticsearch:9200")
 
 # Global executor to avoid thread join blocks on request exit
 executor = ThreadPoolExecutor(max_workers=20)
@@ -52,7 +52,7 @@ def get_services_status():
     services = {
         "HDFS Namenode": {"host": "namenode", "port": 9870, "url": "http://localhost:9870"},
         "HDFS Datanode": {"host": "datanode", "port": 9864, "url": None},
-        "Elasticsearch": {"host": "elasticsearch", "port": 9200, "url": "http://localhost:9200"},
+        "Elasticsearch": {"host": "elasticsearch", "port": 9200, "url": "http://elastic:sdoqap_secure@localhost:9200"},
         "Kibana": {"host": "kibana", "port": 5601, "url": "http://localhost:5601"},
         "Grafana": {"host": "grafana", "port": 3000, "url": "http://localhost:3000"},
         "n8n Orchestrator": {"host": "n8n", "port": 5678, "url": "http://localhost:5678"},
@@ -207,8 +207,21 @@ def get_quality_projection():
             res = es.search(index="sdoqap_quality_runs", body={"sort": [{"timestamp": "desc"}], "size": 10})
             hits = res.get("hits", {}).get("hits", [])
             scores = [hit["_source"]["quality_score"] for hit in hits][::-1]
+            timestamps = [hit["_source"]["timestamp"] for hit in hits][::-1]
             if len(scores) >= 2:
-                x = list(range(len(scores)))
+                # Root Cause Fix: Authentic Linear Regression using actual Time Deltas (Days)
+                from datetime import datetime
+                t0 = datetime.fromisoformat(timestamps[0].replace("Z", "+00:00"))
+                x = []
+                for ts in timestamps:
+                    t = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+                    days_diff = (t - t0).total_seconds() / 86400.0
+                    x.append(days_diff)
+                
+                # If all runs happened at the exact same second (e.g. testing), spread them slightly to avoid ZeroDivision
+                if x[-1] == 0:
+                    x = list(range(len(scores)))
+
                 y = scores
                 n = len(scores)
                 sum_x = sum(x)
@@ -219,15 +232,27 @@ def get_quality_projection():
                 m = (n * sum_xy - sum_x * sum_y) / denom if denom != 0 else -0.5
                 c = (sum_y - m * sum_x) / n
 
+                # Calculate Standard Error of the Regression for realistic Confidence Intervals
+                sse = sum((y[i] - (m * x[i] + c))**2 for i in range(n))
+                variance = sse / (n - 2) if n > 2 else 2.0
+                std_error = variance ** 0.5
+                if std_error < 0.5: std_error = 0.5
+
                 projected_scores = []
                 ci_high = []
                 ci_low = []
-                for day in range(1, 8):
-                    fluctuation = (day * m) + (math.sin(day * 1.5) * 0.3)
-                    proj_val = max(0.0, min(100.0, c + fluctuation))
+                # Project from the last known day
+                last_day = x[-1]
+                for day_offset in range(1, 8):
+                    future_day = last_day + day_offset
+                    # Pure Linear Regression, NO math.sin fake wave!
+                    proj_val = max(0.0, min(100.0, c + (future_day * m)))
                     projected_scores.append(round(proj_val, 2))
-                    ci_high.append(round(min(100.0, proj_val + 1.2 + (0.4 * day)), 2))
-                    ci_low.append(round(max(0.0, proj_val - 1.5 - (0.6 * day)), 2))
+                    
+                    # CI widens over time (uncertainty increases)
+                    margin = std_error * (1 + (day_offset * 0.2))
+                    ci_high.append(round(min(100.0, proj_val + margin), 2))
+                    ci_low.append(round(max(0.0, proj_val - margin), 2))
 
                 stability = max(5.0, min(100.0, 100.0 + (m * 80) - (abs(m) * 20)))
                 breach_prob = max(0.1, min(99.9, 1.2 if m >= -0.1 else (abs(m) * 50.0 + 10.0)))
@@ -361,12 +386,16 @@ def get_business_impact():
             hits = res.get("hits", {}).get("hits", [])
             total_quarantined = sum(hit["_source"].get("quarantined_records", 0) for hit in hits)
             total_records = sum(hit["_source"].get("total_records", 0) for hit in hits) or 1
+            total_quarantined_financial_value = sum(hit["_source"].get("quarantined_financial_value", 0.0) for hit in hits)
 
+        drift_severity = 0
         if es.indices.exists(index="sdoqap_schema_drifts"):
             drift_res = es.search(index="sdoqap_schema_drifts", body={"size": 1})
             if drift_res.get("hits", {}).get("hits", []):
                 has_drift = True
-                drift_table = drift_res["hits"]["hits"][0]["_source"].get("table_name")
+                hit_source = drift_res["hits"]["hits"][0]["_source"]
+                drift_table = hit_source.get("table_name")
+                drift_severity = hit_source.get("drift_severity", 5)
 
         # ---------------------------------------------------------
         # Standardized Framework: Cost of Poor Data Quality (COPDQ)
@@ -381,12 +410,16 @@ def get_business_impact():
         cost_of_correction = total_quarantined * 2
 
         # 2. Cost of Lost Opportunities (Business revenue impact)
-        # Assume 5% of defective records would cause a lost transaction averaging $50
-        cost_of_lost_opportunities = int(total_quarantined * 0.05 * 50)
+        # Root Cause Fix: Calculated dynamically from the real financial value of quarantined rows
+        if total_quarantined_financial_value > 0:
+            cost_of_lost_opportunities = int(total_quarantined_financial_value)
+        else:
+            # Fallback for tables without financial columns (Assume 5% error rate on $50 txn)
+            cost_of_lost_opportunities = int(total_quarantined * 0.05 * 50)
 
         # 3. Cost of Risk (Compliance, GDPR, SLA breaches)
-        # Escalates significantly if schema drift is detected
-        risk_multiplier = 5 if has_drift else 1
+        # Root Cause Fix (Point 26): Use actual drift_severity instead of generic multiplier
+        risk_multiplier = drift_severity if has_drift else 1
         cost_of_risk = total_quarantined * risk_multiplier
 
         # Apportion costs to KPI Connections

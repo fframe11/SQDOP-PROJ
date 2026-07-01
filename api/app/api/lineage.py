@@ -7,7 +7,7 @@ router = APIRouter(
     tags=["lineage"]
 )
 
-ELASTICSEARCH_URL = os.getenv("ELASTICSEARCH_URL", "http://elasticsearch:9200")
+ELASTICSEARCH_URL = os.getenv("ELASTICSEARCH_URL", "http://elastic:sdoqap_secure@elasticsearch:9200")
 
 def get_es_client():
     try:

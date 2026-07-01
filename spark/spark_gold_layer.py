@@ -19,7 +19,7 @@ import re
 from datetime import datetime, timezone, timedelta
 from collections import defaultdict
 
-ELASTICSEARCH_URL = os.getenv("ELASTICSEARCH_URL", "http://elasticsearch:9200")
+ELASTICSEARCH_URL = os.getenv("ELASTICSEARCH_URL", "http://elastic:sdoqap_secure@elasticsearch:9200")
 HEADERS = {"Content-Type": "application/json"}
 
 # Financial model constants (IBM / Gartner COPDQ benchmark)

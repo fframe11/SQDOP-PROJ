@@ -3,7 +3,7 @@ import json
 from datetime import datetime, timedelta, timezone
 from elasticsearch import Elasticsearch
 
-ELASTICSEARCH_URL = os.getenv("ELASTICSEARCH_URL", "http://localhost:9200")
+ELASTICSEARCH_URL = os.getenv("ELASTICSEARCH_URL", "http://elastic:sdoqap_secure@localhost:9200")
 
 def seed():
     print(f"Connecting to Elasticsearch at {ELASTICSEARCH_URL}...")

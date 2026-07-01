@@ -23,6 +23,9 @@ secrets/
 /*.csv
 stress test/*.csv
 stress test/**/*.csv
+dummy_data/
+spark/spark-warehouse/
+spark/derby.log
 user_inputs/datasets/*
 !user_inputs/datasets/README.md
 user_inputs/apis/*

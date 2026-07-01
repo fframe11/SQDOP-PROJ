@@ -6,13 +6,16 @@ import requests
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 
-ELASTICSEARCH_URL = os.getenv("ELASTICSEARCH_URL", "http://elasticsearch:9200")
+ELASTICSEARCH_URL = os.getenv("ELASTICSEARCH_URL", "http://elastic:sdoqap_secure@elasticsearch:9200")
 HDFS_URL = "hdfs://namenode:9000"
 
 def get_spark_session(app_name):
     return SparkSession.builder \
         .appName(app_name) \
         .master("local[*]") \
+        .config("spark.jars.packages", "io.delta:delta-spark_2.12:3.0.0") \
+        .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension") \
+        .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog") \
         .config("spark.sql.adaptive.enabled", "false") \
         .config("spark.sql.shuffle.partitions", "2") \
         .config("spark.driver.host", "127.0.0.1") \
@@ -23,14 +26,25 @@ def log_to_elasticsearch(index_name, doc):
     """Writes metadata document directly to Elasticsearch."""
     url = f"{ELASTICSEARCH_URL}/{index_name}/_doc"
     headers = {"Content-Type": "application/json"}
+    
+    # Parse basic auth from URL if present (e.g., http://user:pass@host:port)
+    auth = None
+    from urllib.parse import urlparse
+    parsed = urlparse(ELASTICSEARCH_URL)
+    if parsed.username and parsed.password:
+        auth = (parsed.username, parsed.password)
+        # Remove credentials from the URL used for the request to avoid exposure
+        base_url = f"{parsed.scheme}://{parsed.hostname}:{parsed.port}"
+        url = f"{base_url}/{index_name}/_doc"
+
     try:
-        res = requests.post(url, headers=headers, data=json.dumps(doc), timeout=10)
+        res = requests.post(url, headers=headers, auth=auth, data=json.dumps(doc), timeout=10)
         res.raise_for_status()
         print(f"Metrics logged to Elasticsearch index '{index_name}' successfully.")
     except Exception as e:
         print(f"Error logging to Elasticsearch: {e}")
 
-N8N_WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL", "http://sdoqap-n8n:5678/webhook/sdoqap-alerts")
+N8N_WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL", "http://n8n:5678/webhook/sdoqap-alerts")
 
 def send_n8n_alert(title, message, severity="warning"):
     """Sends an alert to n8n webhook."""
@@ -40,14 +54,20 @@ def send_n8n_alert(title, message, severity="warning"):
         "severity": severity,
         "timestamp": datetime.utcnow().isoformat()
     }
-    try:
-        res = requests.post(N8N_WEBHOOK_URL, headers={"Content-Type": "application/json"}, json=payload, timeout=5)
-        if res.status_code == 200:
-            print(f"Alert sent to n8n successfully: {title}")
-        else:
-            print(f"Failed to send alert to n8n. Status: {res.status_code}")
-    except Exception as e:
-        print(f"Error sending alert to n8n: {e}")
+    def _send():
+        try:
+            res = requests.post(N8N_WEBHOOK_URL, headers={"Content-Type": "application/json"}, json=payload, timeout=5)
+            if res.status_code == 200:
+                print(f"Alert sent to n8n successfully: {title}")
+            else:
+                print(f"Failed to send alert to n8n. Status: {res.status_code}")
+        except Exception as e:
+            print(f"Error sending alert to n8n: {e}")
+            
+    import threading
+    t = threading.Thread(target=_send)
+    t.daemon = True
+    t.start()
 
 def run_quality_check(table_name, primary_key, date_column, schema_spec):
     spark = get_spark_session(f"SDOQAP_QualityCheck_{table_name}")
@@ -113,12 +133,22 @@ def run_quality_check(table_name, primary_key, date_column, schema_spec):
             sql_type = spark_type_map.get(expected_type, "string")
             df = df.withColumn(col_name, F.lit(None).cast(sql_type))
             actual_columns[col_name] = expected_type
+            send_n8n_alert(
+                title=f"🚨 CRITICAL Schema Drift: Missing Column in {table_name}",
+                message=f"Column '{col_name}' is missing from source data. Auto-healed with NULLs.",
+                severity="critical"
+            )
         elif actual_columns[col_name] != expected_type:
             drift_detected = True
             drift_details[col_name] = {"error": "type_mismatch", "expected": expected_type, "actual": actual_columns[col_name], "action": "coerced_to_string"}
             df = df.withColumn(col_name, F.col(col_name).cast("string"))
             schema_spec[col_name] = "StringType"
             actual_columns[col_name] = "StringType"
+            send_n8n_alert(
+                title=f"🚨 CRITICAL Schema Drift: Type Mismatch in {table_name}",
+                message=f"Column '{col_name}' changed from {expected_type} to {actual_columns[col_name]}.",
+                severity="critical"
+            )
 
     # 1.2 Check new columns in DF (API sent extra fields)
     for col_name, actual_type in list(actual_columns.items()):
@@ -129,12 +159,24 @@ def run_quality_check(table_name, primary_key, date_column, schema_spec):
 
     if drift_detected:
         print(f"Schema drift detected and auto-evolved: {drift_details}")
+        
+        # Calculate overall drift severity weight (Root Cause Fix for Binary Drift - Point 26)
+        total_drift_severity = 0
+        for col, details in drift_details.items():
+            if details["error"] == "new_column":
+                total_drift_severity += 1  # Low risk
+            elif details["error"] == "missing_column":
+                total_drift_severity += 5  # High risk
+            elif details["error"] == "type_mismatch":
+                total_drift_severity += 5  # High risk
+
         log_to_elasticsearch("sdoqap_schema_drifts", {
             "run_id": run_id,
             "table_name": table_name,
             "registered_schema": schema_spec,
             "detected_schema": actual_columns,
             "drift_details": drift_details,
+            "drift_severity": total_drift_severity,
             "timestamp": datetime.utcnow().isoformat()
         })
 
@@ -178,19 +220,21 @@ def run_quality_check(table_name, primary_key, date_column, schema_spec):
     valid_df = df_with_status.filter(~F.col("is_invalid") & F.col("is_invalid").isNotNull())
 
     # Check duplicates on valid records (incremental deduplication)
-    from pyspark.sql.window import Window
+    # Bug 1 & 2 Fix: OOM Window Function -> Optimized dropDuplicates and Anti-Join
     pk_cols = [primary_key] if isinstance(primary_key, str) else primary_key
+    valid_df_with_id = valid_df.withColumn("__row_id", F.monotonically_increasing_id())
 
-    # Bug 1: Deterministic order for deduplication
-    order_cols = [F.col(date_column).desc()] if date_column and date_column in df.columns else [F.monotonically_increasing_id()]
-    window_spec = Window.partitionBy(*pk_cols).orderBy(*order_cols)
-
-    valid_dedup = valid_df.withColumn("row_num", F.row_number().over(window_spec))
-
-    clean_df = valid_dedup.filter(F.col("row_num") == 1).drop("is_invalid", "reject_reason", "row_num")
-    duplicate_df = valid_dedup.filter(F.col("row_num") > 1) \
-                              .drop("row_num") \
-                              .withColumn("reject_reason", F.lit("duplicate_records"))
+    if date_column and date_column in df.columns:
+        valid_df_with_id = valid_df_with_id.orderBy(F.col(date_column).desc())
+    
+    # Efficiently keep only the latest unique records
+    valid_dedup_with_id = valid_df_with_id.dropDuplicates(subset=pk_cols)
+    clean_df = valid_dedup_with_id.drop("__row_id", "is_invalid", "reject_reason")
+    
+    # Find the dropped duplicates by Anti-Join to send to quarantine
+    duplicate_df = valid_df_with_id.join(valid_dedup_with_id.select("__row_id"), on="__row_id", how="left_anti") \
+                                   .drop("__row_id") \
+                                   .withColumn("reject_reason", F.lit("duplicate_records"))
 
     # Combine all quarantined records
     all_quarantined = invalid_df.unionByName(duplicate_df, allowMissingColumns=True)
@@ -207,22 +251,51 @@ def run_quality_check(table_name, primary_key, date_column, schema_spec):
     quarantine_count = all_quarantined_write.count()
     total_records = clean_count + quarantine_count
 
-    print("Writing validated datasets to HDFS...")
-    # Use append to avoid partial overwrite issues, and because run_id is unique per run
-    clean_df.write.mode("append").parquet(f"{active_path}/run_id={run_id}")
-    all_quarantined_write.write.mode("append").parquet(f"{quarantine_path}/run_id={run_id}")
+    print("Writing validated datasets to HDFS using Delta Lake...")
+    
+    # Delta Lake MERGE (True Upsert)
+    clean_df_for_upsert = clean_df.withColumn("run_id", F.lit(run_id))
+    
+    try:
+        from delta.tables import DeltaTable
+        if DeltaTable.isDeltaTable(spark, active_path):
+            print("Existing Delta Table found. Performing MERGE INTO...")
+            delta_table = DeltaTable.forPath(spark, active_path)
+            
+            # Construct merge condition based on PKs
+            if isinstance(pk_cols, list) and len(pk_cols) > 0:
+                merge_cond = " AND ".join([f"old.{col} = new.{col}" for col in pk_cols])
+            else:
+                merge_cond = f"old.{pk_cols} = new.{pk_cols}"
+                
+            delta_table.alias("old").merge(
+                clean_df_for_upsert.alias("new"),
+                merge_cond
+            ).whenMatchedUpdateAll().whenNotMatchedInsertAll().execute()
+            print("Delta Lake Upsert completed successfully.")
+        else:
+            print("No existing Delta table found. Proceeding with initial write.")
+            clean_df_for_upsert.write.format("delta").mode("overwrite").save(active_path)
+    except Exception as e:
+        print(f"Error during Delta Upsert or Table check: {e}. Writing initial table.")
+        clean_df_for_upsert.write.format("delta").mode("overwrite").save(active_path)
+
+    # Quarantined data can still be parquet or delta, we'll use delta for consistency
+    all_quarantined_write.write.format("delta").mode("append").save(f"{quarantine_path}/run_id={run_id}")
 
     # Class Balance / Data Distribution calculation
     class_balance = {}
     group_col = None
     if clean_count > 0:
         try:
-            clean_run_df = spark.read.parquet(f"{active_path}/run_id={run_id}")
-            # 1. Search for common categorical column names
+            clean_run_df = spark.read.format("delta").load(active_path)
+            # 1. Search for common categorical column names (Case Insensitive)
             common_categorical_cols = ["label", "role", "category", "type", "status", "class", "gender", "country", "state", "sector", "transaction_type"]
+            df_cols_lower = {c.lower(): c for c in clean_run_df.columns}
+            
             for col_name in common_categorical_cols:
-                if col_name in clean_run_df.columns:
-                    group_col = col_name
+                if col_name in df_cols_lower:
+                    group_col = df_cols_lower[col_name]
                     break
 
             # 2. Cardinality-based automatic String column fallback (detects 2 to 25 categories)
@@ -245,7 +318,7 @@ def run_quality_check(table_name, primary_key, date_column, schema_spec):
     quarantine_breakdown = {}
     if quarantine_count > 0:
         try:
-            quar_run_df = spark.read.parquet(f"{quarantine_path}/run_id={run_id}")
+            quar_run_df = spark.read.format("delta").load(f"{quarantine_path}/run_id={run_id}")
             if "reject_reason" in quar_run_df.columns:
                 breakdown_df = quar_run_df.groupBy("reject_reason").count().collect()
                 for row in breakdown_df:
@@ -262,9 +335,31 @@ def run_quality_check(table_name, primary_key, date_column, schema_spec):
         except Exception as e:
             print(f"Error computing quarantine breakdown: {e}")
 
+    # Calculate Dynamic Financial COPDQ (Root Cause Fix for hardcoded math)
+    quarantined_financial_value = 0.0
+    if quarantine_count > 0:
+        try:
+            fin_cols = ["total_sales", "sales", "revenue", "profit", "price", "amount", "total"]
+            fin_col_actual = None
+            df_cols_lower = {c.lower(): c for c in quar_run_df.columns}
+            for c in fin_cols:
+                if c in df_cols_lower:
+                    fin_col_actual = df_cols_lower[c]
+                    break
+            
+            if fin_col_actual:
+                sum_val = quar_run_df.select(F.sum(F.col(fin_col_actual).cast("double"))).collect()[0][0]
+                quarantined_financial_value = float(sum_val) if sum_val is not None else 0.0
+                print(f"Dynamic COPDQ: Calculated ${quarantined_financial_value:.2f} lost from '{fin_col_actual}'")
+        except Exception as e:
+            print(f"Error computing financial loss: {e}")
+
     # 3. FRESHNESS LAG
     max_lag_hours = 0.0
-    if date_column and clean_count > 0:
+    # Root Cause Fix (Point 27): Skip Freshness if table is known to be historical or static
+    is_historical = table_name.endswith("_historical") or table_name == "global_ecommerce_sales"
+
+    if date_column and clean_count > 0 and not is_historical:
         try:
             clean_run_df = spark.read.parquet(f"{active_path}/run_id={run_id}")
             if date_column in clean_run_df.columns:
@@ -292,6 +387,8 @@ def run_quality_check(table_name, primary_key, date_column, schema_spec):
                     max_lag_hours = max(0.0, lag_seconds / 3600.0)
         except Exception as e:
             print(f"Error computing freshness: {e}")
+    elif is_historical:
+        print(f"Skipping freshness check for historical dataset '{table_name}'.")
 
     # 4. QUALITY SCORE
     passed_tests = clean_count
@@ -314,7 +411,8 @@ def run_quality_check(table_name, primary_key, date_column, schema_spec):
         "quarantined_records": quarantine_count,
         "quality_score": quality_score,
         "freshness_lag_hours": max_lag_hours,
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.utcnow().isoformat(),
+        "quarantined_financial_value": quarantined_financial_value
     }
     if class_balance:
         quality_run_doc["class_balance"] = class_balance
@@ -405,11 +503,35 @@ if __name__ == "__main__":
 
         raw_path = f"hdfs://namenode:9000/data/raw/{target_table}"
         try:
-            # Read sample to infer schema
-            df_temp = temp_spark.read.option("header", "true").option("inferSchema", "true").csv(raw_path)
+            # 1. Read raw strings to preserve exact values
+            df_raw = temp_spark.read.option("header", "true").csv(raw_path)
+            # 2. Read with inferSchema to get Spark's baseline guesses
+            df_infer = temp_spark.read.option("header", "true").option("inferSchema", "true").csv(raw_path)
+            
+            # 3. Deterministic Profiling (Full 100% Dataset Pass)
+            # We check EVERY row to see if ANY row contains a leading zero (e.g. '01234')
+            agg_exprs = []
+            for col in df_raw.columns:
+                agg_exprs.append(
+                    F.max(F.when(F.col(col).rlike("^0[0-9]+$"), 1).otherwise(0)).alias(f"{col}_has_leading_zero")
+                )
+            
+            # Execute full dataset scan
+            profile_row = df_raw.agg(*agg_exprs).collect()[0]
+            
+            schema_spec = {}
+            for field in df_infer.schema.fields:
+                col = field.name
+                inferred_type = field.dataType.__class__.__name__
+                has_leading_zero = profile_row[f"{col}_has_leading_zero"] == 1
+                
+                if has_leading_zero:
+                    # Root Cause Fix: 100% Guarantee no leading zeros are lost
+                    schema_spec[col] = "StringType"
+                else:
+                    # Safe to use Spark's inferred type (Integer, Double, Timestamp, etc.)
+                    schema_spec[col] = inferred_type
 
-            # Map column names and types
-            schema_spec = {field.name: field.dataType.__class__.__name__ for field in df_temp.schema.fields}
             columns = list(schema_spec.keys())
 
             # 1. Infer Primary Key

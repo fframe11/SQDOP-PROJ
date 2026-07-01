@@ -9,7 +9,7 @@ router = APIRouter(
     tags=["pipeline"]
 )
 
-ELASTICSEARCH_URL = os.getenv("ELASTICSEARCH_URL", "http://elasticsearch:9200")
+ELASTICSEARCH_URL = os.getenv("ELASTICSEARCH_URL", "http://elastic:sdoqap_secure@elasticsearch:9200")
 acknowledged_runs = set()
 
 def get_es_client():
