@@ -503,47 +503,36 @@ def run_quality_check(table_name, primary_key, date_column, schema_spec, input_t
             severity="warning"
         )
 
-    # 2. AUTO-CLEANSING & HEALING (Self-Healing Data Pipeline - User Request)
+    # 2. AUTO-CLEANSING & HEALING (Self-Healing Data Pipeline - Correct Enterprise Logic)
+    # We do NOT generate fake values (UUIDs/Timestamps) for structural keys (PKs/Dates) as it violates data integrity.
+    # We only perform safe deduplication and format-level normalization.
     auto_clean = rules.get("auto_clean", True)
     remediation_logs = []
     
     if auto_clean:
         print("[AUTO-CLEAN] Starting self-healing preprocessing...")
-        
-        # 2.1 Heal Missing Primary Keys (Generate Unique IDs)
-        if isinstance(primary_key, str):
-            pk_null_count = df.filter(F.col(primary_key).isNull()).count()
-            if pk_null_count > 0:
-                print(f"[AUTO-CLEAN] Found {pk_null_count} rows with missing Primary Key. Generating UUIDs...")
-                df = df.withColumn(primary_key, F.coalesce(F.col(primary_key), F.concat(F.lit("AUTO_PK_"), F.expr("uuid()"))))
-                remediation_logs.append(f"healed_{pk_null_count}_missing_pks")
-        elif isinstance(primary_key, list) and len(primary_key) > 0:
-            for pk_col in primary_key:
-                pk_null_count = df.filter(F.col(pk_col).isNull()).count()
-                if pk_null_count > 0:
-                    print(f"[AUTO-CLEAN] Found {pk_null_count} rows with missing PK component '{pk_col}'. Generating UUIDs...")
-                    df = df.withColumn(pk_col, F.coalesce(F.col(pk_col), F.concat(F.lit("AUTO_PK_"), F.expr("uuid()"))))
-                    remediation_logs.append(f"healed_{pk_null_count}_missing_{pk_col}")
-        
-        # 2.2 Heal Missing Dates (Fill with Current Timestamp)
-        if date_column and date_column in df.columns:
-            date_null_count = df.filter(F.col(date_column).isNull()).count()
-            if date_null_count > 0:
-                print(f"[AUTO-CLEAN] Found {date_null_count} rows with missing Date Column. Imputing current timestamp...")
-                df = df.withColumn(date_column, F.coalesce(F.col(date_column), F.current_timestamp()))
-                remediation_logs.append(f"healed_{date_null_count}_missing_dates")
-                
-        # 2.3 Heal Duplicates (Deduplicate directly without quarantining them as errors)
+        # 2.1 Safe Deduplication (Resolve duplicates on valid PKs)
         pk_cols = [primary_key] if isinstance(primary_key, str) else primary_key
-        df_count_before = df.count()
+        
+        # Filter rows with non-null PKs for deduplication, leaving null PKs to be quarantined
+        non_null_pk_cond = F.col(primary_key).isNotNull() if isinstance(primary_key, str) else F.col(pk_cols[0]).isNotNull()
+        df_non_null = df.filter(non_null_pk_cond)
+        df_null_pk = df.filter(~non_null_pk_cond)
+        
+        df_count_before = df_non_null.count()
         if date_column and date_column in df.columns:
-            df = df.orderBy(F.col(date_column).desc())
-        df = df.dropDuplicates(subset=pk_cols)
-        df_count_after = df.count()
+            df_non_null = df_non_null.orderBy(F.col(date_column).desc())
+            
+        df_non_null_dedup = df_non_null.dropDuplicates(subset=pk_cols)
+        df_count_after = df_non_null_dedup.count()
+        
         dup_resolved = df_count_before - df_count_after
         if dup_resolved > 0:
             print(f"[AUTO-CLEAN] Deduplicated and resolved {dup_resolved} duplicate records.")
             remediation_logs.append(f"resolved_{dup_resolved}_duplicates")
+            
+        # Re-combine non-null deduped rows with null PK rows to preserve data integrity
+        df = df_non_null_dedup.unionByName(df_null_pk, allowMissingColumns=True)
 
     # 3. DATA VALIDATION (Row-level Quality check)
     df_with_status = df.withColumn("is_invalid", F.col(primary_key).isNull()) \

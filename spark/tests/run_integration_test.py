@@ -83,8 +83,8 @@ def verify_results():
     print(f"Latest Elasticsearch Quality Document: {json.dumps(doc, indent=2)}")
     
     expected_total = 27
-    expected_clean = 27
-    expected_quarantine = 0
+    expected_clean = 20
+    expected_quarantine = 7
     
     actual_total = doc.get("total_records")
     actual_clean = doc.get("clean_records")
@@ -96,7 +96,7 @@ def verify_results():
     assert actual_clean == expected_clean, f"Expected clean_records to be {expected_clean}, got {actual_clean}"
     assert actual_quarantine == expected_quarantine, f"Expected quarantined_records to be {expected_quarantine}, got {actual_quarantine}"
     
-    expected_score = 100.0
+    expected_score = (expected_clean / expected_total) * 100.0
     assert abs(actual_score - expected_score) < 0.1, f"Expected quality_score to be {expected_score:.2f}%, got {actual_score:.2f}%"
     
     print("[PASS] All Assertions PASSED!")
