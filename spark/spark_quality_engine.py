@@ -70,7 +70,8 @@ N8N_WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL", "http://n8n:5678/webhook/sdoqap-a
 # ─── FIX 2A: Distributed Lock via Elasticsearch with Self-Healing ────────────────
 def acquire_lock(table_name: str, run_id: str) -> bool:
     """Atomically lock a table before Spark starts. Uses ES op_type=create.
-    If lock exists (409 Conflict), checks expires_at. If expired, force overwrites it."""
+    If lock exists (409 Conflict), checks expires_at. If expired, force overwrites it
+    using Optimistic Concurrency Control (seq_no & primary_term) to ensure atomicity."""
     from urllib.parse import urlparse
     parsed = urlparse(ELASTICSEARCH_URL)
     auth = (parsed.username, parsed.password) if parsed.username else None
@@ -80,7 +81,7 @@ def acquire_lock(table_name: str, run_id: str) -> bool:
         "run_id": run_id,
         "status": "RUNNING",
         "locked_at": datetime.utcnow().isoformat(),
-        "expires_at": (datetime.utcnow() + timedelta(hours=2)).isoformat()
+        "expires_at": (datetime.utcnow() + timedelta(minutes=15)).isoformat()
     }
     try:
         url = f"{base_url}/sdoqap_run_locks/_doc/{table_name}?op_type=create"
@@ -98,10 +99,18 @@ def acquire_lock(table_name: str, run_id: str) -> bool:
                 if expires_at_str:
                     expires_at = datetime.fromisoformat(expires_at_str.replace("Z", "+00:00"))
                     if datetime.utcnow() > expires_at:
-                        print(f"[LOCK] Previous lock for '{table_name}' expired. Force overwriting lock...")
-                        res = requests.put(lock_url, json=lock_doc, auth=auth, timeout=5)
+                        print(f"[LOCK] Previous lock for '{table_name}' expired. Force overwriting lock with OCC...")
+                        seq_no = existing.get("_seq_no")
+                        primary_term = existing.get("_primary_term")
+                        
+                        # Use ES Optimistic Concurrency Control parameters to ensure atomic write
+                        occ_url = f"{lock_url}?if_seq_no={seq_no}&if_primary_term={primary_term}"
+                        res = requests.put(occ_url, json=lock_doc, auth=auth, timeout=5)
                         if res.status_code in [200, 201]:
+                            print(f"[LOCK] Re-acquired expired lock atomically for '{table_name}'")
                             return True
+                        else:
+                            print(f"[LOCK] OCC failed (status={res.status_code}). Another process acquired the lock first.")
         print(f"[LOCK] Table '{table_name}' already locked. Aborting duplicate run.")
         return False
     except Exception as e:

@@ -42,6 +42,13 @@ def list_pipeline_runs(page: int = 1, size: int = 50, limit: int = 50, paginated
         actual_size = limit if limit != 50 else size
         from_idx = (page - 1) * actual_size
         
+        # Prevent ES Deep Pagination memory blowup (> 10000 window limit)
+        if from_idx + actual_size > 10000:
+            raise HTTPException(
+                status_code=400,
+                detail="Deep pagination limit exceeded. Elasticsearch restricts offsets above 10,000 to prevent memory exhaustion."
+            )
+            
         res = es.search(
             index="sdoqap_pipeline_runs",
             query={"match_all": {}},
@@ -55,6 +62,8 @@ def list_pipeline_runs(page: int = 1, size: int = 50, limit: int = 50, paginated
             return {"data": data, "total": total, "page": page, "size": actual_size}
         else:
             return data
+    except HTTPException as he:
+        raise he
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Elasticsearch query failed: {str(e)}")
 

@@ -49,11 +49,25 @@ def clear_es_lock():
     except Exception as e:
         print(f"Failed to clear lock: {e}")
 
+def get_spark_master_container_name():
+    try:
+        import subprocess
+        # Get list of running containers using docker ps
+        res = subprocess.run(["docker", "ps", "--format", "{{.Names}}"], capture_output=True, text=True, check=True)
+        for line in res.stdout.split("\n"):
+            name = line.strip()
+            if "spark-master" in name:
+                return name
+    except Exception as e:
+        print(f"Warning: Failed to locate spark-master container dynamically: {e}")
+    return "sdoqap-spark-master"
+
 def run_spark_job():
     print("Running Spark Quality Engine job for benchmark_test on cluster...")
+    container_name = get_spark_master_container_name()
     # Run the quality engine using spark-submit pointing to the Spark master cluster
     run_cmd([
-        "docker", "exec", "-t", "-e", "HADOOP_USER_NAME=root", "sdoqap-spark-master",
+        "docker", "exec", "-t", "-e", "HADOOP_USER_NAME=root", container_name,
         "spark-submit",
         "--master", "spark://spark-master:7077",
         "--packages", "io.delta:delta-core_2.12:2.4.0",
