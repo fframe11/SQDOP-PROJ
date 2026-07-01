@@ -20,10 +20,22 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# CORS configuration to support external dashboard integrations
+# CORS configuration to support external dashboard integrations safely with credentials
+allowed_origins_raw = os.getenv("ALLOWED_ORIGINS", "")
+if allowed_origins_raw:
+    allowed_origins = [o.strip() for o in allowed_origins_raw.split(",") if o.strip()]
+else:
+    allowed_origins = [
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "http://localhost:8000",
+        "http://localhost:8002",
+        "http://localhost:8080"
+    ]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

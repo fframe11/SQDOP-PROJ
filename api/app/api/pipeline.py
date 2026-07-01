@@ -23,11 +23,16 @@ def get_elasticsearch_url():
 
 acknowledged_runs = set()
 
+_es_client = None
+
 def get_es_client():
-    try:
-        return Elasticsearch(get_elasticsearch_url())
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to connect to Elasticsearch: {str(e)}")
+    global _es_client
+    if _es_client is None:
+        try:
+            _es_client = Elasticsearch(get_elasticsearch_url())
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to connect to Elasticsearch: {str(e)}")
+    return _es_client
 
 @router.get("")
 def list_pipeline_runs(page: int = 1, size: int = 50, limit: int = 50, paginated: bool = False):
