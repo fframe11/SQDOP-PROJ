@@ -43,10 +43,12 @@ def list_proposals(status: str = "PENDING"):
 
 
 @router.post("/proposals/{proposal_id}/approve")
-def approve_proposal(proposal_id: str):
+def approve_proposal(proposal_id: str, primary_key: str = None, date_column: str = None):
     """
     Approve a PENDING schema proposal.
-    This writes the proposed schema into schema_registry.json permanently.
+    This writes the proposed schema into sdoqap_schema_registry in ES.
+    Optional query parameters `primary_key` and `date_column` can be provided
+    to override the defaults for new tables.
     """
     es = get_es()
     try:
@@ -58,7 +60,7 @@ def approve_proposal(proposal_id: str):
     if proposal.get("status") != "PENDING":
         raise HTTPException(
             status_code=400,
-            detail=f"Proposal is already '{proposal.get('status')}'. Only PENDING proposals can be approved."
+            detail=f"Proposal is already '{proposal.get('status')}-'. Only PENDING proposals can be approved."
         )
 
     table_name = proposal["table_name"]
@@ -109,10 +111,15 @@ def approve_proposal(proposal_id: str):
             reg_doc = es.get(index="sdoqap_schema_registry", id=table_name)["_source"]
         else:
             reg_doc = default_registry.get(table_name, {
-                "primary_key": "id",
-                "date_column": None,
+                "primary_key": primary_key or "id",
+                "date_column": date_column,
                 "schema_spec": {}
             })
+            
+        if primary_key:
+            reg_doc["primary_key"] = primary_key
+        if date_column is not None:
+            reg_doc["date_column"] = date_column if date_column != "" else None
             
         reg_doc["schema_spec"] = proposed_schema
         es.index(index="sdoqap_schema_registry", id=table_name, document=reg_doc)

@@ -759,7 +759,11 @@ def run_quality_check(table_name, primary_key, date_column, schema_spec, input_t
     # 4. QUALITY SCORE
     passed_tests = clean_count
     total_tests = total_records
-    quality_score = 100.0 if total_tests == 0 else (passed_tests / total_tests) * 100.0
+    if total_tests == 0:
+        quality_score = 0.0
+        remediation_logs.append("Warning: Empty source file ingested. Quality score defaulted to 0.0% to prevent masking upstream ingestion failure.")
+    else:
+        quality_score = (passed_tests / total_tests) * 100.0
 
     # FIX 3A: Use per-table threshold from rules_config instead of hardcoded 90.0
     if quality_score < quality_threshold:
