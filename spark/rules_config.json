@@ -1,0 +1,24 @@
+{
+  "_comment": "Default rules apply to ALL tables. Table-specific configs override defaults.",
+  "_default": {
+    "null_primary_key": { "enabled": true, "severity": "critical" },
+    "null_date_column": { "enabled": true, "severity": "warning" },
+    "duplicate_check":  { "enabled": true, "severity": "critical" },
+    "freshness_threshold_hours": 48,
+    "quality_score_threshold": 90.0
+  },
+  "global_ecommerce_sales": {
+    "null_date_column": { "enabled": false },
+    "freshness_threshold_hours": null,
+    "quality_score_threshold": 85.0
+  },
+  "mbti": {
+    "null_date_column": { "enabled": false },
+    "freshness_threshold_hours": null,
+    "quality_score_threshold": 80.0
+  },
+  "users": {
+    "freshness_threshold_hours": 24,
+    "quality_score_threshold": 95.0
+  }
+}

@@ -1,7 +1,8 @@
 import sys
 import os
 import json
-from datetime import datetime
+import subprocess
+from datetime import datetime, timedelta
 import requests
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
@@ -13,7 +14,8 @@ def get_spark_session(app_name):
     return SparkSession.builder \
         .appName(app_name) \
         .master("local[*]") \
-        .config("spark.jars.packages", "io.delta:delta-spark_2.12:3.0.0") \
+        .config("spark.executor.memory", "2g") \
+        .config("spark.jars.packages", "io.delta:delta-core_2.12:2.4.0") \
         .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension") \
         .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog") \
         .config("spark.sql.adaptive.enabled", "false") \
@@ -46,6 +48,85 @@ def log_to_elasticsearch(index_name, doc):
 
 N8N_WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL", "http://n8n:5678/webhook/sdoqap-alerts")
 
+# ─── FIX 2A: Distributed Lock via Elasticsearch ───────────────────────────────
+def acquire_lock(table_name: str, run_id: str) -> bool:
+    """Atomically lock a table before Spark starts. Uses ES op_type=create.
+    Returns True if lock acquired, False if table is already RUNNING."""
+    from urllib.parse import urlparse
+    parsed = urlparse(ELASTICSEARCH_URL)
+    auth = (parsed.username, parsed.password) if parsed.username else None
+    base_url = f"{parsed.scheme}://{parsed.hostname}:{parsed.port}"
+    lock_doc = {
+        "table_name": table_name,
+        "run_id": run_id,
+        "status": "RUNNING",
+        "locked_at": datetime.utcnow().isoformat(),
+        "expires_at": (datetime.utcnow() + timedelta(hours=2)).isoformat()
+    }
+    try:
+        url = f"{base_url}/sdoqap_run_locks/_doc/{table_name}?op_type=create"
+        res = requests.put(url, json=lock_doc, auth=auth, timeout=5)
+        if res.status_code == 201:
+            print(f"[LOCK] Acquired lock for '{table_name}' (run_id={run_id})")
+            return True
+        print(f"[LOCK] Table '{table_name}' already locked (status={res.status_code}). Aborting duplicate run.")
+        return False
+    except Exception as e:
+        print(f"[LOCK] Lock acquisition failed: {e}. Aborting (fail-safe).")
+        return False
+
+def release_lock(table_name: str):
+    """Release the distributed lock for a table after job completes or fails."""
+    try:
+        from urllib.parse import urlparse
+        parsed = urlparse(ELASTICSEARCH_URL)
+        auth = (parsed.username, parsed.password) if parsed.username else None
+        base_url = f"{parsed.scheme}://{parsed.hostname}:{parsed.port}"
+        requests.delete(f"{base_url}/sdoqap_run_locks/_doc/{table_name}", auth=auth, timeout=5)
+        print(f"[LOCK] Released lock for '{table_name}'.")
+    except Exception as e:
+        print(f"[LOCK] Failed to release lock: {e}")
+
+# ─── FIX 3A: Config-Driven Rules Engine ───────────────────────────────────────
+def load_rules_config(table_name: str) -> dict:
+    """Load validation rules from rules_config.json for the given table.
+    Falls back to '_default' config if table-specific config not found."""
+    config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rules_config.json")
+    if not os.path.exists(config_path):
+        return {"quality_score_threshold": 90.0, "freshness_threshold_hours": 48}
+    try:
+        with open(config_path, "r") as f:
+            all_rules = json.load(f)
+        default = all_rules.get("_default", {})
+        table_rules = all_rules.get(table_name, {})
+        return {**default, **table_rules}  # table-specific overrides default
+    except Exception as e:
+        print(f"[RULES] Failed to load rules_config.json: {e}. Using defaults.")
+        return {"quality_score_threshold": 90.0, "freshness_threshold_hours": 48}
+
+FAST_TRACK_MB_LIMIT = 50
+
+def detect_track(spark, table_name: str) -> str:
+    """Detect whether a table should use Fast Track or Batch Track
+    based on the raw data size on HDFS. Defaults to 'batch' on any error."""
+    try:
+        sc = spark.sparkContext
+        conf = sc._jsc.hadoopConfiguration()
+        URI = sc._gateway.jvm.java.net.URI
+        FileSystem = sc._gateway.jvm.org.apache.hadoop.fs.FileSystem
+        Path = sc._gateway.jvm.org.apache.hadoop.fs.Path
+        fs = FileSystem.get(URI(HDFS_URL), conf)
+        
+        raw_dir = Path(f"/data/raw/{table_name}")
+        if fs.exists(raw_dir):
+            size_bytes = fs.getContentSummary(raw_dir).getLength()
+            track = "fast" if size_bytes < FAST_TRACK_MB_LIMIT * 1024 * 1024 else "batch"
+            print(f"[TRACK] Table '{table_name}' size={size_bytes//1024}KB → {track.upper()} track")
+            return track
+    except Exception as e:
+        print(f"[TRACK] Size detection failed: {e}. Defaulting to batch track.")
+    return "batch"
+
 def send_n8n_alert(title, message, severity="warning"):
     """Sends an alert to n8n webhook."""
     payload = {
@@ -70,14 +151,32 @@ def send_n8n_alert(title, message, severity="warning"):
     t.start()
 
 def run_quality_check(table_name, primary_key, date_column, schema_spec):
-    spark = get_spark_session(f"SDOQAP_QualityCheck_{table_name}")
     run_id = f"run_{datetime.utcnow().strftime('%Y%m%d_%H%M%S_%f')}"
+
+    # ─── FIX 2A: Acquire distributed lock BEFORE starting Spark ───────────────
+    if not acquire_lock(table_name, run_id):
+        print(f"[ABORT] Duplicate run blocked for '{table_name}'. Exiting cleanly.")
+        return None
+
+    # ─── FIX 1B: Create Spark session, detect track, and configure Spark resources accordingly ────────
+    spark = get_spark_session(f"SDOQAP_QualityCheck_{table_name}")
+    track = detect_track(spark, table_name)
+    if track == "fast":
+        spark.conf.set("spark.sql.shuffle.partitions", "2")
+    else:
+        spark.conf.set("spark.sql.shuffle.partitions", "10")
+
+    # ─── FIX 3A: Load per-table validation rules ──────────────────────────────
+    rules = load_rules_config(table_name)
+    quality_threshold = rules.get("quality_score_threshold", 90.0)
+    freshness_limit_hours = rules.get("freshness_threshold_hours", 48)
 
     raw_path = f"{HDFS_URL}/data/raw/{table_name}"
     active_path = f"{HDFS_URL}/data/active/{table_name}"
+    staging_path = f"{HDFS_URL}/data/staging/{table_name}/run_id={run_id}"
     quarantine_path = f"{HDFS_URL}/data/quarantine/{table_name}"
 
-    print(f"Starting quality check for '{table_name}' in run {run_id}...")
+    print(f"Starting quality check for '{table_name}' in run {run_id} [{track.upper()} track]...")
 
     try:
         # Load raw data from HDFS as strings to avoid inference issues (Bug 6)
@@ -102,7 +201,6 @@ def run_quality_check(table_name, primary_key, date_column, schema_spec):
         spark.conf.set("spark.sql.shuffle.partitions", "2")
     except Exception as e:
         print(f"Error reading raw data path {raw_path}: {e}")
-        # Log run failure
         log_to_elasticsearch("sdoqap_pipeline_runs", {
             "run_id": run_id,
             "table_name": table_name,
@@ -110,6 +208,7 @@ def run_quality_check(table_name, primary_key, date_column, schema_spec):
             "error_msg": str(e),
             "timestamp": datetime.utcnow().isoformat()
         })
+        release_lock(table_name)  # FIX 2A: Always release lock on failure
         spark.stop()
         sys.exit(1)
 
@@ -180,23 +279,25 @@ def run_quality_check(table_name, primary_key, date_column, schema_spec):
             "timestamp": datetime.utcnow().isoformat()
         })
 
-        # Save updated schema back to registry
-        try:
-            registry_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "schema_registry.json")
-            if os.path.exists(registry_path):
-                with open(registry_path, "r") as f:
-                    registry = json.load(f)
-                if table_name in registry:
-                    registry[table_name]["schema_spec"] = schema_spec
-                    with open(registry_path, "w") as f:
-                        json.dump(registry, f, indent=4)
-                    print(f"Schema registry updated dynamically for '{table_name}'.")
-        except Exception as e:
-            print(f"Failed to update schema registry: {e}")
+        # FIX 2B: Approval Gate — Write to PENDING proposal index instead of directly modifying schema_registry.json
+        # A Data Engineer must approve via /api/v1/schema/proposals/{id}/approve before the schema is updated
+        log_to_elasticsearch("sdoqap_schema_proposals", {
+            "run_id": run_id,
+            "table_name": table_name,
+            "current_schema": {k: v for k, v in schema_spec.items()},
+            "proposed_schema": actual_columns,
+            "drift_details": drift_details,
+            "drift_severity": total_drift_severity,
+            "status": "PENDING",
+            "proposed_at": datetime.utcnow().isoformat(),
+            "proposed_by": f"spark_engine/{run_id}"
+        })
+        print(f"[APPROVAL GATE] Schema drift proposal written as PENDING. Awaiting Data Engineer approval.")
+        print(f"[APPROVAL GATE] schema_registry.json NOT modified. Review at /api/v1/schema/proposals")
 
         send_n8n_alert(
-            title=f"⚠️ Schema Evolution Triggered: {table_name}",
-            message=f"Run ID: {run_id}\nChanges: {json.dumps(drift_details)}",
+            title=f"⚠️ Schema Change PENDING Approval: {table_name}",
+            message=f"Run ID: {run_id}\nChanges: {json.dumps(drift_details)}\nSeverity: {total_drift_severity}\nAction Required: Review at /api/v1/schema/proposals",
             severity="warning"
         )
 
@@ -261,26 +362,68 @@ def run_quality_check(table_name, primary_key, date_column, schema_spec):
         if DeltaTable.isDeltaTable(spark, active_path):
             print("Existing Delta Table found. Performing MERGE INTO...")
             delta_table = DeltaTable.forPath(spark, active_path)
-            
-            # Construct merge condition based on PKs
             if isinstance(pk_cols, list) and len(pk_cols) > 0:
                 merge_cond = " AND ".join([f"old.{col} = new.{col}" for col in pk_cols])
             else:
                 merge_cond = f"old.{pk_cols} = new.{pk_cols}"
-                
             delta_table.alias("old").merge(
                 clean_df_for_upsert.alias("new"),
                 merge_cond
             ).whenMatchedUpdateAll().whenNotMatchedInsertAll().execute()
             print("Delta Lake Upsert completed successfully.")
         else:
-            print("No existing Delta table found. Proceeding with initial write.")
-            clean_df_for_upsert.write.format("delta").mode("overwrite").save(active_path)
+            # ─── FIX 1A: Atomic Write via Staging Path using Java HDFS API ────
+            print(f"No existing Delta table. Writing to staging: {staging_path}")
+            clean_df_for_upsert.write.format("delta").mode("overwrite").save(staging_path)
+            print(f"Staging write complete. Promoting to active zone...")
+            try:
+                sc = spark.sparkContext
+                conf = sc._jsc.hadoopConfiguration()
+                URI = sc._gateway.jvm.java.net.URI
+                FileSystem = sc._gateway.jvm.org.apache.hadoop.fs.FileSystem
+                Path = sc._gateway.jvm.org.apache.hadoop.fs.Path
+                fs = FileSystem.get(URI(HDFS_URL), conf)
+                
+                src_path = Path(staging_path)
+                dst_path = Path(active_path)
+                
+                if fs.exists(dst_path):
+                    fs.delete(dst_path, True)
+                
+                success = fs.rename(src_path, dst_path)
+                if not success:
+                    raise RuntimeError("Rename returned False")
+                print(f"Atomic promotion: staging → active completed.")
+            except Exception as mv_err:
+                print(f"[ATOMIC] HDFS rename failed: {mv_err}. Cleaning up staging.")
+                try:
+                    sc = spark.sparkContext
+                    conf = sc._jsc.hadoopConfiguration()
+                    URI = sc._gateway.jvm.java.net.URI
+                    FileSystem = sc._gateway.jvm.org.apache.hadoop.fs.FileSystem
+                    Path = sc._gateway.jvm.org.apache.hadoop.fs.Path
+                    fs = FileSystem.get(URI(HDFS_URL), conf)
+                    fs.delete(Path(staging_path), True)
+                except:
+                    pass
+                raise RuntimeError("Atomic write failed. Staging cleaned up.") from mv_err
     except Exception as e:
-        print(f"Error during Delta Upsert or Table check: {e}. Writing initial table.")
+        print(f"Error during Delta write: {e}. Attempting direct fallback write.")
+        try:
+            sc = spark.sparkContext
+            conf = sc._jsc.hadoopConfiguration()
+            URI = sc._gateway.jvm.java.net.URI
+            FileSystem = sc._gateway.jvm.org.apache.hadoop.fs.FileSystem
+            Path = sc._gateway.jvm.org.apache.hadoop.fs.Path
+            fs = FileSystem.get(URI(HDFS_URL), conf)
+            staging_path_obj = Path(staging_path)
+            if fs.exists(staging_path_obj):
+                fs.delete(staging_path_obj, True)
+        except:
+            pass
         clean_df_for_upsert.write.format("delta").mode("overwrite").save(active_path)
 
-    # Quarantined data can still be parquet or delta, we'll use delta for consistency
+    # Quarantined data written with run_id partition for traceability
     all_quarantined_write.write.format("delta").mode("append").save(f"{quarantine_path}/run_id={run_id}")
 
     # Class Balance / Data Distribution calculation
@@ -395,10 +538,11 @@ def run_quality_check(table_name, primary_key, date_column, schema_spec):
     total_tests = total_records
     quality_score = 100.0 if total_tests == 0 else (passed_tests / total_tests) * 100.0
 
-    if quality_score < 90.0:
+    # FIX 3A: Use per-table threshold from rules_config instead of hardcoded 90.0
+    if quality_score < quality_threshold:
         send_n8n_alert(
             title=f"🚨 Critical Data Quality Drop: {table_name}",
-            message=f"Run ID: {run_id}\nQuality Score: {quality_score:.1f}%\nQuarantined: {quarantine_count} rows\nClean: {clean_count} rows",
+            message=f"Run ID: {run_id}\nQuality Score: {quality_score:.1f}% (threshold={quality_threshold}%)\nQuarantined: {quarantine_count} rows\nClean: {clean_count} rows",
             severity="critical"
         )
 
@@ -435,11 +579,13 @@ def run_quality_check(table_name, primary_key, date_column, schema_spec):
     log_to_elasticsearch("sdoqap_pipeline_runs", {
         "run_id": run_id,
         "table_name": table_name,
-        "state": "success" if quality_score >= 90 else "warnings",
+        "state": "success" if quality_score >= quality_threshold else "warnings",
         "timestamp": datetime.utcnow().isoformat()
     })
 
-    print(f"Quality validation completed. Quality Score: {quality_score:.2f}%")
+    print(f"Quality validation completed. Quality Score: {quality_score:.2f}% (threshold={quality_threshold}%)")
+    # FIX 2A: Release the distributed lock after all work is done
+    release_lock(table_name)
     spark.stop()
 
 if __name__ == "__main__":

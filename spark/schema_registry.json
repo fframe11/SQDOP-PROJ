@@ -73,5 +73,17 @@
             "total_cost": "DoubleType",
             "total_profit": "DoubleType"
         }
+    },
+    "benchmark_test": {
+        "primary_key": "id",
+        "date_column": "updated_at",
+        "schema_spec": {
+            "id": "IntegerType",
+            "username": "StringType",
+            "email": "StringType",
+            "role": "StringType",
+            "created_at": "TimestampType",
+            "updated_at": "TimestampType"
+        }
     }
 }

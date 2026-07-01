@@ -12,6 +12,7 @@ from elasticsearch import Elasticsearch
 from app.api.lineage import router as lineage_router
 from app.api.pipeline import router as pipeline_router
 from app.api.quality import router as quality_router
+from app.api.schema import router as schema_router  # Fix 2B: Schema Governance API
 
 app = FastAPI(
     title="SDOQAP Serving API",
@@ -31,6 +32,7 @@ app.add_middleware(
 app.include_router(lineage_router)
 app.include_router(pipeline_router)
 app.include_router(quality_router)
+app.include_router(schema_router)  # Fix 2B: Schema Governance API
 
 ELASTICSEARCH_URL = os.getenv("ELASTICSEARCH_URL", "http://elastic:sdoqap_secure@elasticsearch:9200")
 

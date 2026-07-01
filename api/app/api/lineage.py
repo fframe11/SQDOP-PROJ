@@ -311,3 +311,109 @@ def get_node_inspection(table_name: str, node_id: str):
             "schema": src_schema,
             "sample_data": src_samples
         }
+
+
+# ─── FIX 3B: Pull-Based Lineage Export API (Trust-Check) ──────────────────────
+@router.get("/{table_name}/trust-check")
+def get_table_trust_check(table_name: str):
+    """
+    Export API for BI Tools or ML Pipelines to query if a table's latest run is safe to consume.
+    Checks quality score threshold, pending schema proposals, and freshness.
+    """
+    es = get_es_client()
+    import json
+    
+    # 1. Load rules config to check quality threshold
+    config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "spark", "rules_config.json")
+    quality_threshold = 90.0
+    if os.path.exists(config_path):
+        try:
+            with open(config_path, "r") as f:
+                rules = json.load(f)
+            table_rules = rules.get(table_name, {})
+            quality_threshold = table_rules.get("quality_score_threshold", rules.get("_default", {}).get("quality_score_threshold", 90.0))
+        except Exception as e:
+            print(f"[TRUST CHECK] Error loading rules_config.json: {e}")
+
+    # 2. Query Elasticsearch for the latest quality run of the table
+    latest_run = None
+    if es.indices.exists(index="sdoqap_quality_runs"):
+        try:
+            res = es.search(
+                index="sdoqap_quality_runs",
+                body={
+                    "query": {"term": {"table_name.keyword": table_name}},
+                    "sort": [{"timestamp": {"order": "desc"}}],
+                    "size": 1
+                }
+            )
+            hits = res.get("hits", {}).get("hits", [])
+            if hits:
+                latest_run = hits[0]["_source"]
+        except Exception as e:
+            print(f"[TRUST CHECK] Error querying quality runs: {e}")
+
+    if not latest_run:
+        return {
+            "table": table_name,
+            "is_safe_to_consume": False,
+            "reason": "No quality runs found for this table.",
+            "recommendation": "HALT_INGEST"
+        }
+
+    # 3. Query Elasticsearch for any PENDING schema proposals for this table
+    pending_proposals_count = 0
+    if es.indices.exists(index="sdoqap_schema_proposals"):
+        try:
+            res = es.search(
+                index="sdoqap_schema_proposals",
+                body={
+                    "query": {
+                        "bool": {
+                            "must": [
+                                {"term": {"table_name.keyword": table_name}},
+                                {"term": {"status.keyword": "PENDING"}}
+                            ]
+                        }
+                    },
+                    "size": 0  # We only need the count
+                }
+            )
+            pending_proposals_count = res.get("hits", {}).get("total", {}).get("value", 0)
+        except Exception as e:
+            print(f"[TRUST CHECK] Error querying schema proposals: {e}")
+
+    # 4. Evaluate Safety Conditions
+    quality_score = latest_run.get("quality_score", 0.0)
+    has_pending_drift = pending_proposals_count > 0
+    
+    is_safe = (quality_score >= quality_threshold) and not has_pending_drift
+    
+    reason = "Table meets all quality and schema parameters."
+    recommendation = "SAFE"
+    
+    if not is_safe:
+        reasons = []
+        if quality_score < quality_threshold:
+            reasons.append(f"Quality score {quality_score:.2f}% is below threshold {quality_threshold}%.")
+            recommendation = "HALT_INGEST"
+        if has_pending_drift:
+            reasons.append(f"There are {pending_proposals_count} PENDING schema drift proposal(s) awaiting approval.")
+            if recommendation != "HALT_INGEST":
+                recommendation = "WARNING_SUSPECT"
+        reason = " ".join(reasons)
+
+    return {
+        "table": table_name,
+        "is_safe_to_consume": is_safe,
+        "quality_score": quality_score,
+        "quality_threshold": quality_threshold,
+        "last_run_id": latest_run.get("run_id"),
+        "last_run_at": latest_run.get("timestamp"),
+        "quarantined_records": latest_run.get("quarantined_records", 0),
+        "clean_records": latest_run.get("clean_records", 0),
+        "pending_schema_proposals": pending_proposals_count,
+        "reason": reason,
+        "recommendation": recommendation
+    }
+

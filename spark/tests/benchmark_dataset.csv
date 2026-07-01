@@ -1,0 +1,31 @@
+id,username,email,role,created_at,updated_at
+1,user1,user1@example.com,user,2026-07-01 12:00:00,2026-07-01 12:00:00
+2,user2,user2@example.com,user,2026-07-01 12:00:00,2026-07-01 12:00:00
+3,user3,user3@example.com,admin,2026-07-01 12:00:00,2026-07-01 12:00:00
+4,user4,user4@example.com,user,2026-07-01 12:00:00,2026-07-01 12:00:00
+5,user5,user5@example.com,user,2026-07-01 12:00:00,2026-07-01 12:00:00
+6,user6,user6@example.com,user,2026-07-01 12:00:00,2026-07-01 12:00:00
+7,user7,user7@example.com,user,2026-07-01 12:00:00,2026-07-01 12:00:00
+8,user8,user8@example.com,user,2026-07-01 12:00:00,2026-07-01 12:00:00
+9,user9,user9@example.com,user,2026-07-01 12:00:00,2026-07-01 12:00:00
+10,user10,user10@example.com,user,2026-07-01 12:00:00,2026-07-01 12:00:00
+11,user11,user11@example.com,user,2026-07-01 12:00:00,2026-07-01 12:00:00
+12,user12,user12@example.com,user,2026-07-01 12:00:00,2026-07-01 12:00:00
+13,user13,user13@example.com,user,2026-07-01 12:00:00,2026-07-01 12:00:00
+14,user14,user14@example.com,user,2026-07-01 12:00:00,2026-07-01 12:00:00
+15,user15,user15@example.com,user,2026-07-01 12:00:00,2026-07-01 12:00:00
+16,user16,user16@example.com,user,2026-07-01 12:00:00,2026-07-01 12:00:00
+17,user17,user17@example.com,user,2026-07-01 12:00:00,2026-07-01 12:00:00
+18,user18,user18@example.com,user,2026-07-01 12:00:00,2026-07-01 12:00:00
+19,user19,user19@example.com,user,2026-07-01 12:00:00,2026-07-01 12:00:00
+20,user20,user20@example.com,user,2026-07-01 12:00:00,2026-07-01 12:00:00
+,baduser1,bad1@example.com,user,2026-07-01 12:00:00,2026-07-01 12:00:00
+,baduser2,bad2@example.com,user,2026-07-01 12:00:00,2026-07-01 12:00:00
+,baduser3,bad3@example.com,user,2026-07-01 12:00:00,2026-07-01 12:00:00
+,baduser4,bad4@example.com,user,2026-07-01 12:00:00,2026-07-01 12:00:00
+,baduser5,bad5@example.com,user,2026-07-01 12:00:00,2026-07-01 12:00:00
+1,dupuser1,dup1@example.com,user,2026-07-01 12:00:00,2026-07-01 12:00:00
+2,dupuser2,dup2@example.com,user,2026-07-01 12:00:00,2026-07-01 12:00:00
+3,dupuser3,dup3@example.com,user,2026-07-01 12:00:00,2026-07-01 12:00:00
+21,missdate1,missdate1@example.com,user,2026-07-01 12:00:00,
+22,missdate2,missdate2@example.com,user,2026-07-01 12:00:00,
