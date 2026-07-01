@@ -32,7 +32,7 @@
 - พัฒนาสคริปต์ประมวลผลข้อมูลขนานด้วย Apache Spark เพื่อทำ Data Extraction, Transformation, และ Loading (ETL) ข้อมูลขนาดใหญ่
 - สร้างระบบตรวจสอบกฎเกณฑ์ข้อมูล (Data Validation Rules) ตรวจสอบค่าว่าง (Null Values), ข้อมูลซ้ำซ้อน (Duplicates), รูปแบบข้อมูลไม่ตรงกำหนด (Pattern Mismatch) และการเปลี่ยนแปลงของโครงสร้างข้อมูล (Schema Drift Detection)
 - คำนวณคะแนนรวมคุณภาพข้อมูล (Data Quality Score) เป็นรายชุดข้อมูลและรายฟิลด์เพื่อบันทึกเป็น Metadata
-- พัฒนาระบบพยากรณ์แนวโน้มคุณภาพข้อมูลล่วงหน้า 7 วัน (7-Day Quality Score Projection) โดยใช้แบบจำลองวิเคราะห์การถดถอยเชิงเส้น (Linear Regression Model) ร่วมกับฟังก์ชันแกว่งคลื่นไซน์ (Sine Wave Oscillation Function) เพื่อจำลองความผันผวนตามธรรมชาติ พร้อมคำนวณช่วงความเชื่อมั่น (Confidence Interval: CI High & Low) และหาโอกาสเกิดการละเมิด SLA (SLA Breach Probability) แบบเรียลไทม์
+- พัฒนาระบบพยากรณ์แนวโน้มคุณภาพข้อมูลล่วงหน้า 7 วัน (7-Day Quality Score Projection) โดยใช้แบบจำลองวิเคราะห์การถดถอยเชิงเส้น (Linear Regression Model) ร่วมกับสูตร Standard Error เพื่อสร้างช่วงความเชื่อมั่น (Confidence Interval: CI High & Low) และวิเคราะห์โอกาสการเกิด SLA Breach Probability ได้อย่างแม่นยำตามหลักสถิติศาสตร์
 - พัฒนาระบบจำแนกประเภทและจัดกลุ่มข้อบกพร่องของข้อมูล (Root Cause Error Pattern Clustering) โดยวิเคราะห์สถิติน้ำหนักความถี่การขัดแยกแบบไดนามิก (Quarantine Frequency Mapping Algorithm) เพื่อระบุหาสหสัมพันธ์เชิงลึก (Correlation Analysis) ของคอขวดระบบข้อมูลต้นทาง
 
 3.3 ระบบการติดตามเส้นทางและสเปกข้อมูล (Data Observability & Lineage Visualization)
@@ -90,8 +90,10 @@
 - FR-03 Multi-dimensional Quality: ระบบต้องตรวจสอบกฎข้อมูล 5 มิติ และแปลงเป็น Quality Score เก็บใน Elasticsearch
 - FR-04 Live Observability Lineage: ระบบต้องแสดงเส้นท่อข้อมูลไหลแบบอนิเมชันเรียลไทม์ และทำเส้นเปลี่ยนสีแดง (Danger path) ทันทีเมื่อเกิดข้อมูลตกเกณฑ์
 - FR-05 Recovery Trigger: ระบบต้องมีปุ่มสั่งรันและตรวจสอบข้อมูลใหม่ (Retry Ingest & Audit) เพื่อดึงข้อมูลชำรุดที่แก้ไขแล้วกลับมาทำงานต่อได้
-- FR-06 Error Pattern Clustering & Business Impact: ระบบต้องวิเคราะห์และจัดกลุ่มลักษณะข้อมูลชำรุดด้วย Quarantine Frequency Mapping Algorithm และพยากรณ์แนวโน้มคุณภาพข้อมูลล่วงหน้าด้วย Linear Regression ร่วมกับ Sine Wave Oscillation รวมถึงคำนวณประเมินมูลค่าความเสียหายสะสมเชิงธุรกิจแบบสากล (Attributed Cost of Poor Data Quality - COPDQ) จากการประมวลผลข้อมูลจริงแบบเรียลไทม์
+- FR-06 Error Pattern Clustering & Business Impact: ระบบต้องวิเคราะห์และจัดกลุ่มลักษณะข้อมูลชำรุดด้วย Quarantine Frequency Mapping Algorithm และพยากรณ์แนวโน้มคุณภาพข้อมูลล่วงหน้าด้วย Ordinary Least Squares Linear Regression + Standard Error Confidence Intervals รวมถึงคำนวณประเมินมูลค่าความเสียหายสะสมเชิงธุรกิจแบบสากล (Attributed Cost of Poor Data Quality - COPDQ) จากการประมวลผลข้อมูลจริงแบบเรียลไทม์
 - FR-07 Gold Layer Aggregation: ระบบต้องสร้างชั้นข้อมูลสรุป (Gold Layer) จาก Silver Layer โดยอัตโนมัติ รวบรวมคะแนนคุณภาพรายวัน รูปแบบข้อผิดพลาด มูลค่า COPDQ สะสม และประวัติ Schema Drift เพื่อรองรับการวิเคราะห์ธุรกิจ (Business Intelligence) โดยตรงโดยไม่ต้องประมวลผลใหม่ทุกครั้ง
+- FR-08 Schema Governance & Trust Gate: ระบบต้องมีกลไกป้องกันการเขียนทับ Registry แบบอัตโนมัติ โดยเปลี่ยนเป็นการสร้าง PENDING Schema Proposals เพื่อรอการอนุมัติผ่าน REST API และต้องให้บริการตรวจรับความปลอดภัยของข้อมูลก่อนดึงใช้งานปลายทาง (Trust-Check API) เพื่อป้องกันไม่ให้ข้อมูลเสียไหลลงสู่ชั้นวิเคราะห์ธุรกิจ
+- FR-09 Concurrency Control & Atomic Commits: ระบบต้องใช้ distributed lock ร่วมกับ Elasticsearch เพื่อป้องกัน Race Condition จากท่อประมวลผลที่รันชนกัน และต้องทำธุรกรรมแบบอะตอม (Atomic Commit) โดยเขียนลง staging path ก่อนโปรโมต (Rename) เข้าสู่ active zone บน HDFS เพื่อตัดสภาวะ Zombified Data (ข้อมูลเสียค้างคา) ของตารางสำเร็จรูป
 
 5.2 คุณสมบัติที่ไม่ใช่เชิงหน้าที่ (Non-Functional Requirements)
 - Scalability & Performance: รองรับการประมวลผลระดับล้านแถวโดยใช้เวลาประมวลผลและตรวจคุณภาพไม่เกิน 10 นาที
@@ -158,14 +160,15 @@
 9.3 การประเมินตาม DataOps Principles (DataKitchen DataOps Manifesto)
 - Automated Quality Gate: Quarantine บล็อกข้อมูลเสียก่อนเข้า Silver Layer
 - Closed-loop Recovery: Retry Ingest & Audit วนกลับโดยไม่ต้องแทรกแซงระบบ
-- Proactive Detection: Quality Forecast 7 วัน ด้วย Linear Regression + Sine Wave
+- Proactive Detection: Quality Forecast 7 วัน ด้วย OLS Linear Regression + Standard Error CI
 - Financial Accountability: COPDQ (Cost of Poor Data Quality) คำนวณเป็นมูลค่าจริง
 - Pre-aggregated Reporting: Gold Layer ลด Query latency สำหรับ Business dashboards
+- Upstream Governance: มีระบบตรวจคัดและอนุมัติ Schema Drift (Approval Gate) ก่อนมีผลจริงบน HDFS/Registry และป้องกันปลายน้ำด้วย Trust-Check API
 
 9.4 ระดับวุฒิภาวะของระบบ (Data Engineering Maturity Level)
 ระบบ SDOQAP อยู่ในระดับ Level 4: Full Data Observability Platform
 ซึ่งเกินกว่า ETL ธรรมดา (Level 1-2) และ Data Quality Validation (Level 3) อย่างชัดเจน
-(รวมถึงมีระบบ Push Alerting ผ่าน n8n และ Auto Schema Evolution ที่พัฒนาสำเร็จแล้ว)
+(รวมถึงมีระบบ Push Alerting ผ่าน n8n และ Schema Registry Approval Gate ที่พัฒนาสำเร็จแล้ว)
 ระบบพร้อมขยายต่อสู่ Level 5 (Autonomous DataOps) ด้วยการเพิ่ม:
 - Data Catalog (OpenMetadata/Apache Atlas)
 - Real-time Streaming Quality Validation (Spark Structured Streaming)
