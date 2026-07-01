@@ -55,10 +55,10 @@ def log_to_elasticsearch(index_name, doc):
 
 N8N_WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL", "http://n8n:5678/webhook/sdoqap-alerts")
 
-# ─── FIX 2A: Distributed Lock via Elasticsearch ───────────────────────────────
+# ─── FIX 2A: Distributed Lock via Elasticsearch with Self-Healing ────────────────
 def acquire_lock(table_name: str, run_id: str) -> bool:
     """Atomically lock a table before Spark starts. Uses ES op_type=create.
-    Returns True if lock acquired, False if table is already RUNNING."""
+    If lock exists (409 Conflict), checks expires_at. If expired, force overwrites it."""
     from urllib.parse import urlparse
     parsed = urlparse(ELASTICSEARCH_URL)
     auth = (parsed.username, parsed.password) if parsed.username else None
@@ -76,7 +76,21 @@ def acquire_lock(table_name: str, run_id: str) -> bool:
         if res.status_code == 201:
             print(f"[LOCK] Acquired lock for '{table_name}' (run_id={run_id})")
             return True
-        print(f"[LOCK] Table '{table_name}' already locked (status={res.status_code}). Aborting duplicate run.")
+        elif res.status_code == 409:
+            # Lock already exists, check expiration
+            lock_url = f"{base_url}/sdoqap_run_locks/_doc/{table_name}"
+            get_res = requests.get(lock_url, auth=auth, timeout=5)
+            if get_res.status_code == 200:
+                existing = get_res.json()
+                expires_at_str = existing.get("_source", {}).get("expires_at")
+                if expires_at_str:
+                    expires_at = datetime.fromisoformat(expires_at_str.replace("Z", "+00:00"))
+                    if datetime.utcnow() > expires_at:
+                        print(f"[LOCK] Previous lock for '{table_name}' expired. Force overwriting lock...")
+                        res = requests.put(lock_url, json=lock_doc, auth=auth, timeout=5)
+                        if res.status_code in [200, 201]:
+                            return True
+        print(f"[LOCK] Table '{table_name}' already locked. Aborting duplicate run.")
         return False
     except Exception as e:
         print(f"[LOCK] Lock acquisition failed: {e}. Aborting (fail-safe).")
@@ -93,6 +107,89 @@ def release_lock(table_name: str):
         print(f"[LOCK] Released lock for '{table_name}'.")
     except Exception as e:
         print(f"[LOCK] Failed to release lock: {e}")
+
+# ─── FIX 3B: Database-Backed Schema Registry via Elasticsearch ───────────────
+def load_expected_schema(table_name: str) -> dict:
+    """Loads schema spec, primary key, and date column for a table from Elasticsearch index sdoqap_schema_registry.
+    Falls back to default_registry if Elasticsearch doesn't have it."""
+    from urllib.parse import urlparse
+    parsed = urlparse(ELASTICSEARCH_URL)
+    auth = (parsed.username, parsed.password) if parsed.username else None
+    base_url = f"{parsed.scheme}://{parsed.hostname}:{parsed.port}"
+    
+    url = f"{base_url}/sdoqap_schema_registry/_doc/{table_name}"
+    try:
+        res = requests.get(url, auth=auth, timeout=5)
+        if res.status_code == 200:
+            doc = res.json().get("_source", {})
+            print(f"[REGISTRY] Loaded schema spec for '{table_name}' from Elasticsearch sdoqap_schema_registry.")
+            return doc
+    except Exception as e:
+        print(f"[REGISTRY] Failed to read from Elasticsearch: {e}. Falling back to default registry.")
+        
+    # Fallback to default in-memory registry if not in ES
+    default_registry = {
+        "mbti": {
+            "primary_key": ["author", "text"],
+            "date_column": None,
+            "schema_spec": {
+                "author": "StringType",
+                "text": "StringType",
+                "label": "StringType",
+                "EI": "StringType",
+                "NS": "StringType",
+                "TF": "StringType",
+                "JP": "StringType"
+            }
+        },
+        "users": {
+            "primary_key": "id",
+            "date_column": "updated_at",
+            "schema_spec": {
+                "id": "IntegerType",
+                "username": "StringType",
+                "email": "StringType",
+                "role": "StringType",
+                "created_at": "TimestampType",
+                "updated_at": "TimestampType"
+            }
+        },
+        "benchmark_test": {
+            "primary_key": "id",
+            "date_column": "updated_at",
+            "schema_spec": {
+                "id": "IntegerType",
+                "username": "StringType",
+                "email": "StringType",
+                "role": "StringType",
+                "created_at": "TimestampType",
+                "updated_at": "TimestampType"
+            }
+        }
+    }
+    
+    normalized_target = normalize_name(table_name)
+    for tbl_name, spec in default_registry.items():
+        if normalize_name(tbl_name) == normalized_target:
+            print(f"[REGISTRY] Found fallback matching registry spec for '{tbl_name}'")
+            return spec
+    return None
+
+def save_registry_to_es(table_name: str, spec: dict) -> bool:
+    """Saves schema specification to Elasticsearch index sdoqap_schema_registry."""
+    from urllib.parse import urlparse
+    parsed = urlparse(ELASTICSEARCH_URL)
+    auth = (parsed.username, parsed.password) if parsed.username else None
+    base_url = f"{parsed.scheme}://{parsed.hostname}:{parsed.port}"
+    url = f"{base_url}/sdoqap_schema_registry/_doc/{table_name}"
+    try:
+        res = requests.put(url, json=spec, auth=auth, headers={"Content-Type": "application/json"}, timeout=5)
+        if res.status_code in [200, 201]:
+            print(f"[REGISTRY] Saved schema spec for '{table_name}' to Elasticsearch sdoqap_schema_registry.")
+            return True
+    except Exception as e:
+        print(f"[REGISTRY] Failed to save schema spec to Elasticsearch: {e}")
+    return False
 
 # ─── FIX 3A: Config-Driven Rules Engine ───────────────────────────────────────
 def load_rules_config(table_name: str) -> dict:
@@ -477,56 +574,25 @@ def run_quality_check(table_name, primary_key, date_column, schema_spec, input_t
             ).whenMatchedUpdateAll().whenNotMatchedInsertAll().execute()
             print("Delta Lake Upsert completed successfully.")
         else:
-            # ─── FIX 1A: Atomic Write via Staging Path using Java HDFS API ────
-            print(f"No existing Delta table. Writing to staging: {staging_path}")
-            clean_df_for_upsert.write.format("delta").mode("overwrite").save(staging_path)
-            print(f"Staging write complete. Promoting to active zone...")
-            try:
-                sc = spark.sparkContext
-                conf = sc._jsc.hadoopConfiguration()
-                URI = sc._gateway.jvm.java.net.URI
-                FileSystem = sc._gateway.jvm.org.apache.hadoop.fs.FileSystem
-                Path = sc._gateway.jvm.org.apache.hadoop.fs.Path
-                fs = FileSystem.get(URI(HDFS_URL), conf)
-                
-                src_path = Path(staging_path)
-                dst_path = Path(active_path)
-                
-                if fs.exists(dst_path):
-                    fs.delete(dst_path, True)
-                
-                success = fs.rename(src_path, dst_path)
-                if not success:
-                    raise RuntimeError("Rename returned False")
-                print(f"Atomic promotion: staging → active completed.")
-            except Exception as mv_err:
-                print(f"[ATOMIC] HDFS rename failed: {mv_err}. Cleaning up staging.")
-                try:
-                    sc = spark.sparkContext
-                    conf = sc._jsc.hadoopConfiguration()
-                    URI = sc._gateway.jvm.java.net.URI
-                    FileSystem = sc._gateway.jvm.org.apache.hadoop.fs.FileSystem
-                    Path = sc._gateway.jvm.org.apache.hadoop.fs.Path
-                    fs = FileSystem.get(URI(HDFS_URL), conf)
-                    fs.delete(Path(staging_path), True)
-                except:
-                    pass
-                raise RuntimeError("Atomic write failed. Staging cleaned up.") from mv_err
+            print(f"No existing Delta table. Creating new Delta table at: {active_path}")
+            clean_df_for_upsert.write \
+                .format("delta") \
+                .option("delta.columnMapping.mode", "name") \
+                .option("delta.minReaderVersion", "2") \
+                .option("delta.minWriterVersion", "5") \
+                .mode("overwrite") \
+                .option("txnVersion", run_id) \
+                .save(active_path)
+            print("Delta Lake table created successfully with Column Mapping enabled.")
     except Exception as e:
         print(f"Error during Delta write: {e}. Attempting direct fallback write.")
-        try:
-            sc = spark.sparkContext
-            conf = sc._jsc.hadoopConfiguration()
-            URI = sc._gateway.jvm.java.net.URI
-            FileSystem = sc._gateway.jvm.org.apache.hadoop.fs.FileSystem
-            Path = sc._gateway.jvm.org.apache.hadoop.fs.Path
-            fs = FileSystem.get(URI(HDFS_URL), conf)
-            staging_path_obj = Path(staging_path)
-            if fs.exists(staging_path_obj):
-                fs.delete(staging_path_obj, True)
-        except:
-            pass
-        clean_df_for_upsert.write.format("delta").mode("overwrite").save(active_path)
+        clean_df_for_upsert.write \
+            .format("delta") \
+            .option("delta.columnMapping.mode", "name") \
+            .option("delta.minReaderVersion", "2") \
+            .option("delta.minWriterVersion", "5") \
+            .mode("overwrite") \
+            .save(active_path)
 
     # Quarantined data written with run_id partition for traceability
     all_quarantined_write.write.format("delta").mode("append").save(f"{quarantine_path}/run_id={run_id}")
@@ -651,7 +717,7 @@ def run_quality_check(table_name, primary_key, date_column, schema_spec, input_t
             severity="critical"
         )
 
-    # 4.1 Z-Score Anomaly Detection on Quarantine Rate (Task 3)
+    # 4.1 Z-Score Anomaly Detection on Quarantine Rate (Task 3 with Bug 6 Fix)
     current_quarantine_rate = 0.0 if total_records == 0 else float(quarantine_count) / float(total_records)
     historical_rates = get_historical_stats(table_name)
     z_score = 0.0
@@ -662,40 +728,56 @@ def run_quality_check(table_name, primary_key, date_column, schema_spec, input_t
         avg_rate = sum(historical_rates) / len(historical_rates)
         variance = sum((x - avg_rate) ** 2 for x in historical_rates) / len(historical_rates)
         std_dev = variance ** 0.5
-        if std_dev > 0.001:
-            z_score = abs(current_quarantine_rate - avg_rate) / std_dev
-            if z_score > 3.0:
-                is_anomaly = True
-                print(f"[ANOMALY] Statistical Anomaly Detected! Quarantine Rate: {current_quarantine_rate*100:.2f}% vs Avg: {avg_rate*100:.2f}%, Z-Score: {z_score:.2f}")
-                send_n8n_alert(
-                    title=f"🚨 CRITICAL ANOMALY: {table_name} Data Anomaly",
-                    message=f"Run ID: {run_id}\nQuarantine Rate: {current_quarantine_rate*100:.2f}% (Historical Avg: {avg_rate*100:.2f}%)\nZ-Score: {z_score:.2f} (exceeds threshold 3.0)",
-                    severity="critical"
-                )
+        # Bug 6 Fix: Apply StdDev floor (minimum 0.01 or 1%) to prevent false positive alarms
+        std_dev = max(std_dev, 0.01)
+        z_score = abs(current_quarantine_rate - avg_rate) / std_dev
+        if z_score > 3.0:
+            is_anomaly = True
+            print(f"[ANOMALY] Statistical Anomaly Detected! Quarantine Rate: {current_quarantine_rate*100:.2f}% vs Avg: {avg_rate*100:.2f}%, Z-Score: {z_score:.2f}")
+            send_n8n_alert(
+                title=f"🚨 CRITICAL ANOMALY: {table_name} Data Anomaly",
+                message=f"Run ID: {run_id}\nQuarantine Rate: {current_quarantine_rate*100:.2f}% (Historical Avg: {avg_rate*100:.2f}%)\nZ-Score: {z_score:.2f} (exceeds threshold 3.0)",
+                severity="critical"
+            )
 
-    # 4.2 Weighted Operational COPDQ Score (Task 4)
+    # 4.2 Weighted Operational COPDQ Score (Task 4 with Bug 5 Row-Level Max Weight Fix)
     column_weights = rules.get("column_weights", {})
     pk_weight = column_weights.get(primary_key if isinstance(primary_key, str) else pk_cols[0], 1.0)
     date_weight = column_weights.get(date_column, 0.5) if date_column else 0.5
     
-    weighted_fail_sum = 0.0
-    for reason, count in quarantine_breakdown.items():
-        if "primary" in reason or "duplicate" in reason:
-            weight = pk_weight
-        elif "date" in reason:
-            weight = date_weight
-        else:
-            matched_weight = None
-            for col, w in column_weights.items():
-                if col in reason:
-                    matched_weight = w
-                    break
-            weight = matched_weight if matched_weight is not None else 0.2
-        weighted_fail_sum += weight * count
-        
     operational_impact_score = 0.0
-    if total_records > 0:
-        operational_impact_score = (weighted_fail_sum / total_records) * 100.0
+    if total_records > 0 and quarantine_count > 0:
+        try:
+            # Build Spark expression to calculate max failure weight per row
+            weight_col = F.lit(0.0)
+            weight_col = F.when(
+                F.col("reject_reason").contains("primary") | F.col("reject_reason").contains("duplicate"),
+                F.lit(pk_weight)
+            ).otherwise(weight_col)
+            
+            weight_col = F.when(
+                F.col("reject_reason").contains("date"),
+                F.greatest(weight_col, F.lit(date_weight))
+            ).otherwise(weight_col)
+            
+            for col, w in column_weights.items():
+                if col != primary_key and col != date_column:
+                    weight_col = F.when(
+                        F.col("reject_reason").contains(col),
+                        F.greatest(weight_col, F.lit(w))
+                    ).otherwise(weight_col)
+            
+            weight_col = F.when(
+                (F.col("reject_reason") != "") & (F.col("reject_reason").isNotNull()),
+                F.greatest(weight_col, F.lit(0.2))
+            ).otherwise(weight_col)
+            
+            sum_val = all_quarantined.select(F.sum(weight_col)).collect()[0][0]
+            sum_of_max_row_weights = float(sum_val) if sum_val is not None else 0.0
+            operational_impact_score = (sum_of_max_row_weights / total_records) * 100.0
+        except Exception as e:
+            print(f"Error calculating row-level weighted score: {e}")
+            operational_impact_score = (float(quarantine_count) / float(total_records)) * 100.0
     print(f"Weighted Operational Impact Score: {operational_impact_score:.2f}%")
 
     # Log operational run metrics to Elasticsearch
@@ -749,58 +831,19 @@ if __name__ == "__main__":
     if len(sys.argv) > 1:
         target_table = sys.argv[1]
 
-    registry_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "schema_registry.json")
+    # Load canonical schema registry config from ES or default fallbacks
+    spec = load_expected_schema(target_table)
 
-    # Standard built-in registry configurations
-    default_registry = {
-        "mbti": {
-            "primary_key": ["author", "text"],
-            "date_column": None,
-            "schema_spec": {
-                "author": "StringType",
-                "text": "StringType",
-                "label": "StringType",
-                "EI": "StringType",
-                "NS": "StringType",
-                "TF": "StringType",
-                "JP": "StringType"
-            }
-        },
-        "users": {
-            "primary_key": "id",
-            "date_column": "updated_at",
-            "schema_spec": {
-                "id": "IntegerType",
-                "username": "StringType",
-                "email": "StringType",
-                "role": "StringType",
-                "created_at": "TimestampType",
-                "updated_at": "TimestampType"
-            }
-        }
-    }
-
-    # Load registry if exists, otherwise create it with defaults
-    registry = default_registry.copy()
-    if os.path.exists(registry_path):
-        try:
-            with open(registry_path, "r") as f:
-                loaded = json.load(f)
-                registry.update(loaded)
-        except Exception as e:
-            print(f"Error loading schema registry: {e}")
-
-    # Normalize mapping search (Fuzzy Table Name Mapping)
-    normalized_target = normalize_name(target_table)
-    matched_table_name = None
-    for tbl_name in registry.keys():
-        if normalize_name(tbl_name) == normalized_target:
-            matched_table_name = tbl_name
-            break
-
-    # If the target table is in the registry (exact or normalized), run it
-    if matched_table_name:
-        spec = registry[matched_table_name]
+    if spec:
+        # Resolve table name from spec if it was fuzzy matched
+        normalized_target = normalize_name(target_table)
+        matched_table_name = target_table
+        default_registry_tables = ["mbti", "users", "benchmark_test"]
+        for tbl in default_registry_tables:
+            if normalize_name(tbl) == normalized_target:
+                matched_table_name = tbl
+                break
+        
         run_quality_check(matched_table_name, spec["primary_key"], spec["date_column"], spec["schema_spec"], input_table_name=target_table)
     else:
         print(f"Table '{target_table}' not found in registry. Inferring configuration dynamically...")
@@ -877,20 +920,14 @@ if __name__ == "__main__":
             print(f"  Date Column: {date_column}")
             print(f"  Schema Spec: {schema_spec}")
 
-            # Update registry dictionary
-            registry[target_table] = {
+            inferred_spec = {
                 "primary_key": primary_key,
                 "date_column": date_column,
                 "schema_spec": schema_spec
             }
 
-            # Write updated registry back to local file
-            try:
-                with open(registry_path, "w") as f:
-                    json.dump(registry, f, indent=4)
-                print(f"Saved inferred configuration for '{target_table}' to schema registry.")
-            except Exception as w_err:
-                print(f"Could not save registry file: {w_err}")
+            # Save inferred registry config to ES sdoqap_schema_registry
+            save_registry_to_es(target_table, inferred_spec)
 
             # Do NOT stop temp_spark here, as get_spark_session will reuse the existing active session in local mode
             # temp_spark.stop()

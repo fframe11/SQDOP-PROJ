@@ -64,19 +64,61 @@ def approve_proposal(proposal_id: str):
     table_name = proposal["table_name"]
     proposed_schema = proposal["proposed_schema"]
 
-    # Apply to schema_registry.json
-    registry_path = os.path.normpath(SCHEMA_REGISTRY_PATH)
+    # Apply to Elasticsearch sdoqap_schema_registry
+    default_registry = {
+        "mbti": {
+            "primary_key": ["author", "text"],
+            "date_column": None,
+            "schema_spec": {
+                "author": "StringType",
+                "text": "StringType",
+                "label": "StringType",
+                "EI": "StringType",
+                "NS": "StringType",
+                "TF": "StringType",
+                "JP": "StringType"
+            }
+        },
+        "users": {
+            "primary_key": "id",
+            "date_column": "updated_at",
+            "schema_spec": {
+                "id": "IntegerType",
+                "username": "StringType",
+                "email": "StringType",
+                "role": "StringType",
+                "created_at": "TimestampType",
+                "updated_at": "TimestampType"
+            }
+        },
+        "benchmark_test": {
+            "primary_key": "id",
+            "date_column": "updated_at",
+            "schema_spec": {
+                "id": "IntegerType",
+                "username": "StringType",
+                "email": "StringType",
+                "role": "StringType",
+                "created_at": "TimestampType",
+                "updated_at": "TimestampType"
+            }
+        }
+    }
     try:
-        if os.path.exists(registry_path):
-            with open(registry_path, "r") as f:
-                registry = json.load(f)
-            if table_name in registry:
-                registry[table_name]["schema_spec"] = proposed_schema
-                with open(registry_path, "w") as f:
-                    json.dump(registry, f, indent=4)
-                print(f"[SCHEMA APPROVED] schema_registry.json updated for '{table_name}'.")
+        if es.indices.exists(index="sdoqap_schema_registry") and es.exists(index="sdoqap_schema_registry", id=table_name):
+            reg_doc = es.get(index="sdoqap_schema_registry", id=table_name)["_source"]
+        else:
+            reg_doc = default_registry.get(table_name, {
+                "primary_key": "id",
+                "date_column": None,
+                "schema_spec": {}
+            })
+            
+        reg_doc["schema_spec"] = proposed_schema
+        es.index(index="sdoqap_schema_registry", id=table_name, document=reg_doc)
+        print(f"[SCHEMA APPROVED] sdoqap_schema_registry updated in ES for '{table_name}'.")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to update schema_registry.json: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to update sdoqap_schema_registry in ES: {e}")
 
     # Update proposal status in ES
     es.update(
@@ -96,7 +138,7 @@ def approve_proposal(proposal_id: str):
 def reject_proposal(proposal_id: str):
     """
     Reject a PENDING schema proposal.
-    The current schema_registry.json remains unchanged.
+    The current registry in ES remains unchanged.
     """
     es = get_es()
     try:
@@ -111,5 +153,5 @@ def reject_proposal(proposal_id: str):
     )
 
     return {
-        "message": f"Schema proposal '{proposal_id}' REJECTED. schema_registry.json unchanged."
+        "message": f"Schema proposal '{proposal_id}' REJECTED. sdoqap_schema_registry unchanged."
     }
