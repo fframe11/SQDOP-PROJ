@@ -183,16 +183,39 @@ def run_quality_check(table_name, primary_key, date_column, schema_spec):
         print(f"Reading raw CSV data from {raw_path}")
         df = spark.read.option("header", "true").csv(raw_path)
 
-        # Cast columns according to schema_spec
+        # Cast columns according to schema_spec with Smart Parser / Normalization
         from pyspark.sql.types import IntegerType, DoubleType, TimestampType, StringType
         for col_name, type_str in schema_spec.items():
             if col_name in df.columns:
                 if type_str == "IntegerType":
-                    df = df.withColumn(col_name, F.col(col_name).cast(IntegerType()))
+                    # Remove currency, spaces, and commas
+                    clean_col = F.regexp_replace(F.col(col_name), r"[\$,\s]", "")
+                    # Cast to double first, then to integer, so float strings like "12.00" don't become null
+                    df = df.withColumn(col_name, clean_col.cast("double").cast(IntegerType()))
                 elif type_str == "DoubleType":
-                    df = df.withColumn(col_name, F.col(col_name).cast(DoubleType()))
+                    clean_col = F.regexp_replace(F.col(col_name), r"[\$,\s]", "")
+                    df = df.withColumn(col_name, clean_col.cast(DoubleType()))
                 elif type_str == "TimestampType":
-                    df = df.withColumn(col_name, F.col(col_name).cast(TimestampType()))
+                    # Support multiple common date/timestamp formats
+                    date_formats = [
+                        "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+                        "yyyy-MM-dd'T'HH:mm:ss",
+                        "yyyy-MM-dd HH:mm:ss",
+                        "yyyy-MM-dd",
+                        "dd/MM/yyyy",
+                        "MM/dd/yyyy"
+                    ]
+                    parsed_ts = None
+                    for fmt in date_formats:
+                        ts_attempt = F.to_timestamp(F.col(col_name), fmt)
+                        parsed_ts = ts_attempt if parsed_ts is None else F.coalesce(parsed_ts, ts_attempt)
+                    
+                    # Epoch unix timestamp support (if input is numerical string)
+                    epoch_ts_ms = F.to_timestamp(F.col(col_name).cast("double") / 1000.0)
+                    epoch_ts_sec = F.to_timestamp(F.col(col_name).cast("double"))
+                    parsed_ts = F.coalesce(parsed_ts, epoch_ts_ms, epoch_ts_sec)
+                    
+                    df = df.withColumn(col_name, parsed_ts)
 
         # Partition data into smaller chunks to enable parallel processing in small batches
         df = df.repartition(10)
