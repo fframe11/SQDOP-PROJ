@@ -10,6 +10,12 @@ from pyspark.sql import functions as F
 ELASTICSEARCH_URL = os.getenv("ELASTICSEARCH_URL", "http://elastic:sdoqap_secure@elasticsearch:9200")
 HDFS_URL = "hdfs://namenode:9000"
 
+def normalize_name(name):
+    import re
+    if not name:
+        return ""
+    return re.sub(r'[\s\-_]', '', name).lower()
+
 def get_spark_session(app_name):
     return SparkSession.builder \
         .appName(app_name) \
@@ -18,6 +24,7 @@ def get_spark_session(app_name):
         .config("spark.jars.packages", "io.delta:delta-core_2.12:2.4.0") \
         .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension") \
         .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog") \
+        .config("spark.databricks.delta.schema.autoMerge.enabled", "true") \
         .config("spark.sql.adaptive.enabled", "false") \
         .config("spark.sql.shuffle.partitions", "2") \
         .config("spark.driver.host", "127.0.0.1") \
@@ -150,7 +157,47 @@ def send_n8n_alert(title, message, severity="warning"):
     t.daemon = True
     t.start()
 
-def run_quality_check(table_name, primary_key, date_column, schema_spec):
+def get_historical_stats(table_name):
+    """Fetches historical quarantine rates for z-score anomaly detection."""
+    url = f"{ELASTICSEARCH_URL}/sdoqap_quality_runs/_search"
+    query = {
+        "query": {
+            "term": {
+                "table_name.keyword": table_name
+            }
+        },
+        "sort": [{"timestamp": {"order": "desc"}}],
+        "size": 15
+    }
+    try:
+        # Parse basic auth from URL if present
+        auth = None
+        from urllib.parse import urlparse
+        parsed = urlparse(ELASTICSEARCH_URL)
+        if parsed.username and parsed.password:
+            auth = (parsed.username, parsed.password)
+            base_url = f"{parsed.scheme}://{parsed.hostname}:{parsed.port}"
+            url = f"{base_url}/sdoqap_quality_runs/_search"
+
+        res = requests.post(url, json=query, auth=auth, headers={"Content-Type": "application/json"}, timeout=5)
+        if res.status_code == 200:
+            hits = res.json().get("hits", {}).get("hits", [])
+            rates = []
+            for hit in hits:
+                source = hit.get("_source", {})
+                total = source.get("total_records", 0)
+                quar = source.get("quarantined_records", 0)
+                if total > 0:
+                    rates.append(float(quar) / float(total))
+            return rates
+    except Exception as e:
+        print(f"[STAT] Failed to fetch historical stats: {e}")
+    return []
+
+def run_quality_check(table_name, primary_key, date_column, schema_spec, input_table_name=None):
+    if not input_table_name:
+        input_table_name = table_name
+
     run_id = f"run_{datetime.utcnow().strftime('%Y%m%d_%H%M%S_%f')}"
 
     # ─── FIX 2A: Acquire distributed lock BEFORE starting Spark ───────────────
@@ -160,7 +207,7 @@ def run_quality_check(table_name, primary_key, date_column, schema_spec):
 
     # ─── FIX 1B: Create Spark session, detect track, and configure Spark resources accordingly ────────
     spark = get_spark_session(f"SDOQAP_QualityCheck_{table_name}")
-    track = detect_track(spark, table_name)
+    track = detect_track(spark, input_table_name)
     if track == "fast":
         spark.conf.set("spark.sql.shuffle.partitions", "2")
     else:
@@ -171,7 +218,23 @@ def run_quality_check(table_name, primary_key, date_column, schema_spec):
     quality_threshold = rules.get("quality_score_threshold", 90.0)
     freshness_limit_hours = rules.get("freshness_threshold_hours", 48)
 
+    # Determine raw HDFS path using FileSystem API check
     raw_path = f"{HDFS_URL}/data/raw/{table_name}"
+    try:
+        sc = spark.sparkContext
+        conf = sc._jsc.hadoopConfiguration()
+        URI = sc._gateway.jvm.java.net.URI
+        FileSystem = sc._gateway.jvm.org.apache.hadoop.fs.FileSystem
+        Path = sc._gateway.jvm.org.apache.hadoop.fs.Path
+        fs = FileSystem.get(URI(HDFS_URL), conf)
+        if fs.exists(Path(f"/data/raw/{input_table_name}")):
+            raw_path = f"{HDFS_URL}/data/raw/{input_table_name}"
+            print(f"[PATH] Resolved raw HDFS path to input folder: {raw_path}")
+        else:
+            print(f"[PATH] Input folder not found. Using canonical raw HDFS path: {raw_path}")
+    except Exception as e:
+        print(f"[PATH] HDFS check failed: {e}. Falling back to default: {raw_path}")
+
     active_path = f"{HDFS_URL}/data/active/{table_name}"
     staging_path = f"{HDFS_URL}/data/staging/{table_name}/run_id={run_id}"
     quarantine_path = f"{HDFS_URL}/data/quarantine/{table_name}"
@@ -183,10 +246,29 @@ def run_quality_check(table_name, primary_key, date_column, schema_spec):
         print(f"Reading raw CSV data from {raw_path}")
         df = spark.read.option("header", "true").csv(raw_path)
 
-        # Cast columns according to schema_spec with Smart Parser / Normalization
+        # Column Name Standardization (Fuzzy/Alias Mapping)
+        normalized_spec = {normalize_name(k): k for k in schema_spec.keys()}
+        for col_name in df.columns:
+            norm_col = normalize_name(col_name)
+            if norm_col in normalized_spec:
+                canonical_name = normalized_spec[norm_col]
+                if col_name != canonical_name:
+                    print(f"[RENAME] Standardizing column name: '{col_name}' -> '{canonical_name}'")
+                    df = df.withColumnRenamed(col_name, canonical_name)
+
+        # Cast columns according to schema_spec with Smart Parser / Normalization / Type Promotion
         from pyspark.sql.types import IntegerType, DoubleType, TimestampType, StringType
-        for col_name, type_str in schema_spec.items():
+        for col_name, type_str in list(schema_spec.items()):
             if col_name in df.columns:
+                # Safe Type Promotion: IntegerType to DoubleType if non-zero decimals exist
+                if type_str == "IntegerType":
+                    non_null_col = F.coalesce(F.col(col_name), F.lit(""))
+                    has_decimals = df.filter(non_null_col.rlike(r"\.[0-9]*[1-9]+")).limit(1).count() > 0
+                    if has_decimals:
+                        print(f"[PROMOTION] Column '{col_name}' promoted from IntegerType to DoubleType to preserve decimal precision.")
+                        type_str = "DoubleType"
+                        schema_spec[col_name] = "DoubleType"
+
                 if type_str == "IntegerType":
                     # Remove currency, spaces, and commas
                     clean_col = F.regexp_replace(F.col(col_name), r"[\$,\s]", "")
@@ -569,6 +651,53 @@ def run_quality_check(table_name, primary_key, date_column, schema_spec):
             severity="critical"
         )
 
+    # 4.1 Z-Score Anomaly Detection on Quarantine Rate (Task 3)
+    current_quarantine_rate = 0.0 if total_records == 0 else float(quarantine_count) / float(total_records)
+    historical_rates = get_historical_stats(table_name)
+    z_score = 0.0
+    is_anomaly = False
+    
+    # We need at least 3 historical runs to compute standard deviation
+    if len(historical_rates) >= 3:
+        avg_rate = sum(historical_rates) / len(historical_rates)
+        variance = sum((x - avg_rate) ** 2 for x in historical_rates) / len(historical_rates)
+        std_dev = variance ** 0.5
+        if std_dev > 0.001:
+            z_score = abs(current_quarantine_rate - avg_rate) / std_dev
+            if z_score > 3.0:
+                is_anomaly = True
+                print(f"[ANOMALY] Statistical Anomaly Detected! Quarantine Rate: {current_quarantine_rate*100:.2f}% vs Avg: {avg_rate*100:.2f}%, Z-Score: {z_score:.2f}")
+                send_n8n_alert(
+                    title=f"🚨 CRITICAL ANOMALY: {table_name} Data Anomaly",
+                    message=f"Run ID: {run_id}\nQuarantine Rate: {current_quarantine_rate*100:.2f}% (Historical Avg: {avg_rate*100:.2f}%)\nZ-Score: {z_score:.2f} (exceeds threshold 3.0)",
+                    severity="critical"
+                )
+
+    # 4.2 Weighted Operational COPDQ Score (Task 4)
+    column_weights = rules.get("column_weights", {})
+    pk_weight = column_weights.get(primary_key if isinstance(primary_key, str) else pk_cols[0], 1.0)
+    date_weight = column_weights.get(date_column, 0.5) if date_column else 0.5
+    
+    weighted_fail_sum = 0.0
+    for reason, count in quarantine_breakdown.items():
+        if "primary" in reason or "duplicate" in reason:
+            weight = pk_weight
+        elif "date" in reason:
+            weight = date_weight
+        else:
+            matched_weight = None
+            for col, w in column_weights.items():
+                if col in reason:
+                    matched_weight = w
+                    break
+            weight = matched_weight if matched_weight is not None else 0.2
+        weighted_fail_sum += weight * count
+        
+    operational_impact_score = 0.0
+    if total_records > 0:
+        operational_impact_score = (weighted_fail_sum / total_records) * 100.0
+    print(f"Weighted Operational Impact Score: {operational_impact_score:.2f}%")
+
     # Log operational run metrics to Elasticsearch
     quality_run_doc = {
         "run_id": run_id,
@@ -579,7 +708,10 @@ def run_quality_check(table_name, primary_key, date_column, schema_spec):
         "quality_score": quality_score,
         "freshness_lag_hours": max_lag_hours,
         "timestamp": datetime.utcnow().isoformat(),
-        "quarantined_financial_value": quarantined_financial_value
+        "quarantined_financial_value": quarantined_financial_value,
+        "operational_impact_score": operational_impact_score,
+        "z_score": z_score,
+        "is_anomaly": is_anomaly
     }
     if class_balance:
         quality_run_doc["class_balance"] = class_balance
@@ -658,10 +790,18 @@ if __name__ == "__main__":
         except Exception as e:
             print(f"Error loading schema registry: {e}")
 
-    # If the target table is in the registry, run it
-    if target_table in registry:
-        spec = registry[target_table]
-        run_quality_check(target_table, spec["primary_key"], spec["date_column"], spec["schema_spec"])
+    # Normalize mapping search (Fuzzy Table Name Mapping)
+    normalized_target = normalize_name(target_table)
+    matched_table_name = None
+    for tbl_name in registry.keys():
+        if normalize_name(tbl_name) == normalized_target:
+            matched_table_name = tbl_name
+            break
+
+    # If the target table is in the registry (exact or normalized), run it
+    if matched_table_name:
+        spec = registry[matched_table_name]
+        run_quality_check(matched_table_name, spec["primary_key"], spec["date_column"], spec["schema_spec"], input_table_name=target_table)
     else:
         print(f"Table '{target_table}' not found in registry. Inferring configuration dynamically...")
         # Resolve configuration dynamically using a temporary Spark session
