@@ -96,6 +96,8 @@ services:
     image: bitnamilegacy/spark:3.4.1
     container_name: sdoqap-spark-master
     restart: always
+    env_file:
+      - .env
     environment:
       - SPARK_MODE=master
       - SPARK_RPC_AUTHENTICATION_ENABLED=no
@@ -103,6 +105,7 @@ services:
       - ELASTICSEARCH_PASSWORD=${ELASTICSEARCH_PASSWORD:-sdoqap_secure}
       - ELASTICSEARCH_HOST=${ELASTICSEARCH_HOST:-elasticsearch}
       - ELASTICSEARCH_PORT=${ELASTICSEARCH_PORT:-9200}
+      - HADOOP_USER_NAME=root
     ports:
       - "8081:8080" # Spark Web UI (map to 8081 to avoid conflict)
       - "7077:7077"
@@ -120,6 +123,8 @@ services:
     image: bitnamilegacy/spark:3.4.1
     container_name: sdoqap-spark-worker
     restart: always
+    env_file:
+      - .env
     environment:
       - SPARK_MODE=worker
       - SPARK_MASTER_URL=spark://spark-master:7077
@@ -130,6 +135,7 @@ services:
       - ELASTICSEARCH_PASSWORD=${ELASTICSEARCH_PASSWORD:-sdoqap_secure}
       - ELASTICSEARCH_HOST=${ELASTICSEARCH_HOST:-elasticsearch}
       - ELASTICSEARCH_PORT=${ELASTICSEARCH_PORT:-9200}
+      - HADOOP_USER_NAME=root
     depends_on:
       - spark-master
     volumes:

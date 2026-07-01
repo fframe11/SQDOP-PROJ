@@ -18,7 +18,7 @@ def get_elasticsearch_url():
     return es_url
 
 ELASTICSEARCH_URL = get_elasticsearch_url()
-HDFS_URL = "hdfs://namenode:9000"
+HDFS_URL = os.getenv("HDFS_URL", "hdfs://namenode:9000")
 
 def get_es_auth():
     from urllib.parse import urlparse
@@ -33,10 +33,13 @@ def get_es_base_url():
     return f"{parsed.scheme}://{parsed.hostname}:{parsed.port}"
 
 def get_spark():
-    return SparkSession.builder \
-        .appName("SDOQAP_UnitTest_Runner") \
-        .master("local[*]") \
-        .getOrCreate()
+    builder = SparkSession.builder \
+        .appName("SDOQAP_UnitTest_Runner")
+        
+    if "SPARK_HOME" not in os.environ:
+        builder = builder.master("local[*]")
+        
+    return builder.getOrCreate()
 
 def setup_hdfs(spark):
     print("Clearing any stale locks in Elasticsearch for benchmark_test...")

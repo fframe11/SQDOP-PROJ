@@ -10,14 +10,29 @@ from elasticsearch import Elasticsearch
 
 router = APIRouter(prefix="/api/v1/schema", tags=["Schema Governance"])
 
-ELASTICSEARCH_URL = os.getenv("ELASTICSEARCH_URL", "http://elasticsearch:9200")
+def get_elasticsearch_url():
+    es_user = os.getenv("ELASTICSEARCH_USER", "elastic")
+    es_pass = os.getenv("ELASTICSEARCH_PASSWORD", "sdoqap_secure")
+    es_host = os.getenv("ELASTICSEARCH_HOST", "elasticsearch")
+    es_port = os.getenv("ELASTICSEARCH_PORT", "9200")
+    if "ELASTICSEARCH_HOST" not in os.environ and "ELASTICSEARCH_URL" not in os.environ:
+        es_host = "localhost"
+    es_url = os.getenv("ELASTICSEARCH_URL")
+    if not es_url:
+        es_url = f"http://{es_user}:{es_pass}@{es_host}:{es_port}"
+    return es_url
+
+ELASTICSEARCH_URL = get_elasticsearch_url()
 SCHEMA_REGISTRY_PATH = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
     "..", "..", "..", "spark", "schema_registry.json"
 )
 
 def get_es():
-    return Elasticsearch(ELASTICSEARCH_URL)
+    try:
+        return Elasticsearch(ELASTICSEARCH_URL)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to connect to Elasticsearch: {str(e)}")
 
 
 @router.get("/proposals")

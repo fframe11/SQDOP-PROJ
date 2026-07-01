@@ -238,6 +238,9 @@ def retry_pipeline_run(run_id: str):
         cmd = [
             "spark-submit",
             "--master", "spark://spark-master:7077",
+            "--conf", "spark.executorEnv.HADOOP_USER_NAME=spark",
+            "--conf", "spark.executor.extraJavaOptions=-DHADOOP_USER_NAME=spark",
+            "--conf", "spark.driver.extraJavaOptions=-DHADOOP_USER_NAME=spark",
             "--packages", "io.delta:delta-core_2.12:2.4.0",
             "/opt/spark-apps/spark_quality_engine.py",
             table_name

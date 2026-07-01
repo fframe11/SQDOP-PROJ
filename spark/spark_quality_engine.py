@@ -20,7 +20,7 @@ def get_elasticsearch_url():
     return es_url
 
 ELASTICSEARCH_URL = get_elasticsearch_url()
-HDFS_URL = "hdfs://namenode:9000"
+HDFS_URL = os.getenv("HDFS_URL", "hdfs://namenode:9000")
 
 def normalize_name(name):
     import re
@@ -29,9 +29,8 @@ def normalize_name(name):
     return re.sub(r'[\s\-_]', '', name).lower()
 
 def get_spark_session(app_name):
-    return SparkSession.builder \
+    builder = SparkSession.builder \
         .appName(app_name) \
-        .master("local[*]") \
         .config("spark.executor.memory", "2g") \
         .config("spark.jars.packages", "io.delta:delta-core_2.12:2.4.0") \
         .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension") \
@@ -39,9 +38,17 @@ def get_spark_session(app_name):
         .config("spark.databricks.delta.schema.autoMerge.enabled", "true") \
         .config("spark.sql.adaptive.enabled", "false") \
         .config("spark.sql.shuffle.partitions", "2") \
-        .config("spark.driver.host", "127.0.0.1") \
-        .config("spark.driver.bindAddress", "127.0.0.1") \
-        .getOrCreate()
+        .config("spark.executorEnv.HADOOP_USER_NAME", "spark") \
+        .config("spark.executor.extraJavaOptions", "-DHADOOP_USER_NAME=spark") \
+        .config("spark.driver.extraJavaOptions", "-DHADOOP_USER_NAME=spark")
+        
+    # Dynamically determine master to allow proper distributed cluster resource allocation
+    if "SPARK_HOME" not in os.environ:
+        builder = builder.master("local[*]")
+        builder = builder.config("spark.driver.host", "127.0.0.1") \
+                         .config("spark.driver.bindAddress", "127.0.0.1")
+                         
+    return builder.getOrCreate()
 
 def log_to_elasticsearch(index_name, doc):
     """Writes metadata document directly to Elasticsearch."""
