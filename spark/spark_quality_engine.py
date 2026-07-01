@@ -503,7 +503,49 @@ def run_quality_check(table_name, primary_key, date_column, schema_spec, input_t
             severity="warning"
         )
 
-    # 2. DATA VALIDATION (Row-level Quality check)
+    # 2. AUTO-CLEANSING & HEALING (Self-Healing Data Pipeline - User Request)
+    auto_clean = rules.get("auto_clean", True)
+    remediation_logs = []
+    
+    if auto_clean:
+        print("[AUTO-CLEAN] Starting self-healing preprocessing...")
+        
+        # 2.1 Heal Missing Primary Keys (Generate Unique IDs)
+        if isinstance(primary_key, str):
+            pk_null_count = df.filter(F.col(primary_key).isNull()).count()
+            if pk_null_count > 0:
+                print(f"[AUTO-CLEAN] Found {pk_null_count} rows with missing Primary Key. Generating UUIDs...")
+                df = df.withColumn(primary_key, F.coalesce(F.col(primary_key), F.concat(F.lit("AUTO_PK_"), F.expr("uuid()"))))
+                remediation_logs.append(f"healed_{pk_null_count}_missing_pks")
+        elif isinstance(primary_key, list) and len(primary_key) > 0:
+            for pk_col in primary_key:
+                pk_null_count = df.filter(F.col(pk_col).isNull()).count()
+                if pk_null_count > 0:
+                    print(f"[AUTO-CLEAN] Found {pk_null_count} rows with missing PK component '{pk_col}'. Generating UUIDs...")
+                    df = df.withColumn(pk_col, F.coalesce(F.col(pk_col), F.concat(F.lit("AUTO_PK_"), F.expr("uuid()"))))
+                    remediation_logs.append(f"healed_{pk_null_count}_missing_{pk_col}")
+        
+        # 2.2 Heal Missing Dates (Fill with Current Timestamp)
+        if date_column and date_column in df.columns:
+            date_null_count = df.filter(F.col(date_column).isNull()).count()
+            if date_null_count > 0:
+                print(f"[AUTO-CLEAN] Found {date_null_count} rows with missing Date Column. Imputing current timestamp...")
+                df = df.withColumn(date_column, F.coalesce(F.col(date_column), F.current_timestamp()))
+                remediation_logs.append(f"healed_{date_null_count}_missing_dates")
+                
+        # 2.3 Heal Duplicates (Deduplicate directly without quarantining them as errors)
+        pk_cols = [primary_key] if isinstance(primary_key, str) else primary_key
+        df_count_before = df.count()
+        if date_column and date_column in df.columns:
+            df = df.orderBy(F.col(date_column).desc())
+        df = df.dropDuplicates(subset=pk_cols)
+        df_count_after = df.count()
+        dup_resolved = df_count_before - df_count_after
+        if dup_resolved > 0:
+            print(f"[AUTO-CLEAN] Deduplicated and resolved {dup_resolved} duplicate records.")
+            remediation_logs.append(f"resolved_{dup_resolved}_duplicates")
+
+    # 3. DATA VALIDATION (Row-level Quality check)
     df_with_status = df.withColumn("is_invalid", F.col(primary_key).isNull()) \
                        .withColumn("reject_reason", F.when(F.col("is_invalid"), F.lit("missing_primary_key")).otherwise(F.lit("")))
 
@@ -793,7 +835,9 @@ def run_quality_check(table_name, primary_key, date_column, schema_spec, input_t
         "quarantined_financial_value": quarantined_financial_value,
         "operational_impact_score": operational_impact_score,
         "z_score": z_score,
-        "is_anomaly": is_anomaly
+        "is_anomaly": is_anomaly,
+        "remediation_logs": remediation_logs,
+        "auto_cleaned": auto_clean
     }
     if class_balance:
         quality_run_doc["class_balance"] = class_balance
