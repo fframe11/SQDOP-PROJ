@@ -10,18 +10,15 @@ def get_required_env(key):
     return val
 
 def get_elasticsearch_url():
-    REDDIT_CLIENT_SECRET = get_required_env("REDDIT_CLIENT_SECRET")
-    REDDIT_CLIENT_ID = get_required_env("REDDIT_CLIENT_ID")
-    es_user = get_required_env("ELASTICSEARCH_USER")
-    es_pass = get_required_env("ELASTICSEARCH_PASSWORD")
-    es_host = get_required_env("ELASTICSEARCH_HOST")
-    es_port = get_required_env("ELASTICSEARCH_PORT")
-    if "ELASTICSEARCH_HOST" not in os.environ and "ELASTICSEARCH_URL" not in os.environ:
-        es_host = "localhost"
-    es_url = os.environ.get("ELASTICSEARCH_URL")
-    if not es_url:
-        es_url = f"http://{es_user}:{es_pass}@{es_host}:{es_port}"
-    return es_url
+    # Prefer ELASTICSEARCH_URL if provided via environment
+    es_url = os.getenv("ELASTICSEARCH_URL")
+    if es_url:
+        return es_url
+    es_user = os.getenv("ELASTICSEARCH_USER", "elastic")
+    es_pass = os.getenv("ELASTICSEARCH_PASSWORD", "sdoqap_secure")
+    es_host = os.getenv("ELASTICSEARCH_HOST", "localhost")
+    es_port = os.getenv("ELASTICSEARCH_PORT", "9200")
+    return f"http://{es_user}:{es_pass}@{es_host}:{es_port}"
 
 ELASTICSEARCH_URL = get_elasticsearch_url()
 

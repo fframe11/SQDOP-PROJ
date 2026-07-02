@@ -756,7 +756,7 @@ def run_quality_check(table_name, primary_key, date_column, schema_spec, input_t
             .save(active_path)
 
     # Quarantined data written with run_id partition for traceability
-    all_quarantined_write.write.format("delta").mode("append").save(f"{quarantine_path}/run_id={run_id}")
+    all_quarantined_write.write.format("delta").mode("append").partitionBy("run_id").save(quarantine_path)
 
     # Release cached DataFrames from memory to prevent memory leaks and OOM
     clean_df.unpersist()
@@ -804,7 +804,7 @@ def run_quality_check(table_name, primary_key, date_column, schema_spec, input_t
     quarantine_breakdown = {}
     if quarantine_count > 0:
         try:
-            quar_run_df = spark.read.format("delta").load(f"{quarantine_path}/run_id={run_id}")
+            quar_run_df = spark.read.format("delta").load(quarantine_path).filter(F.col("run_id") == run_id)
             if "reject_reason" in quar_run_df.columns:
                 breakdown_df = quar_run_df.groupBy("reject_reason").count().collect()
                 for row in breakdown_df:

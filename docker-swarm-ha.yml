@@ -224,4 +224,5 @@ volumes:
 
 networks:
   sdoqap_network:
+    name: sdoqap_network
     driver: overlay

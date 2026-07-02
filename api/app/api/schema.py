@@ -70,7 +70,7 @@ def approve_proposal(proposal_id: str, primary_key: str = None, date_column: str
     if proposal.get("status") != "PENDING":
         raise HTTPException(
             status_code=400,
-            detail=f"Proposal is already '{proposal.get('status')}-'. Only PENDING proposals can be approved."
+            detail=f"Proposal is already '{proposal.get('status')}'. Only PENDING proposals can be approved."
         )
 
     table_name = proposal["table_name"]
