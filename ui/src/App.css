@@ -91,21 +91,32 @@ body {
 .nav-link {
   text-decoration: none;
   color: var(--text-muted);
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   font-weight: 500;
   padding: 0.4rem 0.75rem;
-  border-radius: var(--radius-sm);
+  position: relative;
   transition: var(--transition);
 }
 
 .nav-link:hover {
   color: var(--text-main);
-  background: var(--bg-glass);
 }
 
 .nav-link.active {
   color: var(--accent-blue);
-  background: rgba(59, 130, 246, 0.1);
+  background: none;
+}
+
+.nav-link.active::after {
+  content: '';
+  position: absolute;
+  bottom: -10px;
+  left: 10%;
+  width: 80%;
+  height: 3px;
+  background: #38bdf8;
+  border-radius: 4px;
+  box-shadow: 0 0 10px #38bdf8;
 }
 
 /* ========== App Layout container ========== */
