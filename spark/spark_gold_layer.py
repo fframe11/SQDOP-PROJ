@@ -13,6 +13,7 @@ Run via spark-submit or directly: python spark_gold_layer.py
 """
 
 import os
+from api.app.api.config import get_required_env
 import json
 import requests
 import re
@@ -20,13 +21,13 @@ from datetime import datetime, timezone, timedelta
 from collections import defaultdict
 
 def get_elasticsearch_url():
-    es_user = os.getenv("ELASTICSEARCH_USER", "elastic")
-    es_pass = os.getenv("ELASTICSEARCH_PASSWORD", "sdoqap_secure")
-    es_host = os.getenv("ELASTICSEARCH_HOST", "elasticsearch")
-    es_port = os.getenv("ELASTICSEARCH_PORT", "9200")
+    es_user = get_required_env("ELASTICSEARCH_USER")
+    es_pass = get_required_env("ELASTICSEARCH_PASSWORD")
+    es_host = get_required_env("ELASTICSEARCH_HOST")
+    es_port = get_required_env("ELASTICSEARCH_PORT")
     if "ELASTICSEARCH_HOST" not in os.environ and "ELASTICSEARCH_URL" not in os.environ:
         es_host = "localhost"
-    es_url = os.getenv("ELASTICSEARCH_URL")
+    es_url = get_required_env("ELASTICSEARCH_URL")
     if not es_url:
         es_url = f"http://{es_user}:{es_pass}@{es_host}:{es_port}"
     return es_url

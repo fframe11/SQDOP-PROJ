@@ -1,26 +1,56 @@
 import sys
+import argparse
 import os
+try:
+    from api.app.api.config import get_required_env
+except ModuleNotFoundError:
+    # Fallback implementation when the 'api' package is unavailable (e.g., inside Docker container)
+    def get_required_env(name: str) -> str:
+        """Retrieve required environment variable or raise a clear error."""
+        import os
+        value = os.getenv(name)
+        if value is None:
+            raise RuntimeError(f"Missing required environment variable '{name}'. Set it in the environment.")
+        return value
+# Set default Elasticsearch env for test if not provided
+os.environ.setdefault('ELASTICSEARCH_USER', 'elastic')
+os.environ.setdefault('ELASTICSEARCH_PASSWORD', 'sdoqap_secure')
+os.environ.setdefault('ELASTICSEARCH_HOST', 'localhost')
+os.environ.setdefault('ELASTICSEARCH_PORT', '9200')
+os.environ.setdefault('HDFS_URL', 'hdfs://namenode:9000')
+os.environ.setdefault('N8N_WEBHOOK_URL', 'http://localhost:5678')
 import json
+import yaml
 import subprocess
+
+# Load HDFS configuration from yaml if available
+_config_path = os.path.join(os.path.dirname(__file__), "config", "hdfs_config.yaml")
+if os.path.isfile(_config_path):
+    try:
+        with open(_config_path) as f:
+            _cfg = yaml.safe_load(f)
+        HDFS_URL = _cfg.get("hdfs", {}).get("url", HDFS_URL)
+    except Exception as e:
+        print(f"Failed to load HDFS config: {e}")
 from datetime import datetime, timedelta
 import requests
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 
 def get_elasticsearch_url():
-    es_user = os.getenv("ELASTICSEARCH_USER", "elastic")
-    es_pass = os.getenv("ELASTICSEARCH_PASSWORD", "sdoqap_secure")
-    es_host = os.getenv("ELASTICSEARCH_HOST", "elasticsearch")
-    es_port = os.getenv("ELASTICSEARCH_PORT", "9200")
-    if "ELASTICSEARCH_HOST" not in os.environ and "ELASTICSEARCH_URL" not in os.environ:
-        es_host = "localhost"
+    # Prefer full URL if provided via environment
     es_url = os.getenv("ELASTICSEARCH_URL")
-    if not es_url:
-        es_url = f"http://{es_user}:{es_pass}@{es_host}:{es_port}"
-    return es_url
+    if es_url:
+        return es_url
+    # Otherwise construct from components, using defaults where appropriate
+    es_user = get_required_env("ELASTICSEARCH_USER")
+    es_pass = get_required_env("ELASTICSEARCH_PASSWORD")
+    es_host = os.getenv("ELASTICSEARCH_HOST", "localhost")
+    es_port = os.getenv("ELASTICSEARCH_PORT", "9200")
+    return f"http://{es_user}:{es_pass}@{es_host}:{es_port}"
 
 ELASTICSEARCH_URL = get_elasticsearch_url()
-HDFS_URL = os.getenv("HDFS_URL", "hdfs://namenode:9000")
+HDFS_URL = get_required_env("HDFS_URL")
 
 def normalize_name(name):
     import re
@@ -29,20 +59,22 @@ def normalize_name(name):
     return re.sub(r'[\s\-_]', '', name).lower()
 
 def get_spark_session(app_name):
-    builder = SparkSession.builder \
-        .appName(app_name) \
-        .config("spark.executor.memory", "2g") \
-        .config("spark.jars.packages", "io.delta:delta-core_2.12:2.4.0") \
-        .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension") \
-        .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog") \
-        .config("spark.databricks.delta.schema.autoMerge.enabled", "true") \
-        .config("spark.sql.adaptive.enabled", "false") \
-        .config("spark.sql.shuffle.partitions", "2") \
-        .config("spark.executorEnv.HADOOP_USER_NAME", "spark") \
-        .config("spark.executor.extraJavaOptions", "-DHADOOP_USER_NAME=spark") \
-        .config("spark.driver.extraJavaOptions", "-DHADOOP_USER_NAME=spark")
-        
-    # Dynamically determine master to allow proper distributed cluster resource allocation
+    builder = (
+        SparkSession.builder
+        .appName(app_name)
+        .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
+        .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog")
+        .config("spark.executor.memory", "1g")
+        .config("spark.executor.cores", "1")
+        .config("spark.sql.adaptive.enabled", "false")
+        .config("spark.sql.shuffle.partitions", "2")
+        .config("spark.dynamicAllocation.enabled", "true")
+        .config("spark.dynamicAllocation.minExecutors", "1")
+        .config("spark.dynamicAllocation.maxExecutors", "4")
+        .config("spark.hadoop.fs.defaultFS", HDFS_URL)
+        .config("spark.hadoop.fs.hdfs.impl", "org.apache.hadoop.hdfs.DistributedFileSystem")
+        .config("spark.hadoop.fs.file.impl", "org.apache.hadoop.fs.LocalFileSystem")
+    )
     if "SPARK_HOME" not in os.environ:
         builder = builder.master("local[*]")
         builder = builder.config("spark.driver.host", "127.0.0.1") \
@@ -72,10 +104,10 @@ def log_to_elasticsearch(index_name, doc):
     except Exception as e:
         print(f"Error logging to Elasticsearch: {e}")
 
-N8N_WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL", "http://n8n:5678/webhook/sdoqap-alerts")
+N8N_WEBHOOK_URL = get_required_env("N8N_WEBHOOK_URL")
 
 # ─── FIX 2A: Distributed Lock via Elasticsearch with Self-Healing ────────────────
-def acquire_lock(table_name: str, run_id: str) -> bool:
+def acquire_lock(table_name: str, run_id: str, force: bool = False) -> bool:
     """Atomically lock a table before Spark starts. Uses ES op_type=create.
     If lock exists (409 Conflict), checks expires_at. If expired, force overwrites it
     using Optimistic Concurrency Control (seq_no & primary_term) to ensure atomicity."""
@@ -97,28 +129,44 @@ def acquire_lock(table_name: str, run_id: str) -> bool:
             print(f"[LOCK] Acquired lock for '{table_name}' (run_id={run_id})")
             return True
         elif res.status_code == 409:
-            # Lock already exists, check expiration
-            lock_url = f"{base_url}/sdoqap_run_locks/_doc/{table_name}"
-            get_res = requests.get(lock_url, auth=auth, timeout=5)
-            if get_res.status_code == 200:
-                existing = get_res.json()
-                expires_at_str = existing.get("_source", {}).get("expires_at")
-                if expires_at_str:
-                    expires_at = datetime.fromisoformat(expires_at_str.replace("Z", "+00:00"))
-                    if datetime.utcnow() > expires_at:
-                        print(f"[LOCK] Previous lock for '{table_name}' expired. Force overwriting lock with OCC...")
-                        seq_no = existing.get("_seq_no")
-                        primary_term = existing.get("_primary_term")
-                        
-                        # Use ES Optimistic Concurrency Control parameters to ensure atomic write
-                        occ_url = f"{lock_url}?if_seq_no={seq_no}&if_primary_term={primary_term}"
-                        res = requests.put(occ_url, json=lock_doc, auth=auth, timeout=5)
-                        if res.status_code in [200, 201]:
-                            print(f"[LOCK] Re-acquired expired lock atomically for '{table_name}'")
-                            return True
-                        else:
-                            print(f"[LOCK] OCC failed (status={res.status_code}). Another process acquired the lock first.")
-        print(f"[LOCK] Table '{table_name}' already locked. Aborting duplicate run.")
+            # Lock already exists
+            if force:
+                # Force overwrite the existing lock
+                print(f"[LOCK] Force flag enabled. Overwriting existing lock for '{table_name}'.")
+                lock_url = f"{base_url}/sdoqap_run_locks/_doc/{table_name}"
+                get_res = requests.get(lock_url, auth=auth, timeout=5)
+                if get_res.status_code == 200:
+                    existing = get_res.json()
+                    seq_no = existing.get("_seq_no")
+                    primary_term = existing.get("_primary_term")
+                    occ_url = f"{lock_url}?if_seq_no={seq_no}&if_primary_term={primary_term}"
+                    res = requests.put(occ_url, json=lock_doc, auth=auth, timeout=5)
+                    if res.status_code in [200, 201]:
+                        print(f"[LOCK] Forced lock acquisition for '{table_name}'.")
+                        return True
+                # If unable to force, fall through to abort
+                print(f"[LOCK] Failed to force lock for '{table_name}'. Aborting.")
+                return False
+            else:
+                # Normal behavior: check expiration
+                lock_url = f"{base_url}/sdoqap_run_locks/_doc/{table_name}"
+                get_res = requests.get(lock_url, auth=auth, timeout=5)
+                if get_res.status_code == 200:
+                    existing = get_res.json()
+                    expires_at_str = existing.get("_source", {}).get("expires_at")
+                    if expires_at_str:
+                        expires_at = datetime.fromisoformat(expires_at_str.replace("Z", "+00:00"))
+                        if datetime.utcnow() > expires_at:
+                            print(f"[LOCK] Previous lock for '{table_name}' expired. Overwriting...")
+                            seq_no = existing.get("_seq_no")
+                            primary_term = existing.get("_primary_term")
+                            occ_url = f"{lock_url}?if_seq_no={seq_no}&if_primary_term={primary_term}"
+                            res = requests.put(occ_url, json=lock_doc, auth=auth, timeout=5)
+                            if res.status_code in [200, 201]:
+                                print(f"[LOCK] Re-acquired expired lock for '{table_name}'.")
+                                return True
+                print(f"[LOCK] Table '{table_name}' already locked. Aborting duplicate run.")
+                return False
         return False
     except Exception as e:
         print(f"[LOCK] Lock acquisition failed: {e}. Aborting (fail-safe).")
@@ -326,7 +374,7 @@ def run_quality_check(table_name, primary_key, date_column, schema_spec, input_t
     run_id = f"run_{datetime.utcnow().strftime('%Y%m%d_%H%M%S_%f')}"
 
     # ─── FIX 2A: Acquire distributed lock BEFORE starting Spark ───────────────
-    if not acquire_lock(table_name, run_id):
+    if not acquire_lock(table_name, run_id, force=FORCE_LOCK):
         print(f"[ABORT] Duplicate run blocked for '{table_name}'. Exiting cleanly.")
         return None
 
@@ -891,6 +939,12 @@ def run_quality_check(table_name, primary_key, date_column, schema_spec, input_t
     spark.stop()
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Spark Quality Engine")
+    parser.add_argument("table", nargs='?', default="users", help="Target table name")
+    parser.add_argument("--force", action="store_true", help="Force lock acquisition, overriding existing locks")
+    args = parser.parse_args()
+    target_table = args.table
+    FORCE_LOCK = args.force
     # If table argument is passed via spark-submit, run that table, else run default
     target_table = "users"
     if len(sys.argv) > 1:

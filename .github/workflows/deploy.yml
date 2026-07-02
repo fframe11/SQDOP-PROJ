@@ -1,0 +1,28 @@
+name: Deploy SDOQAP
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Docker Compose
+        run: |
+          docker compose -f docker-compose.yml up -d
+
+      # Ensure HDFS raw directories exist and have correct ownership/permissions
+      - name: Create HDFS raw directories
+        run: |
+          docker exec sdoqap-namenode hdfs dfs -mkdir -p /data/raw/orders /data/raw/customers /data/raw/products /data/raw/inventory
+          docker exec sdoqap-namenode hdfs dfs -chown -R spark:spark /data/raw
+          docker exec sdoqap-namenode hdfs dfs -chmod -R 777 /data/raw
+
+      - name: Set HDFS permissions
+        run: |
+          docker exec sdoqap-namenode hdfs dfs -chown -R spark:spark /data/active /data/quarantine /data/raw /data/staging
+          docker exec sdoqap-namenode hdfs dfs -chmod -R 775 /data/active /data/quarantine /data/raw /data/staging

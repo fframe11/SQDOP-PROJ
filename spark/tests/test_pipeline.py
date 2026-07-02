@@ -4,21 +4,39 @@ import json
 import time
 import requests
 from pyspark.sql import SparkSession
+try:
+    from api.app.api.config import get_required_env
+except ModuleNotFoundError:
+    # Fallback when the 'api' package is unavailable (e.g., within Docker/container)
+    def get_required_env(name: str) -> str:
+        """Retrieve required env var or raise a clear error if missing."""
+        import os
+        value = os.getenv(name)
+        if value is None:
+            raise RuntimeError(f"Missing required environment variable '{name}'. Set it in the environment.")
+        return value
+
+# Default Elasticsearch and HDFS env vars for test execution
+os.environ.setdefault('ELASTICSEARCH_USER', 'elastic')
+os.environ.setdefault('ELASTICSEARCH_PASSWORD', 'changeme')
+os.environ.setdefault('ELASTICSEARCH_HOST', 'localhost')
+os.environ.setdefault('ELASTICSEARCH_PORT', '9200')
+os.environ.setdefault('HDFS_URL', 'http://localhost:50070')
 
 def get_elasticsearch_url():
-    es_user = os.getenv("ELASTICSEARCH_USER", "elastic")
-    es_pass = os.getenv("ELASTICSEARCH_PASSWORD", "sdoqap_secure")
-    es_host = os.getenv("ELASTICSEARCH_HOST", "elasticsearch")
-    es_port = os.getenv("ELASTICSEARCH_PORT", "9200")
-    if "ELASTICSEARCH_HOST" not in os.environ and "ELASTICSEARCH_URL" not in os.environ:
-        es_host = "localhost"
+    # Strict env retrieval; raises if missing
+    es_user = get_required_env("ELASTICSEARCH_USER")
+    es_pass = get_required_env("ELASTICSEARCH_PASSWORD")
+    es_host = get_required_env("ELASTICSEARCH_HOST")
+    es_port = get_required_env("ELASTICSEARCH_PORT")
+    # Allow optional ELASTICSEARCH_URL override
     es_url = os.getenv("ELASTICSEARCH_URL")
     if not es_url:
         es_url = f"http://{es_user}:{es_pass}@{es_host}:{es_port}"
     return es_url
 
 ELASTICSEARCH_URL = get_elasticsearch_url()
-HDFS_URL = os.getenv("HDFS_URL", "hdfs://namenode:9000")
+HDFS_URL = get_required_env("HDFS_URL")
 
 def get_es_auth():
     from urllib.parse import urlparse

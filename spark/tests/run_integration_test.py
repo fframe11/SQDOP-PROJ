@@ -4,14 +4,38 @@ import json
 import time
 import subprocess
 import requests
+from pyspark.sql import SparkSession
+# Ensure project root is on PYTHONPATH for imports
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
+try:
+    from api.app.api.config import get_required_env
+except ModuleNotFoundError:
+    # Fallback when api package is unavailable
+    def get_required_env(name: str) -> str:
+        """Retrieve required env var or raise clear error"""
+        import os
+        value = os.getenv(name)
+        if value is None:
+            raise RuntimeError(f"Missing required environment variable '{name}'. Set it in the environment.")
+        return value
+
+# Default HDFS URL for container execution if not provided
+import os
+os.environ.setdefault('HDFS_URL', 'hdfs://localhost:9002')
+# Set default Elasticsearch env for test if not provided
+os.environ.setdefault('ELASTICSEARCH_USER', 'elastic')
+os.environ.setdefault('ELASTICSEARCH_PASSWORD', 'sdoqap_secure')
+os.environ.setdefault('ELASTICSEARCH_HOST', 'localhost')
+os.environ.setdefault('ELASTICSEARCH_PORT', '9200')
 
 def get_elasticsearch_url():
-    es_user = os.getenv("ELASTICSEARCH_USER", "elastic")
-    es_pass = os.getenv("ELASTICSEARCH_PASSWORD", "sdoqap_secure")
-    es_host = os.getenv("ELASTICSEARCH_HOST", "elasticsearch")
-    es_port = os.getenv("ELASTICSEARCH_PORT", "9200")
-    if "ELASTICSEARCH_HOST" not in os.environ and "ELASTICSEARCH_URL" not in os.environ:
-        es_host = "localhost"
+    # Use strict env retrieval; raises if missing
+    es_user = get_required_env("ELASTICSEARCH_USER")
+    es_pass = get_required_env("ELASTICSEARCH_PASSWORD")
+    # Use Docker service name if host not set (default for internal network)
+    es_host = os.getenv("ELASTICSEARCH_HOST", "localhost")
+    es_port = get_required_env("ELASTICSEARCH_PORT")
+    # Allow optional ELASTICSEARCH_URL override
     es_url = os.getenv("ELASTICSEARCH_URL")
     if not es_url:
         es_url = f"http://{es_user}:{es_pass}@{es_host}:{es_port}"
@@ -38,12 +62,16 @@ def setup_hdfs():
     run_cmd(["docker", "exec", "-t", "-e", "HADOOP_USER_NAME=root", "sdoqap-namenode", "hdfs", "dfs", "-mkdir", "-p", "/data/active"])
     run_cmd(["docker", "exec", "-t", "-e", "HADOOP_USER_NAME=root", "sdoqap-namenode", "hdfs", "dfs", "-mkdir", "-p", "/data/quarantine"])
     
+    # Ensure HDFS is ready before putting the file
+    wait_for_hdfs()
+
     # 3. Put file onto HDFS
     run_cmd(["docker", "exec", "-t", "-e", "HADOOP_USER_NAME=root", "sdoqap-namenode", "hdfs", "dfs", "-put", "-f", "/tmp/benchmark_dataset.csv", "/data/raw/benchmark_test/benchmark_dataset.csv"])
     
-    # 4. Set world-writable permissions to avoid permission conflicts between root driver and spark executors
-    run_cmd(["docker", "exec", "-t", "-e", "HADOOP_USER_NAME=root", "sdoqap-namenode", "hdfs", "dfs", "-chmod", "-R", "777", "/data"])
-    print("HDFS Setup completed successfully.")
+    # 4. Set secure permissions: owner spark, group spark, mode 770 (no world write)
+    run_cmd(["docker", "exec", "-t", "-e", "HADOOP_USER_NAME=root", "sdoqap-namenode", "hdfs", "dfs", "-chown", "-R", "spark:spark", "/data"])
+    run_cmd(["docker", "exec", "-t", "-e", "HADOOP_USER_NAME=root", "sdoqap-namenode", "hdfs", "dfs", "-chmod", "-R", "770", "/data"])
+    print("HDFS permissions set to spark:spark with mode 770.")
 
 def clear_es_lock():
     print("Clearing any stale locks in Elasticsearch for benchmark_test...")
@@ -72,7 +100,7 @@ def run_spark_job():
     container_name = get_spark_master_container_name()
     # Run the quality engine using spark-submit pointing to the Spark master cluster
     run_cmd([
-        "docker", "exec", "-t", "-e", "HADOOP_USER_NAME=spark", container_name,
+        "docker", "exec", "-t", "-e", "HADOOP_USER_NAME=spark", "-e", "HDFS_URL=hdfs://sdoqap-namenode:9000", container_name,
         "spark-submit",
         "--master", "spark://spark-master:7077",
         "--conf", "spark.executorEnv.HADOOP_USER_NAME=spark",
@@ -81,7 +109,7 @@ def run_spark_job():
         "--packages", "io.delta:delta-core_2.12:2.4.0",
         "/opt/spark-apps/spark_quality_engine.py",
         "benchmark_test"
-    ])
+      ])
     print("Spark Quality Engine run finished.")
 
 def verify_results():
@@ -146,25 +174,63 @@ def cleanup():
     except Exception as e:
         print(f"Cleanup encountered warnings: {e}")
 
+def get_spark_session(app_name):
+    builder = (
+        SparkSession.builder
+        .appName(app_name)
+        .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
+        .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog")
+        .config("spark.executor.memory", "3g")
+        .config("spark.executor.cores", "2")
+        .config("spark.sql.adaptive.enabled", "false")
+        .config("spark.sql.shuffle.partitions", "4")
+        .config("spark.dynamicAllocation.enabled", "true")
+        .config("spark.dynamicAllocation.minExecutors", "1")
+        .config("spark.dynamicAllocation.maxExecutors", "4")
+        .config("spark.hadoop.fs.defaultFS", HDFS_URL)
+        .config("spark.hadoop.fs.hdfs.impl", "org.apache.hadoop.hdfs.DistributedFileSystem")
+        .config("spark.hadoop.fs.file.impl", "org.apache.hadoop.fs.LocalFileSystem")
+    )
+    if "SPARK_HOME" not in os.environ:
+        builder = builder.master("local[*]")
+        builder = builder.config("spark.driver.host", "127.0.0.1") \
+                         .config("spark.driver.bindAddress", "127.0.0.1")
+    return builder.getOrCreate()
+
 def setup_spark_env():
     print("Ensuring Spark containers have 'requests' package installed...")
+    print("Ensuring Spark containers have 'requests' and 'pyyaml' packages installed...")
     try:
         import subprocess
         res = subprocess.run(["docker", "ps", "--format", "{{.Names}}"], capture_output=True, text=True, check=True)
         containers = [line.strip() for line in res.stdout.split("\n") if line.strip()]
         for container in containers:
             if "spark-master" in container or "spark-worker" in container:
-                print(f"Installing 'requests' in {container}...")
-                subprocess.run(["docker", "exec", "-t", "-u", "root", container, "pip", "install", "requests"], check=True)
+                print(f"Installing dependencies in {container}...")
+                subprocess.run(["docker", "exec", "-t", "-u", "root", container, "pip", "install", "requests", "pyyaml"], check=True)
         print("Spark dependencies check completed successfully.")
     except Exception as e:
         print(f"Warning: Spark dependency setup encountered an issue: {e}")
+
+def wait_for_hdfs(retries=5, delay=5):
+    print("Waiting for HDFS namenode to become reachable...")
+    for i in range(retries):
+        try:
+            # Simple check using hdfs dfs -ls /
+            run_cmd(["docker", "exec", "-t", "-e", "HADOOP_USER_NAME=root", "sdoqap-namenode", "hdfs", "dfs", "-ls", "/"])
+            print("HDFS is reachable.")
+            return True
+        except Exception as e:
+            print(f"HDFS not reachable yet (attempt {i+1}/{retries}): {e}")
+            time.sleep(delay)
+    raise RuntimeError("HDFS namenode not reachable after retries")
 
 if __name__ == "__main__":
     print("=== STARTING HOST-BASED PIPELINE INTEGRATION TEST ===")
     try:
         setup_spark_env()
         setup_hdfs()
+        wait_for_hdfs()
         clear_es_lock()
         run_spark_job()
         verify_results()

@@ -216,7 +216,7 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-curl -s -o NUL http://localhost:!API_PORT!/health
+curl -s -o NUL http://localhost:!API_PORT!/healthz
 if %errorlevel% neq 0 (
     echo [ERROR] FastAPI portal is not healthy on port !API_PORT!.
     exit /b 1

@@ -20,26 +20,40 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# CORS configuration to support external dashboard integrations safely with credentials
-allowed_origins_raw = os.getenv("ALLOWED_ORIGINS", "")
-if allowed_origins_raw:
-    allowed_origins = [o.strip() for o in allowed_origins_raw.split(",") if o.strip()]
-else:
-    allowed_origins = [
-        "http://localhost:3000",
-        "http://localhost:5173",
-        "http://localhost:8000",
-        "http://localhost:8002",
-        "http://localhost:8080"
-    ]
+# Logging configuration – level can be set via LOG_LEVEL env var
+import logging
+from app.api.config import get_required_env
+log_level = get_required_env("LOG_LEVEL").upper()
+logging.basicConfig(level=log_level)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=allowed_origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Rate limiting – 100 requests per minute per IP (adjust as needed)
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+
+limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
+app.state.limiter = limiter
+app.add_exception_handler(429, _rate_limit_exceeded_handler)
+
+# Enhanced health‑check endpoint – also verifies dependent services
+@app.get("/healthz", include_in_schema=False)
+def health_check() -> dict:
+    status = {"app": "ok"}
+    # Elasticsearch check
+    try:
+        res = requests.head(ELASTICSEARCH_URL, timeout=2)
+        status["elasticsearch"] = "ok" if res.status_code < 500 else "error"
+    except Exception:
+        status["elasticsearch"] = "error"
+    # Spark master availability (basic TCP check)
+    try:
+        spark_host = get_required_env("SPARK_MASTER_HOST")
+        spark_port = int(get_required_env("SPARK_MASTER_PORT"))
+        with socket.create_connection((spark_host, spark_port), timeout=2):
+            status["spark_master"] = "ok"
+    except Exception:
+        status["spark_master"] = "error"
+    return status
+
 
 app.include_router(lineage_router)
 app.include_router(pipeline_router)
@@ -47,13 +61,14 @@ app.include_router(quality_router)
 app.include_router(schema_router)  # Fix 2B: Schema Governance API
 
 def get_elasticsearch_url():
-    es_user = os.getenv("ELASTICSEARCH_USER", "elastic")
-    es_pass = os.getenv("ELASTICSEARCH_PASSWORD", "sdoqap_secure")
-    es_host = os.getenv("ELASTICSEARCH_HOST", "elasticsearch")
-    es_port = os.getenv("ELASTICSEARCH_PORT", "9200")
+    es_user = get_required_env("ELASTICSEARCH_USER")
+    es_pass = get_required_env("ELASTICSEARCH_PASSWORD")
+    es_host = get_required_env("ELASTICSEARCH_HOST")
+    es_port = get_required_env("ELASTICSEARCH_PORT")
+    es_url = get_required_env("ELASTICSEARCH_URL")
     if "ELASTICSEARCH_HOST" not in os.environ and "ELASTICSEARCH_URL" not in os.environ:
         es_host = "localhost"
-    es_url = os.getenv("ELASTICSEARCH_URL")
+    es_url = get_required_env("ELASTICSEARCH_URL")
     if not es_url:
         es_url = f"http://{es_user}:{es_pass}@{es_host}:{es_port}"
     return es_url
@@ -75,8 +90,8 @@ def get_services_status():
         except Exception:
             return "offline"
 
-    es_user = os.getenv("ELASTICSEARCH_USER", "elastic")
-    es_pass = os.getenv("ELASTICSEARCH_PASSWORD", "sdoqap_secure")
+    es_user = get_required_env("ELASTICSEARCH_USER")
+    es_pass = get_required_env("ELASTICSEARCH_PASSWORD")
     services = {
         "HDFS Namenode": {"host": "namenode", "port": 9870, "url": "http://localhost:9870"},
         "HDFS Datanode": {"host": "datanode", "port": 9864, "url": None},

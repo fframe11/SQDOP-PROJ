@@ -196,6 +196,24 @@ docker exec sdoqap-namenode hdfs dfs -ls /data/quarantine
 ```cmd
 curl http://localhost:9200/_cat/indices?v
 ```
+## Required Environment Variables
+
+- `ELASTICSEARCH_USER` – Elasticsearch username (required)
+- `ELASTICSEARCH_PASSWORD` – Elasticsearch password (required)
+- `ELASTICSEARCH_HOST` – Elasticsearch host (required)
+- `ELASTICSEARCH_PORT` – Elasticsearch port (required)
+- `ELASTICSEARCH_URL` – Optional full URL override for Elasticsearch
+- `HDFS_URL` – HDFS connection string (default `hdfs://namenode:9000`)
+
+**Example `.env**`
+```
+ELASTICSEARCH_USER=elastic
+ELASTICSEARCH_PASSWORD=sdoqap_secure
+ELASTICSEARCH_HOST=elasticsearch
+ELASTICSEARCH_PORT=9200
+# Optional: ELASTICSEARCH_URL=http://elastic:sdoqap_secure@elasticsearch:9200
+HDFS_URL=hdfs://namenode:9000
+```
 
 ## ไฟล์ที่ไม่ควร push ขึ้น Git
 

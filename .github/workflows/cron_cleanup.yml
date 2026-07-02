@@ -1,0 +1,17 @@
+name: Cron Cleanup HDFS Failed Runs
+
+on:
+  schedule:
+    - cron: '0 2 * * *'  # Daily at 02:00 UTC (09:00 THAI)
+
+jobs:
+  cleanup:
+    runs-on: self-hosted  # Use local runner to access Docker daemon
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Run cleanup script
+        run: |
+          chmod +x ./scripts/cleanup_failed_runs.sh
+          ./scripts/cleanup_failed_runs.sh
