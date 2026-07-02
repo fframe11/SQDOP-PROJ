@@ -112,6 +112,7 @@ def acquire_lock(table_name: str, run_id: str, force: bool = False) -> bool:
     If lock exists (409 Conflict), checks expires_at. If expired, force overwrites it
     using Optimistic Concurrency Control (seq_no & primary_term) to ensure atomicity."""
     from urllib.parse import urlparse
+    from datetime import timezone
     parsed = urlparse(ELASTICSEARCH_URL)
     auth = (parsed.username, parsed.password) if parsed.username else None
     base_url = f"{parsed.scheme}://{parsed.hostname}:{parsed.port}"
@@ -119,8 +120,8 @@ def acquire_lock(table_name: str, run_id: str, force: bool = False) -> bool:
         "table_name": table_name,
         "run_id": run_id,
         "status": "RUNNING",
-        "locked_at": datetime.utcnow().isoformat(),
-        "expires_at": (datetime.utcnow() + timedelta(minutes=15)).isoformat()
+        "locked_at": datetime.now(timezone.utc).isoformat(),
+        "expires_at": (datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat()
     }
     try:
         url = f"{base_url}/sdoqap_run_locks/_doc/{table_name}?op_type=create"
@@ -156,7 +157,7 @@ def acquire_lock(table_name: str, run_id: str, force: bool = False) -> bool:
                     expires_at_str = existing.get("_source", {}).get("expires_at")
                     if expires_at_str:
                         expires_at = datetime.fromisoformat(expires_at_str.replace("Z", "+00:00"))
-                        if datetime.utcnow() > expires_at:
+                        if datetime.now(timezone.utc) > expires_at:
                             print(f"[LOCK] Previous lock for '{table_name}' expired. Overwriting...")
                             seq_no = existing.get("_seq_no")
                             primary_term = existing.get("_primary_term")
