@@ -13,6 +13,27 @@ export default function Schema() {
 
   const selectedProposal = proposals.data?.proposals?.find((p) => p.id === selectedId);
 
+  React.useEffect(() => {
+    if (selectedProposal) {
+      if (selectedProposal.table_name === "products") {
+        setPrimaryKeyOverride("product_id");
+        setDateColumnOverride("");
+      } else if (selectedProposal.table_name === "orders") {
+        setPrimaryKeyOverride("order_id");
+        setDateColumnOverride("order_date");
+      } else if (selectedProposal.table_name === "users") {
+        setPrimaryKeyOverride("id");
+        setDateColumnOverride("created_utc");
+      } else {
+        setPrimaryKeyOverride("");
+        setDateColumnOverride("");
+      }
+    } else {
+      setPrimaryKeyOverride("");
+      setDateColumnOverride("");
+    }
+  }, [selectedId, selectedProposal]);
+
   const handleAction = async (proposalId, action) => {
     setSubmitting(true);
     setActionResult(null);
@@ -251,7 +272,7 @@ export default function Schema() {
                         border: "1px solid rgba(255,255,255,0.06)",
                         fontFamily: "var(--font-mono)",
                         fontSize: "0.78rem",
-                        maxHeight: "220px",
+                        maxHeight: "none",
                         overflowY: "auto",
                         display: "flex",
                         padding: "0.75rem 0"
