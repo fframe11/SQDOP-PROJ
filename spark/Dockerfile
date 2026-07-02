@@ -38,5 +38,8 @@ RUN curl -L -o /opt/bitnami/spark/jars/spark-sql-kafka-0-10_2.12-3.4.1.jar https
 COPY start_daemon.sh /docker-entrypoint-initdb.d/start_daemon.sh
 RUN chmod +x /docker-entrypoint-initdb.d/start_daemon.sh
 
+# Copy spark application scripts into the image
+COPY spark_quality_engine.py spark_gold_layer.py spark_trigger_daemon.py streaming_job.py rules_config.json /opt/spark-apps/
+
 # Restore default CMD from base image
 CMD ["/opt/bitnami/scripts/spark/run.sh"]

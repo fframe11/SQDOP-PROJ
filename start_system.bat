@@ -74,7 +74,7 @@ if not exist "n8n\credentials.json" (
         echo       "host": "postgres",
         echo       "database": "sdoqap_oltp",
         echo       "user": "sdoqap",
-        echo       "password": "sdoqap_secure",
+        echo       "password": "sdoqap",
         echo       "port": 5432,
         echo       "ssl": "disable"
         echo     }

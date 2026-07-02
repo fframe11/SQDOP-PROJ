@@ -86,7 +86,7 @@ services:
       - sdoqap_network
 
   spark-master:
-    image: bitnamilegacy/spark:3.4.1
+    image: dataengproj-spark-master:latest
     restart: always
     environment:
       - SPARK_MODE=master
@@ -95,7 +95,7 @@ services:
       - "8081:8080"
       - "7077:7077"
     volumes:
-      - ./spark:/opt/spark-apps
+      - spark_apps:/opt/spark-apps
     deploy:
       replicas: 1
       resources:
@@ -105,7 +105,7 @@ services:
       - sdoqap_network
 
   spark-worker:
-    image: bitnamilegacy/spark:3.4.1
+    image: dataengproj-spark-worker:latest
     restart: always
     environment:
       - SPARK_MODE=worker
@@ -116,7 +116,7 @@ services:
     depends_on:
       - spark-master
     volumes:
-      - ./spark:/opt/spark-apps
+      - spark_apps:/opt/spark-apps
     deploy:
       replicas: 3
       resources:
@@ -135,7 +135,7 @@ services:
       - "${N8N_PORT}:5678"
     volumes:
       - n8n_data:/home/node/.n8n
-      - ./stress test:/stress_test
+      - stress_test:/stress_test
     deploy:
       replicas: 2
       resources:
@@ -145,7 +145,7 @@ services:
       - sdoqap_network
 
   api:
-    image: sdoqap-api:latest
+    image: dataengproj-api:latest
     restart: always
     depends_on:
       - elasticsearch
@@ -172,7 +172,7 @@ services:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
     volumes:
-      - ./grafana/provisioning:/etc/grafana/provisioning
+      - grafana_provisioning:/etc/grafana/provisioning
     deploy:
       replicas: 1
       resources:
@@ -201,7 +201,7 @@ services:
       - sdoqap_network
 
   ui:
-    image: sdoqap-ui:latest
+    image: dataengproj-ui:latest
     restart: always
     ports:
       - "80:80"
@@ -218,6 +218,9 @@ volumes:
   hadoop_datanode:
   n8n_data:
   postgres_data:
+  spark_apps:
+  stress_test:
+  grafana_provisioning:
 
 networks:
   sdoqap_network:
