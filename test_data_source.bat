@@ -213,7 +213,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command ^
    Stop-Process -Id $ingestProc.Id -Force; ^
    Stop-Process -Id $sparkProc.Id -Force; ^
    Write-Host '[SYSTEM] Querying Elasticsearch for ingested Reddit data...'; ^
-   $esResp = curl -s -u 'elastic:sdoqap_secure' http://localhost:9200/reddit/_count; ^
+   $esResp = curl.exe -s -u 'elastic:sdoqap_secure' http://localhost:9200/reddit/_count; ^
    if ($esResp) { ^
        $json = $esResp | ConvertFrom-Json; ^
        Write-Host \"[SUCCESS] Documents indexed in ES 'reddit' index: $($json.count)\"; ^
