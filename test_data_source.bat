@@ -54,17 +54,19 @@ echo   Select Test Source
 echo =======================================================================
 echo   1. Test with local CSV dataset
 echo   2. Test with API URL
-echo   3. Open Central Portal
-echo   4. Show HDFS raw datasets
-echo   5. Exit
+echo   3. Test with Reddit Live Stream
+echo   4. Open Central Portal
+echo   5. Show HDFS raw datasets
+echo   6. Exit
 echo =======================================================================
-set /p choice="Select option (1-5): "
+set /p choice="Select option (1-6): "
 
 if "%choice%"=="1" goto dataset_test
 if "%choice%"=="2" goto api_test
-if "%choice%"=="3" goto open_portal
-if "%choice%"=="4" goto show_hdfs
-if "%choice%"=="5" exit /b 0
+if "%choice%"=="3" goto reddit_test
+if "%choice%"=="4" goto open_portal
+if "%choice%"=="5" goto show_hdfs
+if "%choice%"=="6" exit /b 0
 
 echo Invalid option.
 pause
@@ -172,6 +174,53 @@ if %errorlevel% neq 0 (
 )
 
 call :run_spark_check "%table_name%"
+pause
+goto menu
+
+:reddit_test
+cls
+echo =======================================================================
+echo   Reddit Live Stream Test
+echo =======================================================================
+echo   This mode triggers real-time data scraping from Reddit and streams it
+echo   into the SDOQAP data pipeline (Reddit -> Kafka -> Spark -> HDFS/ES).
+echo.
+docker ps --format "{{.Names}}" | findstr /I "kafka" >nul
+if %errorlevel% neq 0 (
+    echo [WARNING] Kafka service is not running.
+    echo   This test requires a running Kafka broker to stream real-time data.
+    echo   Please ensure your Kafka service is started, or proceed with simulation.
+    echo.
+)
+set /p subreddits="Enter subreddits to scrape (example: python,bigdata): "
+if "%subreddits%"=="" set subreddits=python
+
+echo.
+echo [INGEST] Spawning Reddit Live stream for subreddits '%subreddits%'...
+echo [INGEST] Real-time stream will run for 10 seconds to show capability.
+echo.
+
+powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+  "Write-Host '[INGEST] Ensuring kafka-python package is installed...'; ^
+   python -m pip install kafka-python --quiet 2>$null; ^
+   Write-Host '[INGEST] Starting background Reddit stream ingestion...'; ^
+   $ingestProc = Start-Process python -ArgumentList 'scripts/reddit_stream.py %subreddits%' -NoNewWindow -PassThru; ^
+   Write-Host '[SPARK] Starting background Spark streaming job...'; ^
+   $sparkProc = Start-Process docker -ArgumentList 'exec -t sdoqap-spark-master spark-submit --master spark://spark-master:7077 --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.1,org.elasticsearch:elasticsearch-spark-30_2.12:8.10.2 /opt/spark-apps/streaming_job.py' -NoNewWindow -PassThru; ^
+   Write-Host '[SYSTEM] Ingestion and processing running in real-time...'; ^
+   for ($i=10; $i -gt 0; $i--) { Write-Host \"[TIMER] $i seconds remaining...\"; Start-Sleep -Seconds 1; }; ^
+   Write-Host '[SYSTEM] Terminating streaming jobs...'; ^
+   Stop-Process -Id $ingestProc.Id -Force; ^
+   Stop-Process -Id $sparkProc.Id -Force; ^
+   Write-Host '[SYSTEM] Querying Elasticsearch for ingested Reddit data...'; ^
+   $esResp = curl -s -u 'elastic:sdoqap_secure' http://localhost:9200/reddit/_count; ^
+   if ($esResp) { ^
+       $json = $esResp | ConvertFrom-Json; ^
+       Write-Host \"[SUCCESS] Documents indexed in ES 'reddit' index: $($json.count)\"; ^
+   } else { ^
+       Write-Host '[WARNING] Could not retrieve ES count.'; ^
+   }"
+echo.
 pause
 goto menu
 

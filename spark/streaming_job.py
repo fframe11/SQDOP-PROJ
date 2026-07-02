@@ -42,7 +42,7 @@ def run_streaming_job():
             .option("checkpointLocation", f"{HDFS_URL}/tmp/checkpoints/parquet") \
             .outputMode("append") \
             .partitionBy("subreddit") \
-            .trigger(processingTime="60 seconds") \
+            .trigger(processingTime="2 seconds") \
             .start()
 
         # Write to Elasticsearch (requires elasticsearch-hadoop connector on Spark image)

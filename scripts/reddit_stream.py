@@ -46,7 +46,10 @@ except Exception:
         print(f"Failed to connect to Kafka: {e}")
         raise e
 
+import sys
 SUBREDDITS = ["python", "datascience", "bigdata", "machinelearning", "technology"]
+if len(sys.argv) > 1:
+    SUBREDDITS = [s.strip() for s in sys.argv[1].split(",") if s.strip()]
 
 def fetch_and_send(sub):
     if USE_PRAW:
