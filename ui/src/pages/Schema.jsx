@@ -85,7 +85,7 @@ export default function Schema() {
         ))}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: selectedProposal ? "1fr 1fr" : "1fr", gap: "1.5rem" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "380px 1fr", gap: "1.5rem", alignItems: "start" }}>
         {/* Left Column: Proposals List */}
         <div className="glass-card animate-in">
           <h3 className="section-title">{statusFilter} Proposals</h3>
@@ -103,7 +103,7 @@ export default function Schema() {
               No {statusFilter.toLowerCase()} proposals found.
             </div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", maxHeight: "calc(100vh - 220px)", overflowY: "auto", paddingRight: "0.25rem" }}>
               {proposals.data.proposals.map((p) => {
                 const isSelected = p.id === selectedId;
                 return (
@@ -114,14 +114,16 @@ export default function Schema() {
                       padding: "1rem",
                       cursor: "pointer",
                       border: isSelected ? "1px solid var(--accent-blue)" : "1px solid var(--border-card)",
-                      background: isSelected ? "rgba(56, 189, 248, 0.05)" : "var(--bg-card)",
+                      background: isSelected ? "rgba(56, 189, 248, 0.08)" : "var(--bg-card)",
+                      boxShadow: isSelected ? "0 0 12px rgba(56, 189, 248, 0.15)" : "none",
+                      transition: "all 0.2s ease"
                     }}
                     onClick={() => {
                       setSelectedId(p.id);
                       setActionResult(null);
                     }}
                   >
-                    <div style={{ display: "flex", justifycontent: "space-between", alignitems: "center", marginBottom: "0.5rem" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
                       <span style={{ fontSize: "1rem", fontWeight: 700, color: "var(--text-main)" }}>
                         {p.table_name}
                       </span>
@@ -149,8 +151,8 @@ export default function Schema() {
         </div>
 
         {/* Right Column: Detailed Proposal view & actions */}
-        {selectedProposal && (
-          <div className="glass-card animate-in">
+        {selectedProposal ? (
+          <div className="glass-card animate-in" style={{ position: "sticky", top: "0" }}>
             <h3 className="section-title">Proposal Details</h3>
             <p className="section-subtitle">Reviewing schema modifications for {selectedProposal.table_name}</p>
 
@@ -158,7 +160,7 @@ export default function Schema() {
               {/* Drift details */}
               <div>
                 <h4 style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginBottom: "0.5rem" }}>Drift Modifications:</h4>
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", maxHeight: "250px", overflowY: "auto" }}>
                   {Object.entries(selectedProposal.drift_details || {}).map(([col, details]) => (
                     <div
                       key={col}
@@ -166,8 +168,8 @@ export default function Schema() {
                       style={{
                         padding: "0.75rem",
                         display: "flex",
-                        justifycontent: "space-between",
-                        alignitems: "center",
+                        justifyContent: "space-between",
+                        alignItems: "center",
                         fontSize: "0.8rem",
                       }}
                     >
@@ -200,7 +202,7 @@ export default function Schema() {
                     borderRadius: "8px",
                     fontFamily: "var(--font-mono)",
                     fontSize: "0.75rem",
-                    maxHeight: "200px",
+                    maxHeight: "150px",
                     overflowY: "auto",
                     border: "1px solid var(--border-card)",
                     color: "var(--accent-blue)",
@@ -294,6 +296,14 @@ export default function Schema() {
                 </div>
               )}
             </div>
+          </div>
+        ) : (
+          <div className="glass-card animate-in" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "4rem", textAlign: "center", minHeight: "450px", background: "rgba(255,255,255,0.01)" }}>
+            <div className="card-icon blue" style={{ width: 60, height: 60, fontSize: "2rem", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "1rem" }}>📋</div>
+            <h3 className="section-title">No Proposal Selected</h3>
+            <p className="section-subtitle" style={{ maxWidth: "320px", margin: "0.5rem auto 0" }}>
+              Select a schema proposal from the list on the left to inspect drift details, configure overrides, and take governance actions.
+            </p>
           </div>
         )}
       </div>
