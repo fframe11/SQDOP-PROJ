@@ -45,7 +45,7 @@ ELASTICSEARCH_URL = get_elasticsearch_url()
 
 def run_cmd(args):
     print(f"Executing host command: {' '.join(args)}")
-    result = subprocess.run(args, capture_output=True, text=True, shell=True)
+    result = subprocess.run(args, capture_output=True, encoding="utf-8", shell=True)
     if result.returncode != 0:
         print(f"Error stdout: {result.stdout}")
         print(f"Error stderr: {result.stderr}")
@@ -86,7 +86,7 @@ def get_spark_master_container_name():
     try:
         import subprocess
         # Get list of running containers using docker ps
-        res = subprocess.run(["docker", "ps", "--format", "{{.Names}}"], capture_output=True, text=True, check=True)
+        res = subprocess.run(["docker", "ps", "--format", "{{.Names}}"], capture_output=True, encoding="utf-8", check=True)
         for line in res.stdout.split("\n"):
             name = line.strip()
             if "spark-master" in name:
@@ -203,7 +203,7 @@ def setup_spark_env():
     print("Ensuring Spark containers have 'requests' and 'pyyaml' packages installed...")
     try:
         import subprocess
-        res = subprocess.run(["docker", "ps", "--format", "{{.Names}}"], capture_output=True, text=True, check=True)
+        res = subprocess.run(["docker", "ps", "--format", "{{.Names}}"], capture_output=True, encoding="utf-8", check=True)
         containers = [line.strip() for line in res.stdout.split("\n") if line.strip()]
         for container in containers:
             if "spark-master" in container or "spark-worker" in container:
