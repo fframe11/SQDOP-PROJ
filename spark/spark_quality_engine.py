@@ -390,6 +390,22 @@ def get_historical_stats(table_name):
         print(f"[STAT] Failed to fetch historical stats: {e}")
     return []
 
+def lock_protector(func):
+    import functools
+    @functools.wraps(func)
+    def wrapper(table_name, *args, **kwargs):
+        try:
+            return func(table_name, *args, **kwargs)
+        except BaseException as e:
+            print(f"[LOCK-PROTECTOR] Run failed or terminated for '{table_name}': {e}")
+            try:
+                release_lock(table_name)
+            except Exception as le:
+                print(f"[LOCK-PROTECTOR] Redundant lock release failed: {le}")
+            raise e
+    return wrapper
+
+@lock_protector
 def run_quality_check(table_name, primary_key, date_column, schema_spec, input_table_name=None):
     if not input_table_name:
         input_table_name = table_name
@@ -1089,9 +1105,7 @@ if __name__ == "__main__":
         except Exception as infer_err:
             print(f"Failed to infer schema dynamically for '{target_table}': {infer_err}")
             # Write a failed run document to ES
-            import requests
             run_id = f"run_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
-            url = f"http://elasticsearch:9200/sdoqap_pipeline_runs/_doc"
             doc = {
                 "run_id": run_id,
                 "table_name": target_table,
@@ -1100,7 +1114,7 @@ if __name__ == "__main__":
                 "timestamp": datetime.utcnow().isoformat()
             }
             try:
-                requests.post(url, headers={"Content-Type": "application/json"}, data=json.dumps(doc), timeout=10)
+                log_to_elasticsearch("sdoqap_pipeline_runs", doc)
             except Exception:
                 pass
             temp_spark.stop()

@@ -13,7 +13,15 @@ Run via spark-submit or directly: python spark_gold_layer.py
 """
 
 import os
-from api.app.api.config import get_required_env
+try:
+    from api.app.api.config import get_required_env
+except ModuleNotFoundError:
+    def get_required_env(name: str) -> str:
+        import os
+        value = os.getenv(name)
+        if value is None:
+            raise RuntimeError(f"Missing required environment variable '{name}'. Set it in the environment.")
+        return value
 import json
 import requests
 import re
