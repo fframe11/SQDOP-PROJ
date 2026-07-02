@@ -3,7 +3,6 @@ import sys
 import json
 import time
 import requests
-from pyspark.sql import SparkSession
 try:
     from api.app.api.config import get_required_env
 except ModuleNotFoundError:
@@ -51,6 +50,7 @@ def get_es_base_url():
     return f"{parsed.scheme}://{parsed.hostname}:{parsed.port}"
 
 def get_spark():
+    from pyspark.sql import SparkSession
     builder = SparkSession.builder \
         .appName("SDOQAP_UnitTest_Runner")
         

@@ -4,7 +4,7 @@ import json
 import time
 import subprocess
 import requests
-from pyspark.sql import SparkSession
+
 # Ensure project root is on PYTHONPATH for imports
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 try:
@@ -175,6 +175,7 @@ def cleanup():
         print(f"Cleanup encountered warnings: {e}")
 
 def get_spark_session(app_name):
+    from pyspark.sql import SparkSession
     builder = (
         SparkSession.builder
         .appName(app_name)

@@ -136,7 +136,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1G
+          memory: 2G
     networks:
       - sdoqap_network
 
@@ -152,7 +152,7 @@ services:
     environment:
       - SPARK_MODE=worker
       - SPARK_MASTER_URL=spark://spark-master:7077
-      - SPARK_WORKER_MEMORY=2G
+      - SPARK_WORKER_MEMORY=3G
       - SPARK_WORKER_CORES=2
       - SPARK_RPC_AUTHENTICATION_ENABLED=no
       - ELASTICSEARCH_USER=${ELASTICSEARCH_USER:-elastic}
@@ -170,7 +170,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1.5G
+          memory: 4G
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8081"]
       interval: 30s
