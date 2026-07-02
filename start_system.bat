@@ -62,6 +62,27 @@ if %errorlevel% neq 0 (
 echo Services started.
 echo.
 
+if not exist "n8n\credentials.json" (
+    echo Creating default n8n/credentials.json for Postgres...
+    (
+        echo [
+        echo   {
+        echo     "id": "c711aa48-356f-4cd2-b67a-12908a85f401",
+        echo     "name": "Postgres Local",
+        echo     "type": "postgres",
+        echo     "data": {
+        echo       "host": "postgres",
+        echo       "database": "sdoqap_oltp",
+        echo       "user": "sdoqap",
+        echo       "password": "sdoqap_secure",
+        echo       "port": 5432,
+        echo       "ssl": "disable"
+        echo     }
+        echo   }
+        echo ]
+    ) > "n8n\credentials.json"
+)
+
 echo [3/5] Preparing optional n8n workflow import...
 if exist "n8n\ingestion_workflow.json" (
     docker cp n8n/ingestion_workflow.json sdoqap-n8n:/home/node/ingestion_workflow.json >nul 2>&1
@@ -107,6 +128,8 @@ if %errorlevel% neq 0 (
     goto wait_es
 )
 echo Elasticsearch is ready.
+echo Setting up kibana_system password...
+curl -s -u elastic:sdoqap_secure -X POST "http://localhost:9200/_security/user/kibana_system/_password" -H "Content-Type: application/json" -d "{\"password\":\"sdoqap_secure\"}" >nul 2>&1
 
 :wait_api
 echo   - Waiting for FastAPI portal on port !API_PORT!...

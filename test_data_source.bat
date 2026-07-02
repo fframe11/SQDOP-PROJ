@@ -248,6 +248,9 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
+docker exec -t -e HADOOP_USER_NAME=root sdoqap-namenode hdfs dfs -chown -R spark:spark /data >nul 2>&1
+docker exec -t -e HADOOP_USER_NAME=root sdoqap-namenode hdfs dfs -chmod -R 770 /data >nul 2>&1
+
 echo HDFS raw file created:
 docker exec sdoqap-namenode hdfs dfs -ls %hdfs_dir%
 exit /b 0
@@ -260,7 +263,7 @@ docker exec sdoqap-spark-master pip install --no-deps /opt/spark-apps/wheels/cer
 docker exec sdoqap-spark-worker pip install --no-deps /opt/spark-apps/wheels/certifi-2026.6.17-py3-none-any.whl /opt/spark-apps/wheels/charset_normalizer-3.4.7-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl /opt/spark-apps/wheels/idna-3.18-py3-none-any.whl /opt/spark-apps/wheels/urllib3-2.7.0-py3-none-any.whl /opt/spark-apps/wheels/requests-2.34.2-py3-none-any.whl >nul 2>&1
 
 echo [SPARK] Running quality check for table '%table%'...
-docker exec -e HADOOP_USER_NAME=root sdoqap-spark-master spark-submit --master spark://spark-master:7077 /opt/spark-apps/spark_quality_engine.py %table%
+docker exec sdoqap-spark-master spark-submit --master spark://spark-master:7077 --packages io.delta:delta-core_2.12:2.4.0 /opt/spark-apps/spark_quality_engine.py %table%
 if %errorlevel% neq 0 (
     echo [ERROR] Spark quality check failed for table '%table%'.
     echo Check logs with: docker logs sdoqap-spark-master
