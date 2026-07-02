@@ -23,7 +23,7 @@ app = FastAPI(
 # Logging configuration – level can be set via LOG_LEVEL env var
 import logging
 from app.api.config import get_required_env
-log_level = get_required_env("LOG_LEVEL").upper()
+log_level = os.getenv("LOG_LEVEL", "INFO").upper()
 logging.basicConfig(level=log_level)
 
 # Rate limiting – 100 requests per minute per IP (adjust as needed)

@@ -91,7 +91,7 @@ def get_table_quality_history(table_name: str, page: int = 1, size: int = 20, li
             
         res = es.search(
             index="sdoqap_quality_runs",
-            query={"term": {"table_name.keyword": table_name}},
+            query={"term": {"table_name.keyword": {"value": table_name, "case_insensitive": True}}},
             sort=[{"timestamp": {"order": "desc"}}],
             from_=from_idx,
             size=actual_size

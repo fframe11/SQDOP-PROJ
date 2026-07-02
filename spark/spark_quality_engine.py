@@ -386,6 +386,7 @@ def get_historical_stats(table_name):
                 if total > 0:
                     rates.append(float(quar) / float(total))
             return rates
+        return []
     except Exception as e:
         print(f"[STAT] Failed to fetch historical stats: {e}")
     return []
@@ -470,16 +471,30 @@ def run_quality_check(table_name, primary_key, date_column, schema_spec, input_t
 
         # Cast columns according to schema_spec with Smart Parser / Normalization / Type Promotion
         from pyspark.sql.types import IntegerType, DoubleType, TimestampType, StringType
+        # Safe Type Promotion: IntegerType to DoubleType if non-zero decimals exist
+        integer_promotion_candidates = [col_name for col_name, t_str in schema_spec.items() if t_str == "IntegerType" and col_name in df.columns]
+        promoted_columns = set()
+        if integer_promotion_candidates:
+            agg_exprs = []
+            for col_name in integer_promotion_candidates:
+                non_null_col = F.coalesce(F.col(col_name), F.lit(""))
+                agg_exprs.append(F.max(F.when(non_null_col.rlike(r"\.[0-9]*[1-9]+"), 1).otherwise(0)).alias(col_name))
+            if agg_exprs:
+                try:
+                    res_row = df.agg(*agg_exprs).first()
+                    if res_row:
+                        for col_name in integer_promotion_candidates:
+                            if res_row[col_name] == 1:
+                                promoted_columns.add(col_name)
+                except Exception as e:
+                    print(f"[PROMOTION] Warning: Failed to scan decimals in parallel: {e}")
+
         for col_name, type_str in list(schema_spec.items()):
             if col_name in df.columns:
-                # Safe Type Promotion: IntegerType to DoubleType if non-zero decimals exist
-                if type_str == "IntegerType":
-                    non_null_col = F.coalesce(F.col(col_name), F.lit(""))
-                    has_decimals = df.filter(non_null_col.rlike(r"\.[0-9]*[1-9]+")).limit(1).count() > 0
-                    if has_decimals:
-                        print(f"[PROMOTION] Column '{col_name}' promoted from IntegerType to DoubleType to preserve decimal precision.")
-                        type_str = "DoubleType"
-                        schema_spec[col_name] = "DoubleType"
+                if type_str == "IntegerType" and col_name in promoted_columns:
+                    print(f"[PROMOTION] Column '{col_name}' promoted from IntegerType to DoubleType to preserve decimal precision.")
+                    type_str = "DoubleType"
+                    schema_spec[col_name] = "DoubleType"
 
                 if type_str == "IntegerType":
                     # Remove currency, spaces, and commas
@@ -765,11 +780,18 @@ def run_quality_check(table_name, primary_key, date_column, schema_spec, input_t
             # 2. Cardinality-based automatic String column fallback (detects 2 to 25 categories)
             if not group_col:
                 string_cols = [f.name for f in clean_run_df.schema.fields if f.dataType.__class__.__name__ == "StringType"]
-                for col_name in string_cols:
-                    distinct_count = clean_run_df.select(col_name).distinct().count()
-                    if 1 < distinct_count <= 25:
-                        group_col = col_name
-                        break
+                if string_cols:
+                    agg_exprs = [F.countDistinct(col_name).alias(col_name) for col_name in string_cols]
+                    try:
+                        counts_row = clean_run_df.agg(*agg_exprs).first()
+                        if counts_row:
+                            for col_name in string_cols:
+                                distinct_count = counts_row[col_name]
+                                if 1 < distinct_count <= 25:
+                                    group_col = col_name
+                                    break
+                    except Exception as e:
+                        print(f"[DISTRIBUTION] Warning: Failed to scan distinct count in parallel: {e}")
 
             if group_col:
                 balance_df = clean_run_df.groupBy(group_col).count().collect()
@@ -1014,11 +1036,8 @@ if __name__ == "__main__":
         run_quality_check(matched_table_name, spec["primary_key"], spec["date_column"], spec["schema_spec"], input_table_name=target_table)
     else:
         print(f"Table '{target_table}' not found in registry. Inferring configuration dynamically...")
-        # Resolve configuration dynamically using a temporary Spark session
-        temp_spark = SparkSession.builder \
-            .appName(f"SDOQAP_Infer_{target_table}") \
-            .master("local[*]") \
-            .getOrCreate()
+        # Resolve configuration dynamically using the standard Spark session
+        temp_spark = get_spark_session(f"SDOQAP_Infer_{target_table}")
 
         raw_path = f"hdfs://namenode:9000/data/raw/{target_table}"
         try:
@@ -1096,8 +1115,8 @@ if __name__ == "__main__":
             # Save inferred registry config to ES sdoqap_schema_registry
             save_registry_to_es(target_table, inferred_spec)
 
-            # Do NOT stop temp_spark here, as get_spark_session will reuse the existing active session in local mode
-            # temp_spark.stop()
+            # Stop the temporary Spark session so that the main job can run on the cluster
+            temp_spark.stop()
 
             # Now execute quality check with inferred schema
             run_quality_check(target_table, primary_key, date_column, schema_spec)

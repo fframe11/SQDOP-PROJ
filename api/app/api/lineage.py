@@ -119,7 +119,7 @@ def get_node_inspection(table_name: str, node_id: str):
             res = es.search(
                 index="sdoqap_quality_runs",
                 body={
-                    "query": {"term": {"table_name.keyword": table}},
+                    "query": {"term": {"table_name.keyword": {"value": table_name, "case_insensitive": True}}},
                     "sort": [{"timestamp": {"order": "desc"}}],
                     "size": 1
                 }
@@ -142,7 +142,7 @@ def get_node_inspection(table_name: str, node_id: str):
             res_schema = es.search(
                 index="sdoqap_schema_drifts",
                 body={
-                    "query": {"term": {"table_name.keyword": table}},
+                    "query": {"term": {"table_name.keyword": {"value": table_name, "case_insensitive": True}}},
                     "sort": [{"timestamp": {"order": "desc"}}],
                     "size": 1
                 }
@@ -358,7 +358,7 @@ def get_table_trust_check(table_name: str):
             res = es.search(
                 index="sdoqap_quality_runs",
                 body={
-                    "query": {"term": {"table_name.keyword": table_name}},
+                    "query": {"term": {"table_name.keyword": {"value": table_name, "case_insensitive": True}}},
                     "sort": [{"timestamp": {"order": "desc"}}],
                     "size": 1
                 }
@@ -387,7 +387,7 @@ def get_table_trust_check(table_name: str):
                     "query": {
                         "bool": {
                             "must": [
-                                {"term": {"table_name.keyword": table_name}},
+                                {"term": {"table_name.keyword": {"value": table_name, "case_insensitive": True}}},
                                 {"term": {"status.keyword": "PENDING"}}
                             ]
                         }
