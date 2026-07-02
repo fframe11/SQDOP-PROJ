@@ -11,9 +11,15 @@ scrape_configs:
     static_configs:
       - targets: ['kafka:9101']
 
-  - job_name: 'spark'
+  - job_name: 'spark-master'
+    metrics_path: '/metrics/prometheus/'
     static_configs:
-      - targets: ['spark-master:4040']
+      - targets: ['spark-master:8080']
+
+  - job_name: 'spark-worker'
+    metrics_path: '/metrics/prometheus/'
+    static_configs:
+      - targets: ['spark-worker:8081']
 
   - job_name: 'node_exporter'
     static_configs:

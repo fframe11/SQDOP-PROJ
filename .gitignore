@@ -23,6 +23,7 @@ secrets/
 /*.csv
 stress test/*.csv
 stress test/**/*.csv
+!stress test/Olist Brazilian E-Commerce/olist_products_dataset.csv
 dummy_data/
 spark/spark-warehouse/
 spark/derby.log

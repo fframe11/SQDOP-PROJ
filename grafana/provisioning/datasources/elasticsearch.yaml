@@ -5,6 +5,10 @@ datasources:
     type: elasticsearch
     access: proxy
     url: http://elasticsearch:9200
+    basicAuth: true
+    basicAuthUser: elastic
+    secureJsonData:
+      basicAuthPassword: sdoqap_secure
     jsonData:
       timeField: timestamp
       esVersion: "8.0.0"

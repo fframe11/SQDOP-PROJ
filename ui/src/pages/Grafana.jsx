@@ -1,6 +1,9 @@
 import React from "react";
 
 export default function Grafana() {
+  const grafanaPort = "3002";
+  const grafanaUrl = `http://${window.location.hostname}:${grafanaPort}`;
+
   return (
     <div className="page-container">
       <div className="service-page">
@@ -11,9 +14,9 @@ export default function Grafana() {
         <p className="service-desc">
           Grafana ใช้สำหรับ Monitoring & Visualization — ดู metrics, สร้าง dashboard, ตั้ง alert rule, และตรวจสอบ system health แบบ real-time
         </p>
-        <div className="service-url">🌐 http://localhost:3000</div>
+        <div className="service-url">🌐 {grafanaUrl}</div>
         <a
-          href="http://localhost:3000"
+          href={grafanaUrl}
           target="_blank"
           rel="noopener noreferrer"
           className="btn btn-primary"

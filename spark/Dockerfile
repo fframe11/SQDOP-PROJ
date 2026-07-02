@@ -17,12 +17,19 @@ ENV SPARK_DIST_CLASSPATH=/opt/bitnami/spark/jars/*
 ENV DELTA_VERSION=2.4.0
 RUN curl -L -o /opt/bitnami/spark/jars/delta-core_2.12-${DELTA_VERSION}.jar https://repo1.maven.org/maven2/io/delta/delta-core_2.12/${DELTA_VERSION}/delta-core_2.12-${DELTA_VERSION}.jar && \
     curl -L -o /opt/bitnami/spark/jars/delta-storage-${DELTA_VERSION}.jar https://repo1.maven.org/maven2/io/delta/delta-storage/${DELTA_VERSION}/delta-storage-${DELTA_VERSION}.jar
-# Add Spark config for Delta Lake
+# Add Spark config for Delta Lake and Prometheus metrics
 RUN echo "spark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension" >> ${SPARK_CONF_DIR}/spark-defaults.conf && \
-    echo "spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog" >> ${SPARK_CONF_DIR}/spark-defaults.conf
+    echo "spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog" >> ${SPARK_CONF_DIR}/spark-defaults.conf && \
+    echo "spark.ui.prometheus.enabled=true" >> ${SPARK_CONF_DIR}/spark-defaults.conf
 
 # Install the matching Python package (used by spark_quality_engine.py)
 RUN pip install --no-cache-dir delta-spark==${DELTA_VERSION} && pip install --no-cache-dir pyyaml requests
+
+# Download Kafka & ES connectors
+RUN curl -L -o /opt/bitnami/spark/jars/spark-sql-kafka-0-10_2.12-3.4.1.jar https://repo1.maven.org/maven2/org/apache/spark/spark-sql-kafka-0-10_2.12/3.4.1/spark-sql-kafka-0-10_2.12-3.4.1.jar && \
+    curl -L -o /opt/bitnami/spark/jars/spark-token-provider-kafka-0-10_2.12-3.4.1.jar https://repo1.maven.org/maven2/org/apache/spark/spark-token-provider-kafka-0-10_2.12/3.4.1/spark-token-provider-kafka-0-10_2.12-3.4.1.jar && \
+    curl -L -o /opt/bitnami/spark/jars/elasticsearch-spark-30_2.12-8.10.2.jar https://repo1.maven.org/maven2/org/elasticsearch/elasticsearch-spark-30_2.12/8.10.2/elasticsearch-spark-30_2.12-8.10.2.jar && \
+    curl -L -o /opt/bitnami/spark/jars/commons-pool2-2.11.1.jar https://repo1.maven.org/maven2/org/apache/commons/commons-pool2/2.11.1/commons-pool2-2.11.1.jar
 
 # Ensure Spark picks up JARs from the default /opt/spark/jars directory (already on classpath)
 # No further configuration is required.
