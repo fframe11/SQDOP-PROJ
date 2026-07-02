@@ -88,8 +88,8 @@ def get_spark_session(app_name):
         .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog")
         .config("spark.executor.memory", "1g")
         .config("spark.executor.cores", "1")
-        .config("spark.sql.adaptive.enabled", "false")
-        .config("spark.sql.shuffle.partitions", "2")
+        .config("spark.sql.adaptive.enabled", "true")
+        .config("spark.sql.shuffle.partitions", "16")
         .config("spark.dynamicAllocation.enabled", "true")
         .config("spark.dynamicAllocation.minExecutors", "1")
         .config("spark.dynamicAllocation.maxExecutors", "4")
@@ -324,7 +324,7 @@ def detect_track(spark, table_name: str) -> str:
         if fs.exists(raw_dir):
             size_bytes = fs.getContentSummary(raw_dir).getLength()
             track = "fast" if size_bytes < FAST_TRACK_MB_LIMIT * 1024 * 1024 else "batch"
-            print(f"[TRACK] Table '{table_name}' size={size_bytes//1024}KB → {track.upper()} track")
+            print(f"[TRACK] Table '{table_name}' size={size_bytes//1024}KB -> {track.upper()} track")
             return track
     except Exception as e:
         print(f"[TRACK] Size detection failed: {e}. Defaulting to batch track.")
@@ -726,6 +726,10 @@ def run_quality_check(table_name, primary_key, date_column, schema_spec, input_t
 
     # Quarantined data written with run_id partition for traceability
     all_quarantined_write.write.format("delta").mode("append").save(f"{quarantine_path}/run_id={run_id}")
+
+    # Release cached DataFrames from memory to prevent memory leaks and OOM
+    clean_df.unpersist()
+    all_quarantined_write.unpersist()
 
     # Class Balance / Data Distribution calculation
     class_balance = {}
