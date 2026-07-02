@@ -62,7 +62,7 @@ def get_node_inspection(table_name: str, node_id: str):
     Returns live inspection data (schema directories, metadata, HDFS file lists, 
     and actual sample records) for a given pipeline lineage node.
     """
-    table = table_name.lower()
+    table = table_name
     nid = node_id.lower()
     es = get_es_client()
     
