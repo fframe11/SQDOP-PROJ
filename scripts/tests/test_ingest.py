@@ -10,7 +10,8 @@ import subprocess
 import requests
 
 # Configuration – adjust if ports differ
-N8N_PORT = int("${N8N_PORT}".strip("{}")) if "${N8N_PORT}" != "" else 5678
+import os
+N8N_PORT = int(os.getenv("N8N_PORT", "5678"))
 WEBHOOK_URL = f"http://localhost:{N8N_PORT}/webhook/1/webhooktrigger/ingest"
 
 # Dummy payloads for three sources (example CSV, API JSON, Kafka placeholder)

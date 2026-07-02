@@ -115,7 +115,7 @@ services:
       - ELASTICSEARCH_PASSWORD=${ELASTICSEARCH_PASSWORD:-sdoqap_secure}
       - ELASTICSEARCH_HOST=${ELASTICSEARCH_HOST:-elasticsearch}
       - ELASTICSEARCH_PORT=${ELASTICSEARCH_PORT:-9200}
-      - HADOOP_USER_NAME=root
+      - HADOOP_USER_NAME=spark
     depends_on:
       namenode:
         condition: service_healthy
@@ -159,7 +159,7 @@ services:
       - ELASTICSEARCH_PASSWORD=${ELASTICSEARCH_PASSWORD:-sdoqap_secure}
       - ELASTICSEARCH_HOST=${ELASTICSEARCH_HOST:-elasticsearch}
       - ELASTICSEARCH_PORT=${ELASTICSEARCH_PORT:-9200}
-      - HADOOP_USER_NAME=root
+      - HADOOP_USER_NAME=spark
     depends_on:
       spark-master:
         condition: service_healthy
