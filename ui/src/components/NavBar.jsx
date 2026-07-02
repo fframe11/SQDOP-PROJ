@@ -9,6 +9,7 @@ export default function NavBar() {
     { to: "/dashboard", label: "Dashboard" },
     { to: "/analytics", label: "Analytics" },
     { to: "/pipeline", label: "Pipeline" },
+    { to: "/schema", label: "Schema" },
   ];
 
   return (
