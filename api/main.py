@@ -46,8 +46,8 @@ def health_check() -> dict:
         status["elasticsearch"] = "error"
     # Spark master availability (basic TCP check)
     try:
-        spark_host = get_required_env("SPARK_MASTER_HOST")
-        spark_port = int(get_required_env("SPARK_MASTER_PORT"))
+        spark_host = os.getenv("SPARK_MASTER_HOST", "spark-master")
+        spark_port = int(os.getenv("SPARK_MASTER_PORT", "7077"))
         with socket.create_connection((spark_host, spark_port), timeout=2):
             status["spark_master"] = "ok"
     except Exception:
@@ -61,17 +61,16 @@ app.include_router(quality_router)
 app.include_router(schema_router)  # Fix 2B: Schema Governance API
 
 def get_elasticsearch_url():
-    es_user = get_required_env("ELASTICSEARCH_USER")
-    es_pass = get_required_env("ELASTICSEARCH_PASSWORD")
-    es_host = get_required_env("ELASTICSEARCH_HOST")
-    es_port = get_required_env("ELASTICSEARCH_PORT")
-    es_url = get_required_env("ELASTICSEARCH_URL")
-    if "ELASTICSEARCH_HOST" not in os.environ and "ELASTICSEARCH_URL" not in os.environ:
-        es_host = "localhost"
-    es_url = get_required_env("ELASTICSEARCH_URL")
-    if not es_url:
-        es_url = f"http://{es_user}:{es_pass}@{es_host}:{es_port}"
-    return es_url
+    # Prefer full URL if provided via environment
+    es_url = os.getenv("ELASTICSEARCH_URL")
+    if es_url:
+        return es_url
+    # Otherwise construct from components, using defaults where appropriate
+    es_user = os.getenv("ELASTICSEARCH_USER", "elastic")
+    es_pass = os.getenv("ELASTICSEARCH_PASSWORD", "sdoqap_secure")
+    es_host = os.getenv("ELASTICSEARCH_HOST", "localhost")
+    es_port = os.getenv("ELASTICSEARCH_PORT", "9200")
+    return f"http://{es_user}:{es_pass}@{es_host}:{es_port}"
 
 ELASTICSEARCH_URL = get_elasticsearch_url()
 
@@ -90,8 +89,8 @@ def get_services_status():
         except Exception:
             return "offline"
 
-    es_user = get_required_env("ELASTICSEARCH_USER")
-    es_pass = get_required_env("ELASTICSEARCH_PASSWORD")
+    es_user = os.getenv("ELASTICSEARCH_USER", "elastic")
+    es_pass = os.getenv("ELASTICSEARCH_PASSWORD", "sdoqap_secure")
     services = {
         "HDFS Namenode": {"host": "namenode", "port": 9870, "url": "http://localhost:9870"},
         "HDFS Datanode": {"host": "datanode", "port": 9864, "url": None},
