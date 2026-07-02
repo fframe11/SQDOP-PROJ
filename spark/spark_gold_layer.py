@@ -29,16 +29,16 @@ from datetime import datetime, timezone, timedelta
 from collections import defaultdict
 
 def get_elasticsearch_url():
+    # Prefer full URL if provided via environment
+    es_url = os.getenv("ELASTICSEARCH_URL")
+    if es_url:
+        return es_url
+    # Otherwise construct from components, using defaults where appropriate
     es_user = get_required_env("ELASTICSEARCH_USER")
     es_pass = get_required_env("ELASTICSEARCH_PASSWORD")
-    es_host = get_required_env("ELASTICSEARCH_HOST")
-    es_port = get_required_env("ELASTICSEARCH_PORT")
-    if "ELASTICSEARCH_HOST" not in os.environ and "ELASTICSEARCH_URL" not in os.environ:
-        es_host = "localhost"
-    es_url = get_required_env("ELASTICSEARCH_URL")
-    if not es_url:
-        es_url = f"http://{es_user}:{es_pass}@{es_host}:{es_port}"
-    return es_url
+    es_host = os.getenv("ELASTICSEARCH_HOST", "localhost")
+    es_port = os.getenv("ELASTICSEARCH_PORT", "9200")
+    return f"http://{es_user}:{es_pass}@{es_host}:{es_port}"
 
 ELASTICSEARCH_URL = get_elasticsearch_url()
 HEADERS = {"Content-Type": "application/json"}

@@ -27,5 +27,9 @@ RUN pip install --no-cache-dir delta-spark==${DELTA_VERSION} && pip install --no
 # Ensure Spark picks up JARs from the default /opt/spark/jars directory (already on classpath)
 # No further configuration is required.
 
-# Preserve the entrypoint from the base image
+# Copy trigger daemon script and automatic initialization script
+COPY start_daemon.sh /docker-entrypoint-initdb.d/start_daemon.sh
+RUN chmod +x /docker-entrypoint-initdb.d/start_daemon.sh
+
+# Restore default CMD from base image
 CMD ["/opt/bitnami/scripts/spark/run.sh"]

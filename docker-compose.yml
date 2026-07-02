@@ -230,8 +230,6 @@ services:
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - SPARK_MASTER_HOST=${SPARK_MASTER_HOST:-spark-master}
       - SPARK_MASTER_PORT=${SPARK_MASTER_PORT:-7077}
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - sdoqap_network
 

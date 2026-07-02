@@ -240,27 +240,31 @@ def retry_pipeline_run(run_id: str):
         if not table_name:
             raise HTTPException(status_code=400, detail="Cannot retry: Pipeline run document does not contain 'table_name'.")
         
-        # Trigger actual spark job asynchronously via Docker Unix Socket!
-        cmd = [
-            "spark-submit",
-            "--master", "spark://spark-master:7077",
-            "--conf", "spark.executorEnv.HADOOP_USER_NAME=spark",
-            "--conf", "spark.executor.extraJavaOptions=-DHADOOP_USER_NAME=spark",
-            "--conf", "spark.driver.extraJavaOptions=-DHADOOP_USER_NAME=spark",
-            "--packages", "io.delta:delta-core_2.12:2.4.0",
-            "/opt/spark-apps/spark_quality_engine.py",
-            table_name
-        ]
-        triggered = exec_docker_cmd("sdoqap-spark-master", cmd)
+        # Trigger actual spark job asynchronously via Spark Trigger Daemon HTTP API!
+        triggered = False
+        try:
+            spark_host = os.getenv("SPARK_MASTER_HOST", "spark-master")
+            res_trigger = requests.post(
+                f"http://{spark_host}:8099/retry",
+                json={"table": table_name},
+                timeout=5
+            )
+            if res_trigger.status_code == 200:
+                print(f"[HTTP TRIGGER] Successfully triggered rerun for table '{table_name}' via daemon.")
+                triggered = True
+            else:
+                print(f"[HTTP TRIGGER] Failed with status {res_trigger.status_code}: {res_trigger.text}")
+        except Exception as e:
+            print(f"[HTTP TRIGGER] Error calling Spark trigger daemon: {e}")
         
         if not triggered:
-            # Fallback to local subprocess if Docker socket is not available (for local testing environments)
+            # Fallback to local subprocess if daemon is not reachable (for local testing environments)
             try:
                 import subprocess
                 subprocess.Popen(["python", "spark/spark_quality_engine.py", table_name])
-                print("[DOCKER EXEC] Fallback to local python process triggered.")
+                print("[HTTP TRIGGER] Fallback to local python process triggered.")
             except Exception as e:
-                raise HTTPException(status_code=500, detail=f"Failed to trigger rerun via Docker socket or local process: {e}")
+                raise HTTPException(status_code=500, detail=f"Failed to trigger rerun via daemon or local process: {e}")
         
         return {
             "status": "success",
