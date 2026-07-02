@@ -15,7 +15,7 @@ if %errorlevel% neq 0 (
 )
 
 rem Check HDFS raw data directory
-wsl -d Ubuntu -u root docker exec sdoqap-namenode hdfs dfs -ls /data/raw >nul 2>&1
+docker exec sdoqap-namenode hdfs dfs -ls /data/raw >nul 2>&1
 if %errorlevel% neq 0 (
     echo [ERROR] HDFS /data/raw directory missing or empty.
     exit /b 1
