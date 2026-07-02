@@ -1,6 +1,27 @@
 import sys
 import argparse
 import os
+
+def load_env_file():
+    # Dynamically search and load .env from project root if available
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    for _ in range(3):
+        env_path = os.path.join(current_dir, ".env")
+        if os.path.exists(env_path):
+            try:
+                with open(env_path, "r") as f:
+                    for line in f:
+                        line = line.strip()
+                        if line and not line.startswith("#") and "=" in line:
+                            k, v = line.split("=", 1)
+                            os.environ.setdefault(k.strip(), v.strip())
+            except Exception:
+                pass
+            break
+        current_dir = os.path.dirname(current_dir)
+
+load_env_file()
+
 try:
     from api.app.api.config import get_required_env
 except ModuleNotFoundError:
@@ -12,7 +33,8 @@ except ModuleNotFoundError:
         if value is None:
             raise RuntimeError(f"Missing required environment variable '{name}'. Set it in the environment.")
         return value
-# Set default Elasticsearch env for test if not provided
+
+# Set default env values if not provided by OS environment or loaded .env file
 os.environ.setdefault('ELASTICSEARCH_USER', 'elastic')
 os.environ.setdefault('ELASTICSEARCH_PASSWORD', 'sdoqap_secure')
 os.environ.setdefault('ELASTICSEARCH_HOST', 'localhost')
@@ -840,9 +862,14 @@ def run_quality_check(table_name, primary_key, date_column, schema_spec, input_t
         avg_rate = sum(historical_rates) / len(historical_rates)
         variance = sum((x - avg_rate) ** 2 for x in historical_rates) / len(historical_rates)
         std_dev = variance ** 0.5
-        # Bug 6 Fix: Apply StdDev floor (minimum 0.01 or 1%) to prevent false positive alarms
-        std_dev = max(std_dev, 0.01)
-        z_score = abs(current_quarantine_rate - avg_rate) / std_dev
+        # Robust Z-Score: minimum standard deviation floor of 0.05 (5%) to prevent scaling blowup
+        std_dev = max(std_dev, 0.05)
+        # Prevent false alarms on tiny, insignificant fluctuations by ignoring changes under 2%
+        if abs(current_quarantine_rate - avg_rate) < 0.02:
+            z_score = 0.0
+        else:
+            z_score = abs(current_quarantine_rate - avg_rate) / std_dev
+        
         if z_score > 3.0:
             is_anomaly = True
             print(f"[ANOMALY] Statistical Anomaly Detected! Quarantine Rate: {current_quarantine_rate*100:.2f}% vs Avg: {avg_rate*100:.2f}%, Z-Score: {z_score:.2f}")

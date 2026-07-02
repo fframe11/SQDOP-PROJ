@@ -11,7 +11,7 @@ services:
       - ELASTIC_PASSWORD=sdoqap_secure
       - ES_JAVA_OPTS=-Xms1g -Xmx1g
     ports:
-      - "9200:9200"
+      - "${ES_HOST_PORT:-9200}:9200"
     volumes:
       - elasticsearch_data:/usr/share/elasticsearch/data
     healthcheck:
@@ -274,7 +274,7 @@ services:
       - POSTGRES_PASSWORD=sdoqap
       - POSTGRES_DB=sdoqap_oltp
     ports:
-      - "5432:5432"
+      - "${POSTGRES_HOST_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     deploy:
@@ -300,7 +300,7 @@ services:
     container_name: sdoqap-nginx
     restart: always
     ports:
-      - "80:80"
+      - "${NGINX_HOST_PORT:-80}:80"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
