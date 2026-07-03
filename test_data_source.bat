@@ -201,17 +201,15 @@ echo [INGEST] Real-time stream will run for 10 seconds to show capability.
 echo.
 
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-  "Write-Host '[INGEST] Ensuring kafka-python package is installed...'; ^
-   python -m pip install kafka-python --quiet 2>$null; ^
-   Write-Host '[INGEST] Starting background Reddit stream ingestion...'; ^
-   $ingestProc = Start-Process python -ArgumentList 'scripts/reddit_stream.py %subreddits%' -NoNewWindow -PassThru; ^
+  "Write-Host '[INGEST] Starting background Reddit stream ingestion...'; ^
+   $ingestProc = Start-Process python -ArgumentList '-u scripts/reddit_stream.py %subreddits%' -NoNewWindow -PassThru; ^
    Write-Host '[SPARK] Starting background Spark streaming job...'; ^
-   $sparkProc = Start-Process docker -ArgumentList 'exec -t sdoqap-spark-master spark-submit --master spark://spark-master:7077 --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.1,org.elasticsearch:elasticsearch-spark-30_2.12:8.10.2 /opt/spark-apps/streaming_job.py' -NoNewWindow -PassThru; ^
+   $sparkProc = Start-Process docker -ArgumentList 'exec -t sdoqap-spark-master spark-submit --master spark://spark-master:7077 /opt/spark-apps/streaming_job.py' -NoNewWindow -PassThru; ^
    Write-Host '[SYSTEM] Ingestion and processing running in real-time...'; ^
-   for ($i=10; $i -gt 0; $i--) { Write-Host \"[TIMER] $i seconds remaining...\"; Start-Sleep -Seconds 1; }; ^
+   for ($i=40; $i -gt 0; $i--) { Write-Host \"[TIMER] $i seconds remaining...\"; Start-Sleep -Seconds 1; }; ^
    Write-Host '[SYSTEM] Terminating streaming jobs...'; ^
-   Stop-Process -Id $ingestProc.Id -Force; ^
-   Stop-Process -Id $sparkProc.Id -Force; ^
+   try { Stop-Process -Id $ingestProc.Id -Force -ErrorAction SilentlyContinue } catch {}; ^
+   try { Stop-Process -Id $sparkProc.Id -Force -ErrorAction SilentlyContinue } catch {}; ^
    Write-Host '[SYSTEM] Querying Elasticsearch for ingested Reddit data...'; ^
    $esResp = curl.exe -s -u 'elastic:sdoqap_secure' http://localhost:9200/reddit/_count; ^
    if ($esResp) { ^
