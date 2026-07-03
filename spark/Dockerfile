@@ -10,8 +10,6 @@ RUN apt-get update && apt-get install -y bash
 RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
 
 ENV SPARK_CONF_DIR=/opt/bitnami/spark/conf
-ENV SPARK_CLASSPATH=/opt/bitnami/spark/jars/*
-ENV SPARK_DIST_CLASSPATH=/opt/bitnami/spark/jars/*
 
 # Download the Delta Lake core JAR (compatible with Spark 3.4 / Scala 2.12)
 ENV DELTA_VERSION=2.4.0
@@ -28,6 +26,7 @@ RUN pip install --no-cache-dir delta-spark==${DELTA_VERSION} && pip install --no
 # Download Kafka & ES connectors
 RUN curl -L -o /opt/bitnami/spark/jars/spark-sql-kafka-0-10_2.12-3.4.1.jar https://repo1.maven.org/maven2/org/apache/spark/spark-sql-kafka-0-10_2.12/3.4.1/spark-sql-kafka-0-10_2.12-3.4.1.jar && \
     curl -L -o /opt/bitnami/spark/jars/spark-token-provider-kafka-0-10_2.12-3.4.1.jar https://repo1.maven.org/maven2/org/apache/spark/spark-token-provider-kafka-0-10_2.12/3.4.1/spark-token-provider-kafka-0-10_2.12-3.4.1.jar && \
+    curl -L -o /opt/bitnami/spark/jars/kafka-clients-3.3.2.jar https://repo1.maven.org/maven2/org/apache/kafka/kafka-clients/3.3.2/kafka-clients-3.3.2.jar && \
     curl -L -o /opt/bitnami/spark/jars/elasticsearch-spark-30_2.12-8.10.2.jar https://repo1.maven.org/maven2/org/elasticsearch/elasticsearch-spark-30_2.12/8.10.2/elasticsearch-spark-30_2.12-8.10.2.jar && \
     curl -L -o /opt/bitnami/spark/jars/commons-pool2-2.11.1.jar https://repo1.maven.org/maven2/org/apache/commons/commons-pool2/2.11.1/commons-pool2-2.11.1.jar
 
@@ -37,6 +36,9 @@ RUN curl -L -o /opt/bitnami/spark/jars/spark-sql-kafka-0-10_2.12-3.4.1.jar https
 # Copy trigger daemon script and automatic initialization script
 COPY start_daemon.sh /docker-entrypoint-initdb.d/start_daemon.sh
 RUN chmod +x /docker-entrypoint-initdb.d/start_daemon.sh
+
+# Pre-resolve and download Spark Streaming Kafka and ES dependencies to local Ivy cache for offline execution
+RUN spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.1,org.elasticsearch:elasticsearch-spark-30_2.12:8.10.2 --version
 
 # Copy spark application scripts into the image
 COPY spark_quality_engine.py spark_gold_layer.py spark_trigger_daemon.py streaming_job.py rules_config.json /opt/spark-apps/
