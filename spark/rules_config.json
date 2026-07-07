@@ -156,5 +156,62 @@
         }
       }
     }
+  },
+  "sales_records": {
+    "null_primary_key": {
+      "enabled": true,
+      "severity": "critical",
+      "mode": "strict"
+    },
+    "null_date_column": {
+      "enabled": true,
+      "severity": "warning",
+      "mode": "strict"
+    },
+    "duplicate_check": {
+      "enabled": true,
+      "severity": "critical",
+      "mode": "strict"
+    },
+    "null_checks": {
+      "mode": "adaptive",
+      "default_tolerance": 0.05,
+      "learn_from_history": true,
+      "column_overrides": {}
+    },
+    "value_range": {
+      "mode": "auto",
+      "method": "iqr",
+      "iqr_multiplier": 1.5,
+      "column_overrides": {
+        "order_id": {
+          "iqr_multiplier": 2.5
+        },
+        "unit_price": {
+          "iqr_multiplier": 2.5
+        },
+        "unit_cost": {
+          "iqr_multiplier": 2.5
+        }
+      }
+    },
+    "freshness_threshold_hours": {
+      "mode": "adaptive",
+      "base_value": 48,
+      "learn_from_history": true
+    },
+    "quality_score_threshold": {
+      "mode": "adaptive",
+      "base_value": 90.0,
+      "min_value": 70.0,
+      "adjustment_window_runs": 15
+    },
+    "ai_advisor": {
+      "enabled": true,
+      "trigger": "on_anomaly",
+      "model": "gemini-2.0-flash",
+      "max_rows_to_analyze": 50,
+      "confidence_threshold": 0.7
+    }
   }
 }

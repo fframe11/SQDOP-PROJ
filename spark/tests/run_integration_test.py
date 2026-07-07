@@ -74,6 +74,9 @@ def setup_hdfs():
     # 3. Put file onto HDFS
     run_cmd(["docker", "exec", "-t", "-e", "HADOOP_USER_NAME=root", "sdoqap-namenode", "hdfs", "dfs", "-put", "-f", "/tmp/benchmark_dataset.csv", "/data/raw/benchmark_test/benchmark_dataset.csv"])
     
+    # Clean up host-copied file from Namenode's container /tmp directory to prevent disk bloating
+    run_cmd(["docker", "exec", "-t", "sdoqap-namenode", "rm", "-f", "/tmp/benchmark_dataset.csv"])
+
     # 4. Set secure permissions: owner spark, group spark, mode 770 (no world write)
     run_cmd(["docker", "exec", "-t", "-e", "HADOOP_USER_NAME=root", "sdoqap-namenode", "hdfs", "dfs", "-chown", "-R", "spark:spark", "/data"])
     run_cmd(["docker", "exec", "-t", "-e", "HADOOP_USER_NAME=root", "sdoqap-namenode", "hdfs", "dfs", "-chmod", "-R", "770", "/data"])

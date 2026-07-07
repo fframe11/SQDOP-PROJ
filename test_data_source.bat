@@ -295,6 +295,8 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
+docker exec sdoqap-namenode rm -f %container_file%
+
 docker exec -t -e HADOOP_USER_NAME=root sdoqap-namenode hdfs dfs -chown -R spark:spark /data >nul 2>&1
 docker exec -t -e HADOOP_USER_NAME=root sdoqap-namenode hdfs dfs -chmod -R 777 /data >nul 2>&1
 

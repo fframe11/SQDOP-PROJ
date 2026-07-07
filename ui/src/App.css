@@ -119,6 +119,91 @@ body {
   box-shadow: 0 0 10px #38bdf8;
 }
 
+/* Responsive Toggle Button */
+.navbar-toggle {
+  display: none;
+  flex-direction: column;
+  justify-content: space-between;
+  width: 22px;
+  height: 16px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  z-index: 101;
+}
+
+.navbar-toggle .hamburger-bar {
+  width: 100%;
+  height: 2px;
+  background-color: var(--text-main);
+  border-radius: 2px;
+  transition: all 0.3s ease;
+}
+
+/* Responsive Navbar Media Query */
+@media (max-width: 992px) {
+  .navbar {
+    padding: 0 1.5rem;
+  }
+  
+  .navbar-brand .brand-sub {
+    display: none; /* Hide subtitle on smaller screens to save space */
+  }
+
+  .navbar-toggle {
+    display: flex;
+  }
+
+  .navbar-links {
+    position: absolute;
+    top: 56px;
+    right: 0;
+    width: 250px;
+    height: calc(100vh - 56px);
+    background: rgba(10, 14, 26, 0.95);
+    backdrop-filter: blur(20px);
+    border-left: 1px solid var(--border-glass);
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 2rem 1.5rem;
+    gap: 1.5rem;
+    transform: translateX(100%);
+    transition: transform 0.3s ease-in-out;
+    box-shadow: -10px 0 30px rgba(0, 0, 0, 0.5);
+  }
+
+  .navbar-links.open {
+    transform: translateX(0);
+  }
+
+  .nav-link {
+    width: 100%;
+    font-size: 1rem;
+    padding: 0.5rem 0;
+  }
+
+  .nav-link.active::after {
+    bottom: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    box-shadow: 0 0 10px #38bdf8;
+  }
+  
+  /* Hamburger Open State Animations */
+  .navbar-toggle.open .hamburger-bar:nth-child(1) {
+    transform: translateY(7px) rotate(45deg);
+  }
+  .navbar-toggle.open .hamburger-bar:nth-child(2) {
+    opacity: 0;
+  }
+  .navbar-toggle.open .hamburger-bar:nth-child(3) {
+    transform: translateY(-7px) rotate(-45deg);
+  }
+}
+
+
 /* ========== App Layout container ========== */
 .sdoqap-app {
   display: flex;

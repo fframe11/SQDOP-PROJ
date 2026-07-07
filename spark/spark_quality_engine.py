@@ -1459,6 +1459,22 @@ def run_quality_check(table_name, primary_key, date_column, schema_spec, input_t
         except Exception as gold_err:
             print(f"[DYNAMIC ENGINE] Local downstream trigger failed (non-fatal): {gold_err}")
 
+    # ─── HDFS Raw File Cleanup after Successful Run ──────────────────────────
+    try:
+        cleanup_target = input_table_name or table_name
+        sc = spark.sparkContext
+        conf = sc._jsc.hadoopConfiguration()
+        URI = sc._gateway.jvm.java.net.URI
+        FileSystem = sc._gateway.jvm.org.apache.hadoop.fs.FileSystem
+        Path = sc._gateway.jvm.org.apache.hadoop.fs.Path
+        fs = FileSystem.get(URI(HDFS_URL), conf)
+        raw_dir_path = Path(f"/data/raw/{cleanup_target}")
+        if fs.exists(raw_dir_path):
+            print(f"[CLEANUP] Deleting raw HDFS source folder after successful quality check: {raw_dir_path}")
+            fs.delete(raw_dir_path, True)
+    except Exception as cleanup_err:
+        print(f"[CLEANUP] Warning: Failed to delete raw HDFS source folder: {cleanup_err}")
+
     # FIX 2A: Release the distributed lock after all work is done
     release_lock(table_name)
     spark.stop()
