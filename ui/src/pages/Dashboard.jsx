@@ -1,34 +1,61 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useApi, postApi } from '../hooks/useApi';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { ComposedChart, AreaChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Legend } from 'recharts';
 
 export default function Dashboard() {
-  // 1. Fetch real-time metrics from API endpoints
+  // 1. Interactive States (Slicers & Filters)
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedSourceFilter, setSelectedSourceFilter] = useState('All');
+  const [selectedRun, setSelectedRun] = useState(null);
+  const [userSelectedRunId, setUserSelectedRunId] = useState(null);
+
+  const [leftTab, setLeftTab] = useState('Ratio'); // Ratio, Quarantine, Insights
+  const [centerTab, setCenterTab] = useState('Trends'); // Trends, RootCause, Impact, Actionable
+
+  // Pagination states
+  const [historyPage, setHistoryPage] = useState(1);
+  const historyPageSize = 8;
+
+  useEffect(() => {
+    setHistoryPage(1);
+  }, [searchTerm, selectedSourceFilter]);
+
+  // 2. Fetch real-time metrics from API endpoints
   const kpi = useApi('/kpi/stats', { refreshInterval: 15000 });
   const anomaly = useApi('/anomaly/sources', { refreshInterval: 15000 });
   const services = useApi('/services/status', { refreshInterval: 10000 });
   const activity = useApi('/system/activity?limit=15', { refreshInterval: 15000 });
   const perf = useApi('/performance/metrics', { refreshInterval: 15000 });
   const qualityHistory = useApi('/quality?limit=50', { refreshInterval: 15000 });
-  const projection = useApi('/analytics/projection', { refreshInterval: 30000 });
+  const projection = useApi(selectedSourceFilter === 'All' ? '/analytics/projection' : `/analytics/projection?table_name=${selectedSourceFilter}`, { refreshInterval: 30000 });
   const clustering = useApi('/analytics/clustering', { refreshInterval: 30000 });
   const impact = useApi('/analytics/impact', { refreshInterval: 30000 });
   const recommendations = useApi('/analytics/recommendations', { refreshInterval: 30000 });
 
-  // 2. Interactive States (Slicers & Filters)
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedSourceFilter, setSelectedSourceFilter] = useState('All');
-  const [selectedRun, setSelectedRun] = useState(null);
-
-  const [leftTab, setLeftTab] = useState('Ratio'); // Ratio, Quarantine, Insights
-  const [centerTab, setCenterTab] = useState('Trends'); // Trends, RootCause, Impact, Actionable
-
-  // Automatically select the first pipeline run if none is selected
+  // Automatically select the first pipeline run if none or if tracking the latest
   useEffect(() => {
-    if (qualityHistory.data && qualityHistory.data.length > 0 && !selectedRun) {
-      setSelectedRun(qualityHistory.data[0]);
+    if (qualityHistory.data && qualityHistory.data.length > 0) {
+      if (!userSelectedRunId) {
+        setSelectedRun(qualityHistory.data[0]);
+      } else {
+        const match = qualityHistory.data.find(r => r.run_id === userSelectedRunId);
+        if (match) {
+          setSelectedRun(match);
+        } else {
+          setSelectedRun(qualityHistory.data[0]);
+        }
+      }
     }
-  }, [qualityHistory.data, selectedRun]);
+  }, [qualityHistory.data, userSelectedRunId]);
+
+  const terminalEndRef = useRef(null);
+
+  // Auto-scroll terminal logs to bottom on update
+  useEffect(() => {
+    if (terminalEndRef.current) {
+      terminalEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [activity.data]);
 
   // 3. PowerBI Style CSV Export Utility
   const handleExportCSV = (jsonData, filename) => {
@@ -86,6 +113,11 @@ export default function Dashboard() {
     });
   }, [qualityHistory.data, searchTerm, selectedSourceFilter]);
 
+  const paginatedRuns = useMemo(() => {
+    const start = (historyPage - 1) * historyPageSize;
+    return filteredRuns.slice(start, start + historyPageSize);
+  }, [filteredRuns, historyPage]);
+
   // 5. Data transformers for Recharts area visualization
   const seriesKeys = useMemo(() => {
     if (!anomaly.data || !anomaly.data.series) return [];
@@ -107,11 +139,21 @@ export default function Dashboard() {
     if (!projection.data || !projection.data.projection_days) return [];
     return projection.data.projection_days.map((day, i) => ({
       day: `Day +${day}`,
-      Forecast: projection.data.projected_scores[i],
-      High: projection.data.ci_high[i],
-      Low: projection.data.ci_low[i],
+      Forecast:    parseFloat(projection.data.projected_scores[i]?.toFixed(2) ?? 0),
+      Optimistic:  parseFloat(projection.data.ci_high[i]?.toFixed(2) ?? 0),
+      Pessimistic: parseFloat(projection.data.ci_low[i]?.toFixed(2) ?? 0),
     }));
   }, [projection.data]);
+
+  // Dynamic Y-axis zoom for forecast chart
+  const yForecastDomain = useMemo(() => {
+    if (!forecastData.length) return [75, 102];
+    const allVals = forecastData.flatMap(d => [d.Forecast, d.Optimistic, d.Pessimistic]).filter(Boolean);
+    const minVal = Math.min(...allVals);
+    const maxVal = Math.max(...allVals);
+    const pad = Math.max((maxVal - minVal) * 1.5, 1.5);
+    return [parseFloat((minVal - pad).toFixed(1)), parseFloat((maxVal + pad * 0.5).toFixed(1))];
+  }, [forecastData]);
 
   // 6. Action triggering (Retry)
   const [retrying, setRetrying] = useState(false);
@@ -257,7 +299,8 @@ export default function Dashboard() {
               ) : filteredRuns.length === 0 ? (
                 <div className="loading-state" style={{ color: 'var(--text-muted)' }}>No run history found</div>
               ) : (
-                <table>
+                <>
+                  <table>
                   <thead>
                     <tr>
                       <th>TIMESTAMP</th>
@@ -268,11 +311,14 @@ export default function Dashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredRuns.map((run) => (
+                    {paginatedRuns.map((run) => (
                       <tr
                         key={run.run_id}
                         className={`clickable-row ${selectedRun && selectedRun.run_id === run.run_id ? 'selected' : ''}`}
-                        onClick={() => setSelectedRun(run)}
+                        onClick={() => {
+                          setSelectedRun(run);
+                          setUserSelectedRunId(run.run_id === qualityHistory.data[0]?.run_id ? null : run.run_id);
+                        }}
                       >
                         <td>{new Date(run.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}</td>
                         <td><strong>{run.table_name}</strong></td>
@@ -285,7 +331,29 @@ export default function Dashboard() {
                     ))}
                   </tbody>
                 </table>
-              )}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem', padding: '0 0.5rem' }}>
+                  <button 
+                    className="btn btn-secondary" 
+                    disabled={historyPage === 1} 
+                    onClick={() => setHistoryPage(p => Math.max(p - 1, 1))}
+                    style={{ padding: '0.25rem 0.75rem', fontSize: '0.75rem', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer', borderRadius: '4px' }}
+                  >
+                    Previous
+                  </button>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                    Page {historyPage} of {Math.ceil(filteredRuns.length / historyPageSize) || 1}
+                  </span>
+                  <button 
+                    className="btn btn-secondary" 
+                    disabled={historyPage >= Math.ceil(filteredRuns.length / historyPageSize)} 
+                    onClick={() => setHistoryPage(p => p + 1)}
+                    style={{ padding: '0.25rem 0.75rem', fontSize: '0.75rem', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer', borderRadius: '4px' }}
+                  >
+                    Next
+                  </button>
+                </div>
+              </>
+            )}
             </div>
           </div>
 
@@ -450,9 +518,9 @@ export default function Dashboard() {
                       })}
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" />
-                    <XAxis dataKey="time" stroke="#64748b" tick={{ fontSize: 9.5 }} />
-                    <YAxis domain={[0, 100]} stroke="#64748b" tick={{ fontSize: 9.5 }} />
-                    <Tooltip contentClassName="custom-tooltip" />
+                    <XAxis dataKey="time" stroke="#64748b" tick={{ fontSize: 9.5, fontFamily: "Outfit, sans-serif" }} />
+                    <YAxis domain={[0, 100]} stroke="#64748b" tick={{ fontSize: 9.5, fontFamily: "Outfit, sans-serif" }} />
+                    <Tooltip contentClassName="custom-tooltip" wrapperStyle={{ fontFamily: "Outfit, sans-serif" }} />
                     {seriesKeys.map((k, idx) => {
                         const colors = ["#38bdf8", "#10b981", "#fbbf24", "#f43f5e", "#a855f7"];
                         const color = colors[idx % colors.length];
@@ -532,15 +600,41 @@ export default function Dashboard() {
                       <div className="loading-state"><span>Processing predictive model...</span></div>
                     ) : (
                       <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={forecastData} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.02)" />
-                          <XAxis dataKey="day" stroke="#64748b" tick={{ fontSize: 9 }} />
-                          <YAxis domain={[75, 100]} stroke="#64748b" tick={{ fontSize: 9 }} />
-                          <Tooltip contentClassName="custom-tooltip" />
-                          <Area type="monotone" dataKey="Optimistic" stroke="#10b981" fill="none" strokeWidth={1} strokeDasharray="3 3" />
-                          <Area type="monotone" dataKey="Pessimistic" stroke="#f43f5e" fill="none" strokeWidth={1} strokeDasharray="3 3" />
-                          <Area type="monotone" dataKey="Forecast" stroke="#3b82f6" fill="rgba(59,130,246,0.05)" strokeWidth={2} />
-                        </AreaChart>
+                        <ComposedChart data={forecastData} margin={{ top: 5, right: 20, left: -10, bottom: 0 }}>
+                          <defs>
+                            <linearGradient id="dashFillHigh" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%"  stopColor="#10b981" stopOpacity={0.28}/>
+                              <stop offset="100%" stopColor="#10b981" stopOpacity={0.03}/>
+                            </linearGradient>
+                            <linearGradient id="dashFillLow" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%"  stopColor="#f43f5e" stopOpacity={0.18}/>
+                              <stop offset="100%" stopColor="#f43f5e" stopOpacity={0.03}/>
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                          <XAxis dataKey="day" stroke="#64748b" tick={{ fontSize: 9, fontFamily: "Outfit, sans-serif" }} />
+                          <YAxis
+                            domain={yForecastDomain}
+                            stroke="#64748b"
+                            tick={{ fontSize: 9, fontFamily: "Outfit, sans-serif" }}
+                            tickFormatter={v => `${v}%`}
+                          />
+                          <Tooltip
+                            contentStyle={{ background: '#0f172a', border: '1px solid rgba(0,229,255,0.25)', borderRadius: 6, fontSize: 11, fontFamily: "Outfit, sans-serif" }}
+                            formatter={(val, name) => [`${typeof val === 'number' ? val.toFixed(2) : val}%`, name]}
+                          />
+                          <Legend verticalAlign="top" height={22} wrapperStyle={{ fontSize: 9, fontFamily: "Outfit, sans-serif" }} />
+                          <ReferenceLine
+                            y={95}
+                            stroke="#f59e0b"
+                            strokeDasharray="5 3"
+                            strokeWidth={1.5}
+                            label={{ value: 'SLA', position: 'right', fill: '#f59e0b', fontSize: 9, fontFamily: "Outfit, sans-serif" }}
+                          />
+                          <Area type="monotone" dataKey="Optimistic" stroke="#10b981" strokeWidth={2} fill="url(#dashFillHigh)" dot={{ r: 2.5, fill: '#10b981', strokeWidth: 0 }} />
+                          <Area type="monotone" dataKey="Pessimistic" stroke="#f43f5e" strokeWidth={2} fill="url(#dashFillLow)" dot={{ r: 2.5, fill: '#f43f5e', strokeWidth: 0 }} />
+                          <Line type="monotone" dataKey="Forecast" stroke="#00E5FF" strokeWidth={2.5} dot={{ r: 3.5, fill: '#00E5FF', stroke: '#0f172a', strokeWidth: 1.5 }} activeDot={{ r: 6 }} />
+                        </ComposedChart>
                       </ResponsiveContainer>
                     )}
                   </div>
@@ -647,6 +741,7 @@ export default function Dashboard() {
               const quarRecs = activeRun?.quarantined_records || 0;
               const hasError = activeRun && quarRecs > 0;
               const hasClean = activeRun && (totalRecs - quarRecs > 0);
+              const isExecutionFailed = activeRun && (activeRun.quality_score === 0 || activeRun.quality_score === null);
               return (
             <div className="lineage-wrapper dynamic-lineage">
               <div className="lineage-path">
@@ -659,7 +754,7 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                <div className={`lineage-connector ${hasError ? 'danger' : (activeRun ? 'active' : '')}`}></div>
+                <div className={`lineage-connector ${isExecutionFailed ? 'danger' : (activeRun ? 'active' : '')}`}></div>
 
                 {/* Node 2 */}
                 <div className="lineage-node audit">
@@ -670,7 +765,7 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                <div className={`lineage-connector ${hasError ? 'danger' : (activeRun ? 'active' : '')}`} style={{ flexGrow: 0, minWidth: '35px', width: '35px' }}></div>
+                <div className={`lineage-connector ${isExecutionFailed ? 'danger' : (activeRun ? 'active' : '')}`} style={{ flexGrow: 0, minWidth: '35px', width: '35px' }}></div>
 
                 {/* Branches Container */}
                 <div className="lineage-branches-container" style={{ display: 'flex', alignItems: 'center', flexShrink: 0, padding: '5px 0' }}>
@@ -790,19 +885,22 @@ export default function Dashboard() {
                 {activity.loading ? (
                   <div className="log-line info">Connecting to Log Stream...</div>
                 ) : activity.data && activity.data.length > 0 ? (
-                  activity.data.map((act, i) => {
-                    let logClass = 'info';
-                    if (act.level === 'error') logClass = 'error';
-                    else if (act.level === 'warning') logClass = 'warning';
-                    else if (act.level === 'success') logClass = 'success';
+                  <>
+                    {[...activity.data].reverse().map((act, i) => {
+                      let logClass = 'info';
+                      if (act.level === 'error') logClass = 'error';
+                      else if (act.level === 'warning') logClass = 'warning';
+                      else if (act.level === 'success') logClass = 'success';
 
-                    return (
-                      <div key={i} className={`log-line ${logClass}`}>
-                        <span className="log-time">[{new Date(act.timestamp).toLocaleTimeString([], { hour12: false })}]</span>
-                        <span>{act.message}</span>
-                      </div>
-                    );
-                  })
+                      return (
+                        <div key={i} className={`log-line ${logClass}`}>
+                          <span className="log-time">[{new Date(act.timestamp).toLocaleTimeString([], { hour12: false })}]</span>
+                          <span>{act.message}</span>
+                        </div>
+                      );
+                    })}
+                    <div ref={terminalEndRef} />
+                  </>
                 ) : (
                   <div className="log-line error">ไม่มีประวัติข้อความ Log ล่าสุดพบในระบบ</div>
                 )}

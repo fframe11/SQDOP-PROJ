@@ -1,0 +1,104 @@
+apiVersion: 1
+groups:
+  - orgId: 1
+    name: SDOQAP Data Quality Alerts
+    folder: Data Quality
+    interval: 1m
+    rules:
+      - uid: quality_score_critical
+        title: Data Quality Score Critical Drop
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 3600
+              to: 0
+            datasourceUid: SDOQAP_Elasticsearch
+            model:
+              query: "quality_score: < 80"
+          - refId: B
+            relativeTimeRange:
+              from: 3600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              expression: A
+              type: classic_condition
+              conditions:
+                - evaluator:
+                    params:
+                      - 80
+                    type: lt
+                  query:
+                    params:
+                      - A
+                  reducer:
+                    type: avg
+                  type: query
+        noDataState: NoData
+        execErrState: Alerting
+        for: 1m
+        annotations:
+          summary: "Data Quality Score is critical (below 80%)"
+          description: "Table quality score dropped to a critical level of {{ $values.B.Value }}%."
+        labels:
+          severity: critical
+
+      - uid: quarantine_rate_high
+        title: Data Quarantine Rate High
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 3600
+              to: 0
+            datasourceUid: SDOQAP_Elasticsearch
+            model:
+              query: "quarantined_records: > 0"
+          - refId: B
+            relativeTimeRange:
+              from: 3600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              expression: A
+              type: classic_condition
+              conditions:
+                - evaluator:
+                    params:
+                      - 20
+                    type: gt
+                  query:
+                    params:
+                      - A
+                  reducer:
+                    type: avg
+                  type: query
+        noDataState: NoData
+        execErrState: Alerting
+        for: 1m
+        annotations:
+          summary: "Quarantine rate is high (above 20%)"
+          description: "More than 20% of records in the latest batch were routed to the Quarantine Zone."
+        labels:
+          severity: warning
+
+contactPoints:
+  - orgId: 1
+    name: SDOQAP Alert Router Webhook
+    receivers:
+      - uid: sdoqap_api_webhook
+        type: webhook
+        settings:
+          url: http://api:8000/api/v1/system/alert
+          method: POST
+          contentType: application/json
+        disableResolveMessage: false
+
+policies:
+  - orgId: 1
+    receiver: SDOQAP Alert Router Webhook
+    group_by: ["alertname", "severity"]
+    group_wait: 10s
+    group_interval: 5m
+    repeat_interval: 1h

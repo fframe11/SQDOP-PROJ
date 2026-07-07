@@ -5,6 +5,7 @@ Approved proposals update schema_registry.json. Rejected proposals are discarded
 """
 import os
 import json
+from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException
 from elasticsearch import Elasticsearch
 
@@ -137,11 +138,10 @@ def approve_proposal(proposal_id: str, primary_key: str = None, date_column: str
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to update sdoqap_schema_registry in ES: {e}")
 
-    # Update proposal status in ES
     es.update(
         index="sdoqap_schema_proposals",
         id=proposal_id,
-        body={"doc": {"status": "APPROVED", "resolved_at": __import__("datetime").datetime.utcnow().isoformat()}}
+        body={"doc": {"status": "APPROVED", "resolved_at": datetime.now(timezone.utc).isoformat()}}
     )
 
     return {
@@ -166,7 +166,7 @@ def reject_proposal(proposal_id: str):
     es.update(
         index="sdoqap_schema_proposals",
         id=proposal_id,
-        body={"doc": {"status": "REJECTED", "resolved_at": __import__("datetime").datetime.utcnow().isoformat()}}
+        body={"doc": {"status": "REJECTED", "resolved_at": datetime.now(timezone.utc).isoformat()}}
     )
 
     return {

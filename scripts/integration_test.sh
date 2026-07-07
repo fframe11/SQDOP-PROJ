@@ -6,7 +6,7 @@ set -euo pipefail
 
 echo "=== Checking Kafka health ==="
 # Verify Kafka port is reachable via Docker exec
-if ! docker exec kafka bash -c "nc -z localhost 9092" >/dev/null 2>&1; then
+if ! docker exec sdoqap-kafka bash -c "nc -z localhost 9092" >/dev/null 2>&1; then
   echo "❌ Kafka not reachable"
   exit 1
 fi
@@ -14,7 +14,7 @@ fi
 echo "Kafka reachable"
 
 # Consumer lag check skipped (no consumer group in this test)
-# KAFKA_LAG=$(docker exec kafka bash -c "kafka-consumer-groups.sh --bootstrap-server localhost:9092 --describe --group reddit-consumer" | grep reddit_raw | awk '{print \$6}')
+# KAFKA_LAG=$(docker exec sdoqap-kafka bash -c "kafka-consumer-groups.sh --bootstrap-server localhost:9092 --describe --group reddit-consumer" | grep reddit_raw | awk '{print \$6}')
 # echo "Kafka consumer lag: $KAFKA_LAG"
 # if [[ -z "$KAFKA_LAG" || $KAFKA_LAG -gt 10 ]]; then
 #   echo "❌ Consumer lag too high"
@@ -23,7 +23,7 @@ echo "Kafka reachable"
 
 echo "=== Verifying Spark processing ==="
 # Check Spark UI for RUNNING app
-SPARK_RUNNING=$(docker exec spark-master bash -c "curl -s http://localhost:8080/api/v1/applications | grep RUNNING || true")
+SPARK_RUNNING=$(docker exec sdoqap-spark-master bash -c "curl -s http://localhost:8080/api/v1/applications | grep RUNNING || true")
 if [[ -z "$SPARK_RUNNING" ]]; then
   echo "❌ Spark job not running"
   exit 1
@@ -32,7 +32,7 @@ fi
 echo "Spark job is RUNNING"
 
 echo "=== Checking HDFS parquet output ==="
-HDFS_COUNT=$(docker exec hdfs-namenode bash -c "hdfs dfs -count -q /data/reddit/parquet | awk '{print \$2}'")
+HDFS_COUNT=$(docker exec sdoqap-namenode bash -c "hdfs dfs -count -q /data/reddit/parquet | awk '{print \$2}'")
 echo "Parquet files in HDFS: $HDFS_COUNT"
 if [[ -z "$HDFS_COUNT" || $HDFS_COUNT -lt 1 ]]; then
   echo "❌ No parquet files found"

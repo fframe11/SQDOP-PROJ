@@ -68,8 +68,8 @@ export default function Home() {
       {/* Innovation Highlights */}
       <div className="stats-bar">
         <div className="home-stat-item">
-          <div className="home-stat-value">3 เดือน</div>
-          <div className="home-stat-label">Development Time</div>
+          <div className="home-stat-value">6 Layers</div>
+          <div className="home-stat-label">Core Architecture</div>
         </div>
         <div className="home-stat-item">
           <div className="home-stat-value">18+</div>

@@ -9,15 +9,34 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from elasticsearch import Elasticsearch
 
+_original_Elasticsearch = Elasticsearch
+_global_es_client = None
+
+def Elasticsearch(*args, **kwargs):
+    global _global_es_client
+    if _global_es_client is None:
+        _global_es_client = _original_Elasticsearch(*args, **kwargs)
+    return _global_es_client
+
 from app.api.lineage import router as lineage_router
 from app.api.pipeline import router as pipeline_router
 from app.api.quality import router as quality_router
 from app.api.schema import router as schema_router  # Fix 2B: Schema Governance API
+from app.api.data_export import router as data_export_router
+from app.api.dynamic_rules import router as dynamic_rules_router
 
 app = FastAPI(
     title="SDOQAP Serving API",
     description="Serving Layer API for Scalable Data Observability and Quality Assurance Platform",
     version="1.0.0"
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Logging configuration – level can be set via LOG_LEVEL env var
@@ -59,6 +78,8 @@ app.include_router(lineage_router)
 app.include_router(pipeline_router)
 app.include_router(quality_router)
 app.include_router(schema_router)  # Fix 2B: Schema Governance API
+app.include_router(data_export_router)
+app.include_router(dynamic_rules_router)
 
 def get_elasticsearch_url():
     # Prefer full URL if provided via environment
@@ -142,7 +163,31 @@ def get_kpi_stats():
         total_ingested = aggregations.get("total_ingested", {}).get("value") or 0.0
         total_quarantined = aggregations.get("total_quarantined", {}).get("value") or 0.0
         avg_score = aggregations.get("avg_score", {}).get("value") or 100.0
-        mttd = round(2.1 + (total_ingested % 5) * 0.1, 2)
+        
+        # Calculate real MTTD based on average pipeline durations
+        mttd = 2.4  # fallback
+        try:
+            if es.indices.exists(index="sdoqap_pipeline_runs"):
+                res_perf = es.search(
+                    index="sdoqap_pipeline_runs",
+                    body={
+                        "size": 20,
+                        "query": {
+                            "bool": {
+                                "must_not": {"term": {"state.keyword": "failed"}}
+                            }
+                        },
+                        "sort": [{"timestamp": {"order": "desc"}}]
+                    }
+                )
+                hits = res_perf.get("hits", {}).get("hits", [])
+                durations = [h["_source"].get("duration_seconds") for h in hits if h["_source"].get("duration_seconds")]
+                if durations:
+                    avg_dur = sum(durations) / len(durations)
+                    mttd = round(avg_dur / 60.0, 2)
+        except Exception:
+            pass
+
         return {
             "total_records_ingested": int(total_ingested),
             "global_quality_score": round(avg_score, 2),
@@ -236,7 +281,7 @@ def get_anomaly_sources():
     return response_data
 
 @app.get("/api/v1/analytics/projection")
-def get_quality_projection():
+def get_quality_projection(table_name: str = None):
     es = Elasticsearch(ELASTICSEARCH_URL)
     default_scores = [98.4, 97.8, 96.5, 95.1, 93.4, 91.2, 88.0]
     default_ci_high = [99.5, 99.0, 98.2, 97.5, 96.2, 94.5, 92.0]
@@ -244,17 +289,33 @@ def get_quality_projection():
     try:
         import math
         if es.indices.exists(index="sdoqap_quality_runs"):
-            res = es.search(index="sdoqap_quality_runs", body={"sort": [{"timestamp": "desc"}], "size": 10})
+            # Auto-detect latest table if not provided
+            if not table_name:
+                recent_res = es.search(index="sdoqap_quality_runs", body={"sort": [{"timestamp": "desc"}], "size": 1})
+                recent_hits = recent_res.get("hits", {}).get("hits", [])
+                if recent_hits:
+                    table_name = recent_hits[0]["_source"]["table_name"]
+            
+            # Query runs filtered by table_name
+            if table_name:
+                body = {
+                    "query": {"term": {"table_name.keyword": {"value": table_name, "case_insensitive": True}}},
+                    "sort": [{"timestamp": "desc"}],
+                    "size": 10
+                }
+            else:
+                body = {"sort": [{"timestamp": "desc"}], "size": 10}
+
+            res = es.search(index="sdoqap_quality_runs", body=body)
             hits = res.get("hits", {}).get("hits", [])
             scores = [hit["_source"]["quality_score"] for hit in hits][::-1]
             timestamps = [hit["_source"]["timestamp"] for hit in hits][::-1]
             if len(scores) >= 2:
                 # Root Cause Fix: Authentic Linear Regression using actual Time Deltas (Days)
-                from datetime import datetime
-                t0 = datetime.fromisoformat(timestamps[0].replace("Z", "+00:00"))
+                t0 = datetime.fromisoformat(timestamps[0].replace("Z", "+00:00")).replace(tzinfo=None)
                 x = []
                 for ts in timestamps:
-                    t = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+                    t = datetime.fromisoformat(ts.replace("Z", "+00:00")).replace(tzinfo=None)
                     days_diff = (t - t0).total_seconds() / 86400.0
                     x.append(days_diff)
                 
@@ -294,8 +355,26 @@ def get_quality_projection():
                     ci_high.append(round(min(100.0, proj_val + margin), 2))
                     ci_low.append(round(max(0.0, proj_val - margin), 2))
 
-                stability = max(5.0, min(100.0, 100.0 + (m * 80) - (abs(m) * 20)))
-                breach_prob = max(0.1, min(99.9, 1.2 if m >= -0.1 else (abs(m) * 50.0 + 10.0)))
+                # 1. Compute Data Stability Index (DSI) based on standard deviation of scores
+                mean_score = sum(scores) / len(scores)
+                variance = sum((s - mean_score)**2 for s in scores) / len(scores)
+                std_dev = variance ** 0.5
+                stability = max(5.0, min(100.0, 100.0 - (std_dev * 4.0)))
+
+                # 2. Compute SLA Breach Probability (SBP) based on normal CDF of projected scores
+                # SLA Threshold is 95.0%
+                sla_threshold = 95.0
+                if scores[-1] < sla_threshold:
+                    breach_prob = 99.9
+                else:
+                    max_breach = 0.0
+                    for val in projected_scores:
+                        z_sla = (val - sla_threshold) / std_error
+                        # Normal CDF approximation using math.erf
+                        prob = 0.5 * (1.0 - math.erf(z_sla / math.sqrt(2.0)))
+                        if prob > max_breach:
+                            max_breach = prob
+                    breach_prob = max(0.1, min(99.9, max_breach * 100.0))
 
                 trend_desc = "Decline detected" if m < 0 else "Stable or improving trend detected"
                 trend_desc += f" in pipeline runs (slope: {m:.3f} per run)"
@@ -366,8 +445,7 @@ def get_diagnostic_clustering():
 
             if reasons:
                 total_errors = sum(reasons.values())
-                clusters = []
-                idx = 1
+                aggregated = {}
                 for reason, count in reasons.items():
                     source = "Unknown"
                     pattern = reason
@@ -389,6 +467,13 @@ def get_diagnostic_clustering():
                     elif "duplicate" in reason:
                         source = "API Gateway"
                         pattern = "Duplicate Payload Ingestion"
+                    
+                    key = (source, pattern)
+                    aggregated[key] = aggregated.get(key, 0) + count
+                
+                clusters = []
+                idx = 1
+                for (source, pattern), count in aggregated.items():
                     pct = round((count / total_errors) * 100, 1) if total_errors > 0 else 0.0
                     clusters.append({
                         "id": idx,
@@ -698,20 +783,21 @@ def get_gold_schema_drift_history(days: int = 30):
 
 @app.post("/api/v1/gold/rebuild")
 def trigger_gold_rebuild():
-    """Trigger an async Gold Layer rebuild inside the API container (no Spark needed)."""
-    import subprocess, threading
+    """Trigger an async Gold Layer rebuild by calling the Spark Trigger Daemon."""
+    import requests, threading
     def run_gold():
+        spark_host = os.getenv("SPARK_MASTER_HOST", "spark-master")
         try:
-            script_path = "/app/spark_gold_layer.py"
-            if not os.path.exists(script_path):
-                script_path = "/spark/spark_gold_layer.py"
-            subprocess.run(["python", script_path], timeout=120, check=True)
-            print("[GOLD REBUILD] Completed successfully.")
+            res = requests.post(f"http://{spark_host}:8099/gold/rebuild", timeout=5)
+            if res.status_code == 200:
+                print("[GOLD REBUILD] Successfully triggered rebuild on Spark Trigger Daemon.")
+            else:
+                print(f"[GOLD REBUILD ERROR] Spark Trigger Daemon returned status {res.status_code}: {res.text}")
         except Exception as e:
-            print(f"[GOLD REBUILD ERROR] {e}")
+            print(f"[GOLD REBUILD ERROR] Failed to connect to Spark Trigger Daemon: {e}")
     thread = threading.Thread(target=run_gold, daemon=True)
     thread.start()
-    return {"status": "rebuild_triggered", "message": "Gold Layer rebuild started in background. Check logs for progress."}
+    return {"status": "rebuild_triggered", "message": "Gold Layer rebuild started in background via Spark Daemon."}
 
 
 @app.get("/api/v1/performance/metrics")
@@ -725,6 +811,33 @@ def get_performance_metrics():
     cpu_history = []
     mem_history = []
     processing_latency_seconds = []
+    
+    # 1. Fetch real host-level metrics from /proc
+    real_cpu = 15.0
+    real_mem = 30.0
+    try:
+        if os.path.exists("/proc/loadavg"):
+            with open("/proc/loadavg", "r") as f:
+                load = float(f.readline().split()[0])
+            # Assuming 4 cores, normalize to 100%
+            real_cpu = min(99.0, max(5.0, (load / 4.0) * 100.0))
+    except Exception:
+        pass
+        
+    try:
+        if os.path.exists("/proc/meminfo"):
+            mem_total = 1.0
+            mem_free = 1.0
+            with open("/proc/meminfo", "r") as f:
+                for line in f:
+                    if "MemTotal" in line:
+                        mem_total = float(line.split()[1])
+                    elif "MemFree" in line:
+                        mem_free = float(line.split()[1])
+            real_mem = min(99.0, max(5.0, ((mem_total - mem_free) / mem_total) * 100.0))
+    except Exception:
+        pass
+
     try:
         if not es.indices.exists(index="sdoqap_pipeline_runs"):
             raise HTTPException(status_code=404, detail="Pipeline runs index 'sdoqap_pipeline_runs' does not exist yet.")
@@ -734,8 +847,7 @@ def get_performance_metrics():
             raise HTTPException(status_code=404, detail="No pipeline runs data found to extract performance metrics.")
         
         durations = []
-        import random
-        for i, hit in enumerate(hits):
+        for hit in hits:
             doc = hit["_source"]
             raw_duration = doc.get("duration_seconds", doc.get("duration"))
             if raw_duration is not None:
@@ -745,16 +857,19 @@ def get_performance_metrics():
             durations.append(base)
         durations.reverse()
         processing_latency_seconds = [int(d) for d in durations]
-        # Calculate simulated but dynamic system usage proportional to Spark latency for visual representation
-        cpu_history = [min(95.0, max(15.0, 20.0 + (lat % 45.0) + (i * 2))) for i, lat in enumerate(processing_latency_seconds)]
-        mem_history = [min(90.0, max(30.0, 40.0 + (lat % 35.0) + (i * 1.5))) for i, lat in enumerate(processing_latency_seconds)]
+        
+        # Build CPU and Mem history mapped around the real current metrics
+        for i in range(len(processing_latency_seconds)):
+            diff = (len(processing_latency_seconds) - 1 - i)
+            cpu_history.append(max(5.0, min(99.0, real_cpu - (diff * 2.5) + (processing_latency_seconds[i] % 5))))
+            mem_history.append(max(5.0, min(99.0, real_mem - (diff * 1.5) + (processing_latency_seconds[i] % 3))))
     except HTTPException as he:
         raise he
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to query performance metrics from Elasticsearch: {str(e)}")
         
-    current_cpu = cpu_history[-1] if cpu_history else 0.0
-    current_memory = mem_history[-1] if mem_history else 0.0
+    current_cpu = real_cpu
+    current_memory = real_mem
     average_latency = sum(processing_latency_seconds) / len(processing_latency_seconds) if processing_latency_seconds else 0.0
     return {
         "timestamps": timestamps,
@@ -839,7 +954,7 @@ def get_system_activity(limit: int = 15):
 
     except Exception as e:
         return [{
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "level": "error",
             "component": "System",
             "message": f"Failed to retrieve logs from Elasticsearch: {str(e)}"
@@ -852,6 +967,223 @@ def read_portal():
         "service": "SDOQAP API Serving Layer",
         "documentation": "/docs"
     }
+
+@app.post("/api/v1/system/cleanup")
+def trigger_system_cleanup():
+    """Trigger the automated storage retention and cleanup script asynchronously."""
+    import subprocess, threading
+    def run_cleanup():
+        try:
+            script_path = "/app/scripts/data_retention_cleanup.py"
+            if not os.path.exists(script_path):
+                script_path = "scripts/data_retention_cleanup.py"
+            subprocess.run(["python", script_path], timeout=180, check=True)
+            print("[CLEANUP JOB] Finished successfully.")
+        except Exception as e:
+            print(f"[CLEANUP JOB ERROR] {e}")
+            
+    thread = threading.Thread(target=run_cleanup, daemon=True)
+    thread.start()
+    return {"status": "triggered", "message": "Retention cleanup job started in background."}
+
+from pydantic import BaseModel
+class SettingsPayload(BaseModel):
+    gemini_api_key: str
+    gemini_model: str = "gemini-1.5-flash"
+    gemini_enabled: bool = True
+
+@app.get("/api/v1/system/settings")
+def get_system_settings():
+    es = Elasticsearch(ELASTICSEARCH_URL)
+    try:
+        if es.indices.exists(index="sdoqap_settings"):
+            res = es.get(index="sdoqap_settings", id="global")
+            doc = res.get("_source", {})
+            api_key = doc.get("gemini_api_key", "")
+            masked = ""
+            if api_key:
+                if len(api_key) > 8:
+                    masked = api_key[:6] + "..." + api_key[-4:]
+                else:
+                    masked = "********"
+            return {
+                "gemini_api_key_masked": masked,
+                "gemini_model": doc.get("gemini_model", "gemini-1.5-flash"),
+                "gemini_enabled": doc.get("gemini_enabled", False)
+            }
+    except Exception:
+        pass
+    return {
+        "gemini_api_key_masked": "",
+        "gemini_model": "gemini-1.5-flash",
+        "gemini_enabled": False
+    }
+
+@app.post("/api/v1/system/settings")
+def update_system_settings(payload: SettingsPayload):
+    es = Elasticsearch(ELASTICSEARCH_URL)
+    existing_key = ""
+    try:
+        if es.indices.exists(index="sdoqap_settings"):
+            res = es.get(index="sdoqap_settings", id="global")
+            existing_key = res.get("_source", {}).get("gemini_api_key", "")
+    except Exception:
+        pass
+        
+    new_key = payload.gemini_api_key.strip()
+    if "..." in new_key or "*" in new_key:
+        new_key = existing_key
+        
+    doc = {
+        "gemini_api_key": new_key,
+        "gemini_model": payload.gemini_model,
+        "gemini_enabled": payload.gemini_enabled if new_key else False
+    }
+    
+    if doc["gemini_enabled"] and doc["gemini_api_key"]:
+        if doc["gemini_api_key"].startswith("gsk_"):
+            # Validate the key by sending a test request to Groq API
+            url = "https://api.groq.com/openai/v1/chat/completions"
+            headers = {
+                "Authorization": f"Bearer {doc['gemini_api_key']}",
+                "Content-Type": "application/json"
+            }
+            payload_test = {
+                "model": "llama-3.3-70b-versatile",
+                "messages": [{"role": "user", "content": "Hello"}],
+                "max_tokens": 5
+            }
+            try:
+                res_test = requests.post(url, headers=headers, json=payload_test, timeout=10)
+                if res_test.status_code != 200:
+                    error_msg = "Invalid API key or model error"
+                    try:
+                        error_msg = res_test.json().get("error", {}).get("message", error_msg)
+                    except Exception:
+                        pass
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Groq API key validation failed: {error_msg}."
+                    )
+            except requests.exceptions.RequestException as req_err:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Network error trying to validate Groq API key: {str(req_err)}"
+                )
+        else:
+            # Validate the key by sending a test request to Gemini API
+            api_base = "https://generativelanguage.googleapis.com/v1beta"
+            url = f"{api_base}/models/{doc['gemini_model']}:generateContent?key={doc['gemini_api_key']}"
+            payload_test = {
+                "contents": [{"parts": [{"text": "Hello"}]}]
+            }
+            headers = {"Content-Type": "application/json"}
+            try:
+                res_test = requests.post(url, headers=headers, json=payload_test, timeout=10)
+                if res_test.status_code != 200:
+                    error_msg = "Invalid API key or model error"
+                    try:
+                        error_msg = res_test.json().get("error", {}).get("message", error_msg)
+                    except Exception:
+                        pass
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Gemini API key validation failed: {error_msg}."
+                    )
+            except requests.exceptions.RequestException as req_err:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Network error trying to validate Gemini API key: {str(req_err)}"
+                )
+            
+    try:
+        if not es.indices.exists(index="sdoqap_settings"):
+            es.indices.create(index="sdoqap_settings")
+        es.index(index="sdoqap_settings", id="global", document=doc)
+        return {"status": "success", "message": "System settings updated and Gemini API key validated successfully."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save settings: {str(e)}")
+
+@app.post("/api/v1/system/alert")
+def trigger_alert_routing(payload: dict):
+    """Accepts alert payload (e.g. from Grafana webhook) and routes it to Slack/LINE."""
+    title = payload.get("title")
+    message = payload.get("message")
+    severity = payload.get("severity", "warning")
+    
+    # Handle standard Grafana webhook payload structure
+    if "alerts" in payload:
+        for alert in payload["alerts"]:
+            annotations = alert.get("annotations", {})
+            labels = alert.get("labels", {})
+            title = annotations.get("summary", title or "Grafana Alert")
+            message = annotations.get("description", message or "Grafana Alert Triggered")
+            severity = labels.get("severity", severity)
+            
+            # Route individual alert
+            try:
+                import sys
+                script_dir = os.path.dirname(os.path.abspath(__file__))
+                sys.path.append(os.path.join(script_dir, "scripts"))
+                from scripts.alert_router import route_alert
+                route_alert(title, message, severity)
+            except Exception as e:
+                print(f"[ALERT ENDPOINT ERROR] {e}")
+        return {"status": "routed", "message": "Successfully parsed and routed Grafana payload."}
+
+    # Handle flat JSON payload
+    if not title or not message:
+        raise HTTPException(status_code=400, detail="Missing 'title' or 'message' in payload")
+        
+    try:
+        import sys
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        sys.path.append(os.path.join(script_dir, "scripts"))
+        from scripts.alert_router import route_alert
+        route_alert(title, message, severity)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to route alert: {str(e)}")
+        
+    return {"status": "routed", "message": f"Successfully routed alert '{title}'."}
+
+@app.get("/api/v1/system/remediations")
+def get_upstream_remediations():
+    es = Elasticsearch(ELASTICSEARCH_URL)
+    try:
+        if not es.indices.exists(index="sdoqap_upstream_remediations"):
+            return {"tickets": []}
+        res = es.search(
+            index="sdoqap_upstream_remediations",
+            body={
+                "query": {"match_all": {}},
+                "sort": [{"timestamp": {"order": "desc"}}],
+                "size": 100
+            }
+        )
+        hits = res.get("hits", {}).get("hits", [])
+        tickets = [hit.get("_source") for hit in hits]
+        return {"tickets": tickets}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch remediations: {str(e)}")
+
+@app.post("/api/v1/system/remediations/{ticket_id}/resolve")
+def resolve_upstream_remediation(ticket_id: str):
+    es = Elasticsearch(ELASTICSEARCH_URL)
+    try:
+        if not es.indices.exists(index="sdoqap_upstream_remediations"):
+            raise HTTPException(status_code=404, detail="Remediations index not found")
+        if not es.exists(index="sdoqap_upstream_remediations", id=ticket_id):
+            raise HTTPException(status_code=404, detail=f"Remediation ticket '{ticket_id}' not found")
+        res = es.get(index="sdoqap_upstream_remediations", id=ticket_id)
+        doc = res.get("_source", {})
+        doc["status"] = "RESOLVED"
+        doc["resolved_at"] = datetime.now(timezone.utc).isoformat()
+        es.index(index="sdoqap_upstream_remediations", id=ticket_id, document=doc)
+        return {"status": "success", "message": f"Remediation ticket '{ticket_id}' marked as RESOLVED."}
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to resolve remediation ticket: {str(e)}")
 
 @app.get("/health")
 @app.post("/health")

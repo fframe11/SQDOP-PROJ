@@ -119,6 +119,11 @@ if %errorlevel% neq 0 (
     goto wait_hdfs
 )
 echo HDFS is ready.
+echo Initializing HDFS data directories and permissions...
+docker exec sdoqap-namenode hadoop fs -mkdir -p /data/raw /data/active /data/quarantine /data/profiles
+docker exec sdoqap-namenode hadoop fs -chmod -R 777 /data
+echo HDFS permissions initialized.
+echo.
 
 :wait_es
 echo   - Waiting for Elasticsearch health...

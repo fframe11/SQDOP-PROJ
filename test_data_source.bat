@@ -296,7 +296,7 @@ if %errorlevel% neq 0 (
 )
 
 docker exec -t -e HADOOP_USER_NAME=root sdoqap-namenode hdfs dfs -chown -R spark:spark /data >nul 2>&1
-docker exec -t -e HADOOP_USER_NAME=root sdoqap-namenode hdfs dfs -chmod -R 770 /data >nul 2>&1
+docker exec -t -e HADOOP_USER_NAME=root sdoqap-namenode hdfs dfs -chmod -R 777 /data >nul 2>&1
 
 echo HDFS raw file created:
 docker exec sdoqap-namenode hdfs dfs -ls %hdfs_dir%

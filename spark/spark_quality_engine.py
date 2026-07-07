@@ -54,7 +54,7 @@ if os.path.isfile(_config_path):
         HDFS_URL = _cfg.get("hdfs", {}).get("url", HDFS_URL)
     except Exception as e:
         print(f"Failed to load HDFS config: {e}")
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import requests
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
@@ -80,6 +80,14 @@ def normalize_name(name):
         return ""
     return re.sub(r'[\s\-_]', '', name).lower()
 
+def clean_column_name(name):
+    import re
+    if not name:
+        return ""
+    cleaned = re.sub(r'[ ,;{}()\n\t=]', '_', name)
+    cleaned = re.sub(r'_{2,}', '_', cleaned)
+    return cleaned.strip('_')
+
 def get_spark_session(app_name):
     builder = (
         SparkSession.builder
@@ -96,6 +104,7 @@ def get_spark_session(app_name):
         .config("spark.hadoop.fs.defaultFS", HDFS_URL)
         .config("spark.hadoop.fs.hdfs.impl", "org.apache.hadoop.hdfs.DistributedFileSystem")
         .config("spark.hadoop.fs.file.impl", "org.apache.hadoop.fs.LocalFileSystem")
+        .config("spark.databricks.delta.schema.autoMerge.enabled", "true")
     )
     if "SPARK_HOME" not in os.environ:
         builder = builder.master("local[*]")
@@ -191,6 +200,9 @@ def acquire_lock(table_name: str, run_id: str, force: bool = False) -> bool:
                 print(f"[LOCK] Table '{table_name}' already locked. Aborting duplicate run.")
                 return False
         return False
+    except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as conn_err:
+        print(f"[LOCK] Elasticsearch is offline ({conn_err}). Bypassing lock as a fail-safe to prevent pipeline disruption.")
+        return True
     except Exception as e:
         print(f"[LOCK] Lock acquisition failed: {e}. Aborting (fail-safe).")
         return False
@@ -290,22 +302,136 @@ def save_registry_to_es(table_name: str, spec: dict) -> bool:
         print(f"[REGISTRY] Failed to save schema spec to Elasticsearch: {e}")
     return False
 
+def auto_evolve_schema_registry(table_name: str, proposed_schema: dict) -> bool:
+    """Auto-evolves the schema registry in ES and local schema_registry.json.
+    Called when drift is determined to be safe (only new columns added).
+    """
+    # 1. Fetch current registry doc from ES (or construct standard fallback)
+    try:
+        from urllib.parse import urlparse
+        parsed = urlparse(ELASTICSEARCH_URL)
+        auth = (parsed.username, parsed.password) if parsed.username else None
+        base_url = f"{parsed.scheme}://{parsed.hostname}:{parsed.port}"
+        
+        url = f"{base_url}/sdoqap_schema_registry/_doc/{table_name}"
+        res = requests.get(url, auth=auth, timeout=5)
+        if res.status_code == 200:
+            reg_doc = res.json().get("_source", {})
+        else:
+            reg_doc = {
+                "primary_key": "id",
+                "date_column": None,
+                "schema_spec": {}
+            }
+        
+        # Merge proposed schema spec
+        reg_doc["schema_spec"] = proposed_schema
+        
+        # Write back to ES
+        requests.put(url, json=reg_doc, auth=auth, headers={"Content-Type": "application/json"}, timeout=5)
+        print(f"[AUTO-EVOLVE] Successfully auto-evolved sdoqap_schema_registry in ES for '{table_name}'.")
+        
+        # 2. Update local schema_registry.json
+        local_registry_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "schema_registry.json")
+        if os.path.exists(local_registry_path):
+            with open(local_registry_path, "r", encoding="utf-8") as f:
+                local_reg = json.load(f)
+            
+            table_entry = local_reg.setdefault(table_name, {
+                "primary_key": reg_doc.get("primary_key", "id"),
+                "date_column": reg_doc.get("date_column"),
+                "schema_spec": {}
+            })
+            table_entry["schema_spec"] = proposed_schema
+            
+            # Save backup
+            with open(local_registry_path + ".bak", "w", encoding="utf-8") as f:
+                json.dump(local_reg, f, indent=4)
+                
+            with open(local_registry_path, "w", encoding="utf-8") as f:
+                json.dump(local_reg, f, indent=4)
+            print(f"[AUTO-EVOLVE] Successfully updated local schema_registry.json for '{table_name}'.")
+            return True
+            
+    except Exception as e:
+        print(f"[AUTO-EVOLVE] Failed to auto-evolve schema: {e}")
+    return False
+
 # ─── FIX 3A: Config-Driven Rules Engine ───────────────────────────────────────
 def load_rules_config(table_name: str) -> dict:
-    """Load validation rules from rules_config.json for the given table.
-    Falls back to '_default' config if table-specific config not found."""
+    """Load validation rules from Elasticsearch index sdoqap_rules_registry first.
+    Falls back to rules_config.json on disk if ES is unreachable or index does not exist.
+    """
+    from urllib.parse import urlparse
+    parsed = urlparse(ELASTICSEARCH_URL)
+    auth = (parsed.username, parsed.password) if parsed.username else None
+    base_url = f"{parsed.scheme}://{parsed.hostname}:{parsed.port}"
+    
+    # 1. Try reading from ES
+    es_default = {}
+    es_table = {}
+    es_read_success = False
+    
+    try:
+        # Read default config
+        url_default = f"{base_url}/sdoqap_rules_registry/_doc/_default"
+        res_default = requests.get(url_default, auth=auth, timeout=3)
+        if res_default.status_code == 200:
+            es_default = res_default.json().get("_source", {})
+            es_read_success = True
+            
+        # Read table-specific overrides
+        url_table = f"{base_url}/sdoqap_rules_registry/_doc/{table_name}"
+        res_table = requests.get(url_table, auth=auth, timeout=3)
+        if res_table.status_code == 200:
+            es_table = res_table.json().get("_source", {})
+            es_read_success = True
+            
+        if es_read_success:
+            print(f"[RULES] Successfully loaded configuration for '{table_name}' from Elasticsearch sdoqap_rules_registry.")
+            return _merge_configs_dict(es_default, es_table)
+    except Exception as e:
+        print(f"[RULES] Failed to read rules from Elasticsearch: {e}. Falling back to rules_config.json on disk.")
+
+    # 2. Fallback to local file config
     config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rules_config.json")
     if not os.path.exists(config_path):
         return {"quality_score_threshold": 90.0, "freshness_threshold_hours": 48}
     try:
-        with open(config_path, "r") as f:
+        with open(config_path, "r", encoding="utf-8") as f:
             all_rules = json.load(f)
         default = all_rules.get("_default", {})
         table_rules = all_rules.get(table_name, {})
-        return {**default, **table_rules}  # table-specific overrides default
+        return _merge_configs_dict(default, table_rules)
     except Exception as e:
         print(f"[RULES] Failed to load rules_config.json: {e}. Using defaults.")
         return {"quality_score_threshold": 90.0, "freshness_threshold_hours": 48}
+
+def _merge_configs_dict(default: dict, table_rules: dict) -> dict:
+    """Helper to deep merge table-specific configs override default configs."""
+    merged = {}
+    for key in set(list(default.keys()) + list(table_rules.keys())):
+        default_val = default.get(key)
+        table_val = table_rules.get(key)
+        if table_val is not None:
+            if isinstance(default_val, dict) and isinstance(table_val, dict):
+                merged[key] = {**default_val, **table_val}
+            else:
+                merged[key] = table_val
+        elif default_val is not None:
+            merged[key] = default_val
+    return merged
+
+
+def resolve_rule_value(rule_entry, fallback):
+    """Extract the effective scalar value from a rule entry.
+    Supports both v1 flat format (e.g., 90.0) and v2 nested format (e.g., {'mode': 'adaptive', 'base_value': 90.0}).
+    Returns the base_value from nested format, or the raw value from flat format."""
+    if isinstance(rule_entry, dict):
+        return rule_entry.get("base_value", fallback)
+    if rule_entry is not None:
+        return rule_entry
+    return fallback
 
 FAST_TRACK_MB_LIMIT = 50
 
@@ -331,12 +457,20 @@ def detect_track(spark, table_name: str) -> str:
     return "batch"
 
 def send_n8n_alert(title, message, severity="warning"):
-    """Sends an alert to n8n webhook."""
+    """Sends an alert to n8n webhook and routes to active channels."""
+    # 1. Route to external platforms (Slack / LINE Notify)
+    try:
+        from alert_router import route_alert
+        route_alert(title, message, severity)
+    except Exception as e:
+        print(f"Failed to route alert locally: {e}")
+
+    # 2. Original n8n webhook alert
     payload = {
         "title": title,
         "message": message,
         "severity": severity,
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.now(timezone.utc).isoformat()
     }
     def _send():
         try:
@@ -411,7 +545,15 @@ def run_quality_check(table_name, primary_key, date_column, schema_spec, input_t
     if not input_table_name:
         input_table_name = table_name
 
-    run_id = f"run_{datetime.utcnow().strftime('%Y%m%d_%H%M%S_%f')}"
+    schema_spec = {clean_column_name(k): v for k, v in schema_spec.items()}
+    if isinstance(primary_key, list):
+        primary_key = [clean_column_name(pk) for pk in primary_key]
+    elif isinstance(primary_key, str):
+        primary_key = clean_column_name(primary_key)
+    if date_column:
+        date_column = clean_column_name(date_column)
+
+    run_id = f"run_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S_%f')}"
 
     # ─── FIX 2A: Acquire distributed lock BEFORE starting Spark ───────────────
     if not acquire_lock(table_name, run_id, force=FORCE_LOCK):
@@ -426,10 +568,22 @@ def run_quality_check(table_name, primary_key, date_column, schema_spec, input_t
     else:
         spark.conf.set("spark.sql.shuffle.partitions", "10")
 
-    # ─── FIX 3A: Load per-table validation rules ──────────────────────────────
+    # ─── DYNAMIC RULES ENGINE: Load and adapt per-table validation rules ─────
     rules = load_rules_config(table_name)
-    quality_threshold = rules.get("quality_score_threshold", 90.0)
-    freshness_limit_hours = rules.get("freshness_threshold_hours", 48)
+    
+    # Try to apply dynamic adaptive rules (Layer 2: Statistical Engine)
+    # Falls back gracefully to base values if dynamic_rules_engine is unavailable
+    try:
+        from dynamic_rules_engine import apply_adaptive_rules
+        rules = apply_adaptive_rules(rules, table_name, df=None, spark=None)
+        print(f"[DYNAMIC RULES] Adaptive rules applied for '{table_name}'")
+    except ImportError:
+        print(f"[DYNAMIC RULES] dynamic_rules_engine not available, using base config")
+    except Exception as dre:
+        print(f"[DYNAMIC RULES] Failed to apply adaptive rules: {dre}. Using base config.")
+    
+    quality_threshold = resolve_rule_value(rules.get("quality_score_threshold"), 90.0)
+    freshness_limit_hours = resolve_rule_value(rules.get("freshness_threshold_hours"), 48)
 
     # Determine raw HDFS path using FileSystem API check
     raw_path = f"{HDFS_URL}/data/raw/{table_name}"
@@ -458,6 +612,10 @@ def run_quality_check(table_name, primary_key, date_column, schema_spec, input_t
         # Load raw data from HDFS as strings to avoid inference issues (Bug 6)
         print(f"Reading raw CSV data from {raw_path}")
         df = spark.read.option("header", "true").csv(raw_path)
+        for col_name in df.columns:
+            cleaned_col = clean_column_name(col_name)
+            if col_name != cleaned_col:
+                df = df.withColumnRenamed(col_name, cleaned_col)
 
         # Column Name Standardization (Fuzzy/Alias Mapping)
         normalized_spec = {normalize_name(k): k for k in schema_spec.keys()}
@@ -528,9 +686,6 @@ def run_quality_check(table_name, primary_key, date_column, schema_spec, input_t
 
         # Partition data into smaller chunks to enable parallel processing in small batches
         df = df.repartition(10)
-
-        # Adjust shuffle partitions dynamically
-        spark.conf.set("spark.sql.shuffle.partitions", "2")
     except Exception as e:
         print(f"Error reading raw data path {raw_path}: {e}")
         log_to_elasticsearch("sdoqap_pipeline_runs", {
@@ -538,7 +693,7 @@ def run_quality_check(table_name, primary_key, date_column, schema_spec, input_t
             "table_name": table_name,
             "state": "failed",
             "error_msg": str(e),
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         })
         release_lock(table_name)  # FIX 2A: Always release lock on failure
         spark.stop()
@@ -608,30 +763,48 @@ def run_quality_check(table_name, primary_key, date_column, schema_spec, input_t
             "detected_schema": actual_columns,
             "drift_details": drift_details,
             "drift_severity": total_drift_severity,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         })
 
-        # FIX 2B: Approval Gate — Write to PENDING proposal index instead of directly modifying schema_registry.json
-        # A Data Engineer must approve via /api/v1/schema/proposals/{id}/approve before the schema is updated
-        log_to_elasticsearch("sdoqap_schema_proposals", {
-            "run_id": run_id,
-            "table_name": table_name,
-            "current_schema": {k: v for k, v in schema_spec.items()},
-            "proposed_schema": actual_columns,
-            "drift_details": drift_details,
-            "drift_severity": total_drift_severity,
-            "status": "PENDING",
-            "proposed_at": datetime.utcnow().isoformat(),
-            "proposed_by": f"spark_engine/{run_id}"
-        })
-        print(f"[APPROVAL GATE] Schema drift proposal written as PENDING. Awaiting Data Engineer approval.")
-        print(f"[APPROVAL GATE] schema_registry.json NOT modified. Review at /api/v1/schema/proposals")
+        # FIX 2B: Self-Healing Schema Evolution Gate
+        is_safe_drift = all(details["error"] == "new_column" for details in drift_details.values())
+        if is_safe_drift:
+            print(f"[SELF-HEALING] Safe schema drift detected (only new columns). Automatically evolving schema...")
+            auto_evolve_schema_registry(table_name, actual_columns)
+            log_to_elasticsearch("sdoqap_schema_proposals", {
+                "run_id": run_id,
+                "table_name": table_name,
+                "current_schema": {k: v for k, v in schema_spec.items()},
+                "proposed_schema": actual_columns,
+                "drift_details": drift_details,
+                "drift_severity": total_drift_severity,
+                "status": "APPROVED",
+                "proposed_at": datetime.now(timezone.utc).isoformat(),
+                "proposed_by": f"spark_engine/{run_id}",
+                "resolved_at": datetime.now(timezone.utc).isoformat()
+            })
+            print(f"[SELF-HEALING] Auto-evolved schema proposal logged as APPROVED.")
+        else:
+            # Dangerous drift (missing columns, type mismatches) requires manual Data Engineer approval
+            log_to_elasticsearch("sdoqap_schema_proposals", {
+                "run_id": run_id,
+                "table_name": table_name,
+                "current_schema": {k: v for k, v in schema_spec.items()},
+                "proposed_schema": actual_columns,
+                "drift_details": drift_details,
+                "drift_severity": total_drift_severity,
+                "status": "PENDING",
+                "proposed_at": datetime.now(timezone.utc).isoformat(),
+                "proposed_by": f"spark_engine/{run_id}"
+            })
+            print(f"[APPROVAL GATE] Schema drift proposal written as PENDING. Awaiting Data Engineer approval.")
+            print(f"[APPROVAL GATE] schema_registry.json NOT modified. Review at /api/v1/schema/proposals")
 
-        send_n8n_alert(
-            title=f"⚠️ Schema Change PENDING Approval: {table_name}",
-            message=f"Run ID: {run_id}\nChanges: {json.dumps(drift_details)}\nSeverity: {total_drift_severity}\nAction Required: Review at /api/v1/schema/proposals",
-            severity="warning"
-        )
+            send_n8n_alert(
+                title=f"⚠️ Schema Change PENDING Approval: {table_name}",
+                message=f"Run ID: {run_id}\nChanges: {json.dumps(drift_details)}\nSeverity: {total_drift_severity}\nAction Required: Review at /api/v1/schema/proposals",
+                severity="warning"
+            )
 
     # 2. AUTO-CLEANSING & HEALING (Self-Healing Data Pipeline - Correct Enterprise Logic)
     # We do NOT generate fake values (UUIDs/Timestamps) for structural keys (PKs/Dates) as it violates data integrity.
@@ -700,8 +873,124 @@ def run_quality_check(table_name, primary_key, date_column, schema_spec, input_t
                                    .drop("__row_id") \
                                    .withColumn("reject_reason", F.lit("duplicate_records"))
 
-    # Combine all quarantined records
+    # ─── DYNAMIC RULES Layer 2: IQR Value Range Outlier Detection ─────────────
+    outlier_df = None
+    value_range_profile = {}
+    try:
+        from dynamic_rules_engine import compute_value_range_rules, flag_outlier_rows
+        vr_config = rules.get("value_range", {})
+        vr_mode = vr_config.get("mode", "off") if isinstance(vr_config, dict) else "off"
+        
+        if vr_mode in ("auto", "adaptive"):
+            # Identify numeric columns from schema_spec
+            numeric_cols = [col for col, t in schema_spec.items() 
+                           if t in ("IntegerType", "DoubleType") and col in clean_df.columns]
+            
+            if numeric_cols:
+                iqr_mult = vr_config.get("iqr_multiplier", 1.5) if isinstance(vr_config, dict) else 1.5
+                value_range_profile = compute_value_range_rules(clean_df, numeric_cols, multiplier=iqr_mult)
+                
+                if value_range_profile:
+                    flagged_df = flag_outlier_rows(clean_df, value_range_profile)
+                    outlier_df = flagged_df.filter(F.col("_outlier_flag") == True) \
+                                          .withColumn("is_invalid", F.lit(True)) \
+                                          .withColumn("reject_reason", F.col("_outlier_details")) \
+                                          .drop("_outlier_flag", "_outlier_details")
+                    clean_df = flagged_df.filter((F.col("_outlier_flag") == False) | F.col("_outlier_flag").isNull()) \
+                                        .drop("_outlier_flag", "_outlier_details")
+                    
+                    outlier_count = outlier_df.count()
+                    if outlier_count > 0:
+                        print(f"[DYNAMIC RULES] IQR outlier detection flagged {outlier_count} rows as value outliers")
+                        remediation_logs.append(f"iqr_outliers_flagged_{outlier_count}")
+    except ImportError:
+        pass  # dynamic_rules_engine not available, skip outlier detection
+    except Exception as ore:
+        print(f"[DYNAMIC RULES] IQR outlier detection failed: {ore}. Continuing without outlier flagging.")
+
+    # ─── DYNAMIC RULES: Unsupervised Anomaly Detection (Z-score) ──────────────
+    unsupervised_outlier_df = None
+    try:
+        from dynamic_rules_engine import detect_unsupervised_anomalies
+        # Find numeric columns
+        numeric_cols = [col for col, t in schema_spec.items() 
+                       if t in ("IntegerType", "DoubleType") and col in clean_df.columns]
+        if numeric_cols:
+            flagged_unsupervised = detect_unsupervised_anomalies(clean_df, numeric_cols, threshold=3.0)
+            unsupervised_outlier_df = flagged_unsupervised.filter(F.col("_unsupervised_anomaly") == True) \
+                                                          .withColumn("is_invalid", F.lit(True)) \
+                                                          .withColumn("reject_reason", F.col("_unsupervised_anomaly_details")) \
+                                                          .drop("_unsupervised_anomaly", "_unsupervised_anomaly_details")
+            clean_df = flagged_unsupervised.filter((F.col("_unsupervised_anomaly") == False) | F.col("_unsupervised_anomaly").isNull()) \
+                                           .drop("_unsupervised_anomaly", "_unsupervised_anomaly_details")
+            
+            unsupervised_count = unsupervised_outlier_df.count()
+            if unsupervised_count > 0:
+                print(f"[DYNAMIC RULES] Unsupervised Z-score anomaly detection flagged {unsupervised_count} rows")
+                remediation_logs.append(f"unsupervised_anomalies_flagged_{unsupervised_count}")
+    except ImportError:
+        pass
+    except Exception as uae:
+        print(f"[DYNAMIC RULES] Unsupervised anomaly detection failed: {uae}. Continuing.")
+
+    # ─── DYNAMIC RULES: Induced Tree Rules ────────────────────────────────────
+    induced_outlier_df = None
+    try:
+        induced_config = rules.get("induced", {})
+        if induced_config:
+            # We will build a combined SQL filter expression from all induced rules
+            conditions = []
+            for rule_name, rule_data in induced_config.items():
+                cond = rule_data.get("condition")
+                if cond:
+                    conditions.append(f"({cond})")
+            
+            if conditions:
+                combined_sql_cond = " OR ".join(conditions)
+                print(f"[DYNAMIC ENGINE] Applying induced rules filter: {combined_sql_cond}")
+                
+                # Flag rows matching the induced conditions
+                flagged_induced = clean_df.withColumn(
+                    "_induced_anomaly", 
+                    F.expr(combined_sql_cond)
+                )
+                
+                induced_outlier_df = flagged_induced.filter(F.col("_induced_anomaly") == True) \
+                    .withColumn("is_invalid", F.lit(True)) \
+                    .withColumn("reject_reason", F.lit("induced_tree_rule_match")) \
+                    .drop("_induced_anomaly")
+                
+                clean_df = flagged_induced.filter((F.col("_induced_anomaly") == False) | F.col("_induced_anomaly").isNull()) \
+                    .drop("_induced_anomaly")
+                
+                induced_count = induced_outlier_df.count()
+                if induced_count > 0:
+                    print(f"[DYNAMIC ENGINE] Induced ML rules flagged {induced_count} rows")
+                    remediation_logs.append(f"induced_rules_flagged_{induced_count}")
+    except Exception as ie:
+        print(f"[DYNAMIC ENGINE] Induced rules execution failed: {ie}. Continuing.")
+
+    # Combine all quarantined records (null PKs + duplicates + outliers + unsupervised anomalies + induced anomalies)
     all_quarantined = invalid_df.unionByName(duplicate_df, allowMissingColumns=True)
+    if unsupervised_outlier_df is not None:
+        try:
+            if unsupervised_outlier_df.count() > 0:
+                all_quarantined = all_quarantined.unionByName(unsupervised_outlier_df, allowMissingColumns=True)
+        except Exception:
+            pass
+    if outlier_df is not None:
+        try:
+            outlier_count_check = outlier_df.count()
+            if outlier_count_check > 0:
+                all_quarantined = all_quarantined.unionByName(outlier_df, allowMissingColumns=True)
+        except Exception:
+            pass
+    if induced_outlier_df is not None:
+        try:
+            if induced_outlier_df.count() > 0:
+                all_quarantined = all_quarantined.unionByName(induced_outlier_df, allowMissingColumns=True)
+        except Exception:
+            pass
 
     # Add run_id partition structure to quarantined parquet
     all_quarantined_write = all_quarantined.withColumn("run_id", F.lit(run_id)) \
@@ -847,7 +1136,7 @@ def run_quality_check(table_name, primary_key, date_column, schema_spec, input_t
 
     if date_column and clean_count > 0 and not is_historical:
         try:
-            clean_run_df = spark.read.parquet(f"{active_path}/run_id={run_id}")
+            clean_run_df = spark.read.format("delta").load(active_path).filter(F.col("run_id") == run_id)
             if date_column in clean_run_df.columns:
                 max_ts = clean_run_df.select(F.max(date_column)).collect()[0][0]
                 if max_ts:
@@ -865,7 +1154,6 @@ def run_quality_check(table_name, primary_key, date_column, schema_spec, input_t
                                     continue
                             if not parsed:
                                 raise ValueError(f"Unsupported timestamp format: {max_ts}")
-                    from datetime import timezone
                     now_utc = datetime.now(timezone.utc)
                     if max_ts.tzinfo is None:
                         max_ts = max_ts.replace(tzinfo=timezone.utc)
@@ -921,6 +1209,153 @@ def run_quality_check(table_name, primary_key, date_column, schema_spec, input_t
                 severity="critical"
             )
 
+    # ─── DYNAMIC RULES Layer 3: Dynamic Decision Engine ─────────────────────────
+    ai_config = rules.get("ai_advisor", {})
+    ai_enabled = ai_config.get("enabled", False) if isinstance(ai_config, dict) else False
+    profile_report = None
+    
+    # ── Component A: Data Profile Cycle (runs every time when enabled) ─────────
+    if ai_enabled:
+        try:
+            from data_profile_store import run_profile_cycle
+            # Use clean_df snapshot to build profiles (read from Delta since clean_df is unpersisted)
+            try:
+                profile_df = spark.read.format("delta").load(active_path)
+                profile_report = run_profile_cycle(profile_df, table_name)
+                
+                if profile_report.get("total_drifted_columns", 0) > 0:
+                    remediation_logs.append(f"profile_drift_detected_{profile_report['total_drifted_columns']}_columns")
+                    # Drift counts as an anomaly signal for triggering deeper analysis
+                    if not is_anomaly:
+                        print("[DYNAMIC ENGINE] Distribution drift detected — escalating to AI analysis.")
+            except Exception as profile_err:
+                print(f"[DYNAMIC ENGINE] Profile cycle failed (non-fatal): {profile_err}")
+                profile_report = None
+        except ImportError:
+            print("[DYNAMIC ENGINE] data_profile_store module not available. Skipping profile cycle.")
+    
+    # ── Components B+C: AI Analysis + Rule Induction (on anomaly/drift) ────────
+    trigger_always = ai_config.get("trigger", "on_anomaly") == "always"
+    if ai_enabled and (trigger_always or is_anomaly or quality_score < (quality_threshold - 15) or
+                       (profile_report and profile_report.get("total_drifted_columns", 0) > 0)):
+        try:
+            from ai_rule_advisor import get_ai_advisor
+            advisor = get_ai_advisor()
+            if advisor:
+                quality_context = {
+                    "is_anomaly": is_anomaly,
+                    "quality_score": quality_score,
+                    "current_threshold": quality_threshold,
+                    "historical_avg": 100.0 - (sum(historical_rates) / len(historical_rates) * 100) if historical_rates else 90.0,
+                    "z_score": z_score,
+                    "schema_drift_detected": drift_detected,
+                    "quarantine_rate": current_quarantine_rate,
+                    "table_name": table_name,
+                    "trigger_always": trigger_always
+                }
+                
+                if trigger_always or advisor.should_trigger(quality_context) or \
+                   (profile_report and profile_report.get("total_drifted_columns", 0) > 0):
+                    max_ai_rows = ai_config.get("max_rows_to_analyze", 50)
+                    # Sample quarantined rows from persisted Delta Lake
+                    try:
+                        sample_rows = [
+                            row.asDict() for row in spark.read.format("delta").load(quarantine_path)
+                            .filter(F.col("run_id") == run_id)
+                            .limit(max_ai_rows).collect()
+                        ]
+                    except Exception as sample_err:
+                        print(f"[DYNAMIC ENGINE] Failed to read quarantine sample from Delta: {sample_err}")
+                        sample_rows = []
+                    
+                    # Gather column statistics
+                    col_stats = {}
+                    if value_range_profile:
+                        col_stats["value_ranges"] = value_range_profile
+                    col_stats["quarantine_breakdown"] = quarantine_breakdown
+                    
+                    historical_ctx = {
+                        "avg_quality": quality_context["historical_avg"],
+                        "current_quality": quality_score,
+                        "current_threshold": quality_threshold,
+                        "total_records": total_records,
+                        "quarantined_records": quarantine_count,
+                        "primary_key": primary_key if isinstance(primary_key, str) else ",".join(pk_cols) if pk_cols else "unknown",
+                        "date_column": date_column or "unknown"
+                    }
+                    
+                    # ── Component B: Profile-Based Analysis (enhanced heuristic + drift) ──
+                    if profile_report and not profile_report.get("is_first_run"):
+                        analysis = advisor.run_profile_based_analysis(
+                            table_name, sample_rows, col_stats, historical_ctx,
+                            profile_report=profile_report
+                        )
+                    else:
+                        analysis = advisor.ai_analyze_quarantined_sample(
+                            table_name, sample_rows, col_stats, historical_ctx
+                        )
+                    
+                    min_confidence = ai_config.get("confidence_threshold", 0.7)
+                    if analysis and analysis.get("confidence", 0) >= min_confidence:
+                        # Auto-promote if confidence is extremely high (e.g. >= 0.90)
+                        if analysis.get("confidence", 0) >= 0.90:
+                            print(f"[DYNAMIC ENGINE] Auto-promoting analysis rules (confidence={analysis['confidence']})")
+                            analysis["status"] = "APPROVED"
+                            advisor.promote_rules_to_config(table_name, analysis.get("suggested_rules", []))
+                        
+                        advisor.log_proposal_to_es(table_name, run_id, analysis)
+                        method = analysis.get("analysis_metadata", {}).get("method", "unknown")
+                        print(f"[DYNAMIC ENGINE] Analysis complete ({method}). Root cause: {analysis.get('root_cause', 'N/A')}")
+                        print(f"[DYNAMIC ENGINE] Suggested {len(analysis.get('suggested_rules', []))} rules. Confidence: {analysis.get('confidence', 0):.0%}")
+                        remediation_logs.append(f"ai_advisor_triggered_confidence_{analysis.get('confidence', 0):.2f}")
+                    else:
+                        print(f"[DYNAMIC ENGINE] Analysis returned low confidence. No proposal created.")
+                    
+                    # ── Component C: Decision Tree Rule Induction (only on anomaly) ──
+                    if is_anomaly and quarantine_count >= 10:
+                        try:
+                            # Get numeric columns for features
+                            numeric_features = profile_report.get("numeric_columns", []) if profile_report else []
+                            if not numeric_features:
+                                from pyspark.sql.types import IntegerType, LongType, FloatType, DoubleType, ShortType, DecimalType
+                                numeric_types = (IntegerType, LongType, FloatType, DoubleType, ShortType, DecimalType)
+                                try:
+                                    active_df_check = spark.read.format("delta").load(active_path)
+                                    numeric_features = [f.name for f in active_df_check.schema.fields
+                                                        if isinstance(f.dataType, numeric_types)]
+                                except Exception:
+                                    numeric_features = []
+                            
+                            if len(numeric_features) >= 2:
+                                clean_for_tree = spark.read.format("delta").load(active_path)
+                                quarantine_for_tree = spark.read.format("delta").load(quarantine_path) \
+                                    .filter(F.col("run_id") == run_id)
+                                
+                                induction_result = advisor.induce_rules_from_data(
+                                    spark, clean_for_tree, quarantine_for_tree,
+                                    numeric_features, table_name, run_id
+                                )
+                                
+                                n_induced = len(induction_result.get("induced_rules", []))
+                                if n_induced > 0:
+                                    auc = induction_result.get("model_accuracy", 0)
+                                    if auc >= 0.90:
+                                        print(f"[DYNAMIC ENGINE] Auto-promoting induced rules (AUC={auc:.4f})")
+                                        # Set status as APPROVED inside each rule
+                                        for r in induction_result.get("induced_rules", []):
+                                            r["status"] = "APPROVED"
+                                        advisor.promote_rules_to_config(table_name, induction_result.get("induced_rules", []))
+                                    print(f"[DYNAMIC ENGINE] Decision Tree induced {n_induced} rules (AUC={auc:.4f})")
+                                    remediation_logs.append(f"decision_tree_induced_{n_induced}_rules_auc_{auc:.2f}")
+                        except Exception as dt_err:
+                            print(f"[DYNAMIC ENGINE] Decision Tree induction failed (non-fatal): {dt_err}")
+                    
+        except ImportError:
+            print(f"[DYNAMIC ENGINE] ai_rule_advisor module not available. Skipping AI analysis.")
+        except Exception as ai_err:
+            print(f"[DYNAMIC ENGINE] AI analysis failed (non-fatal): {ai_err}")
+
+
     # 4.2 Weighted Operational COPDQ Score (Task 4 with Bug 5 Row-Level Max Weight Fix)
     column_weights = rules.get("column_weights", {})
     pk_weight = column_weights.get(primary_key if isinstance(primary_key, str) else pk_cols[0], 1.0)
@@ -970,7 +1405,7 @@ def run_quality_check(table_name, primary_key, date_column, schema_spec, input_t
         "quarantined_records": quarantine_count,
         "quality_score": quality_score,
         "freshness_lag_hours": max_lag_hours,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "quarantined_financial_value": quarantined_financial_value,
         "operational_impact_score": operational_impact_score,
         "z_score": z_score,
@@ -983,6 +1418,12 @@ def run_quality_check(table_name, primary_key, date_column, schema_spec, input_t
         quality_run_doc["class_balance_column"] = group_col
     if quarantine_breakdown:
         quality_run_doc["quarantine_breakdown"] = quarantine_breakdown
+    # Dynamic Rules metadata: log which mode was used and computed thresholds
+    quality_run_doc["rules_mode"] = "adaptive" if isinstance(rules.get("quality_score_threshold"), dict) else "static"
+    quality_run_doc["effective_quality_threshold"] = quality_threshold
+    quality_run_doc["effective_freshness_threshold"] = freshness_limit_hours
+    if value_range_profile:
+        quality_run_doc["value_range_profile"] = value_range_profile
 
     log_to_elasticsearch("sdoqap_quality_runs", quality_run_doc)
 
@@ -993,17 +1434,31 @@ def run_quality_check(table_name, primary_key, date_column, schema_spec, input_t
         "source_path": raw_path,
         "target_path": active_path,
         "quarantine_path": quarantine_path,
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.now(timezone.utc).isoformat()
     })
 
     log_to_elasticsearch("sdoqap_pipeline_runs", {
         "run_id": run_id,
         "table_name": table_name,
         "state": "success" if quality_score >= quality_threshold else "warnings",
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.now(timezone.utc).isoformat()
     })
 
     print(f"Quality validation completed. Quality Score: {quality_score:.2f}% (threshold={quality_threshold}%)")
+
+    # ─── Track 3: Downstream Event-Driven Trigger ─────────────────────────────
+    if quality_score >= quality_threshold:
+        try:
+            print("[DYNAMIC ENGINE] Automatically triggering downstream Gold Layer rebuild locally...")
+            import subprocess
+            gold_script = "/opt/spark-apps/spark_gold_layer.py"
+            if not os.path.exists(gold_script):
+                gold_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "spark_gold_layer.py")
+            subprocess.Popen(["python", gold_script])
+            print("[DYNAMIC ENGINE] Gold Layer rebuild triggered successfully in background.")
+        except Exception as gold_err:
+            print(f"[DYNAMIC ENGINE] Local downstream trigger failed (non-fatal): {gold_err}")
+
     # FIX 2A: Release the distributed lock after all work is done
     release_lock(table_name)
     spark.stop()
@@ -1015,10 +1470,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
     target_table = args.table
     FORCE_LOCK = args.force
-    # If table argument is passed via spark-submit, run that table, else run default
-    target_table = "users"
-    if len(sys.argv) > 1:
-        target_table = sys.argv[1]
 
     # Load canonical schema registry config from ES or default fallbacks
     spec = load_expected_schema(target_table)
@@ -1043,8 +1494,17 @@ if __name__ == "__main__":
         try:
             # 1. Read raw strings to preserve exact values
             df_raw = temp_spark.read.option("header", "true").csv(raw_path)
+            for col_name in df_raw.columns:
+                cleaned_col = clean_column_name(col_name)
+                if col_name != cleaned_col:
+                    df_raw = df_raw.withColumnRenamed(col_name, cleaned_col)
+
             # 2. Read with inferSchema to get Spark's baseline guesses
             df_infer = temp_spark.read.option("header", "true").option("inferSchema", "true").csv(raw_path)
+            for col_name in df_infer.columns:
+                cleaned_col = clean_column_name(col_name)
+                if col_name != cleaned_col:
+                    df_infer = df_infer.withColumnRenamed(col_name, cleaned_col)
             
             # 3. Deterministic Profiling (Full 100% Dataset Pass)
             # We check EVERY row to see if ANY row contains a leading zero (e.g. '01234')
@@ -1115,6 +1575,13 @@ if __name__ == "__main__":
             # Save inferred registry config to ES sdoqap_schema_registry
             save_registry_to_es(target_table, inferred_spec)
 
+            # Auto-generate dynamic rules configuration for new table
+            try:
+                from dynamic_rules_engine import generate_rules_from_schema
+                generate_rules_from_schema(target_table, schema_spec, primary_key, date_column)
+            except Exception as ar_err:
+                print(f"[DYNAMIC_RULES] Failed to generate default rules for '{target_table}': {ar_err}")
+
             # Stop the temporary Spark session so that the main job can run on the cluster
             temp_spark.stop()
 
@@ -1124,13 +1591,13 @@ if __name__ == "__main__":
         except Exception as infer_err:
             print(f"Failed to infer schema dynamically for '{target_table}': {infer_err}")
             # Write a failed run document to ES
-            run_id = f"run_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
+            run_id = f"run_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
             doc = {
                 "run_id": run_id,
                 "table_name": target_table,
                 "state": "failed",
                 "error_msg": f"Failed to infer schema: {str(infer_err)}",
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.now(timezone.utc).isoformat()
             }
             try:
                 log_to_elasticsearch("sdoqap_pipeline_runs", doc)

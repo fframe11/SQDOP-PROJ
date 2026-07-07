@@ -27,7 +27,7 @@ def seed():
     es = Elasticsearch(ELASTICSEARCH_URL)
     
     # 1. Reset / recreate indices if they exist
-    indices = ["sdoqap_quality_runs", "sdoqap_pipeline_runs", "sdoqap_schema_drifts", "sdoqap_lineage_runs"]
+    indices = ["sdoqap_quality_runs", "sdoqap_pipeline_runs", "sdoqap_schema_drifts", "sdoqap_lineage_runs", "sdoqap_upstream_remediations"]
     for idx in indices:
         if es.indices.exists(index=idx):
             print(f"Deleting index {idx}...")
@@ -187,6 +187,65 @@ def seed():
     ]
     for doc in lineage_runs:
         es.index(index="sdoqap_lineage_runs", document=doc)
+
+    print("Seeding sdoqap_rules_registry...")
+    try:
+        config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "spark", "rules_config.json")
+        if os.path.exists(config_path):
+            with open(config_path, "r", encoding="utf-8") as f:
+                rules_config = json.load(f)
+            
+            # Reset/Create sdoqap_rules_registry index
+            rules_idx = "sdoqap_rules_registry"
+            if es.indices.exists(index=rules_idx):
+                es.indices.delete(index=rules_idx)
+            es.indices.create(index=rules_idx)
+            
+            for key, val in rules_config.items():
+                if key == "_comment":
+                    continue
+                es.index(index=rules_idx, id=key, document=val)
+            print(f"  Successfully seeded rules registry ({len(rules_config)} keys).")
+        else:
+            print(f"  Warning: baseline config not found at {config_path}. Seeding skipped.")
+    except Exception as e:
+        print(f"  Error seeding rules registry: {e}")
+
+    print("Seeding sdoqap_upstream_remediations...")
+    remediations = [
+        {
+            "ticket_id": "tkt_run_users_001_users",
+            "table_name": "users",
+            "run_id": "run_users_001",
+            "timestamp": get_ts(10),
+            "target_system": "Upstream Auth API",
+            "remediation_action": "API sent duplicate registration events. Investigate idempotency key handling on API gateway.",
+            "severity": "warning",
+            "status": "OPEN"
+        },
+        {
+            "ticket_id": "tkt_run_prod_002_products",
+            "table_name": "products",
+            "run_id": "run_prod_002",
+            "timestamp": get_ts(45),
+            "target_system": "Warehouse ERP Database",
+            "remediation_action": "Nullable fields found on product_id. Enforce NOT NULL check constraints on DB schema.",
+            "severity": "critical",
+            "status": "OPEN"
+        },
+        {
+            "ticket_id": "tkt_run_bank_003_bank_data",
+            "table_name": "bank_data",
+            "run_id": "run_bank_003",
+            "timestamp": get_ts(80),
+            "target_system": "CRM Core Exporter",
+            "remediation_action": "Outlier income values detected (exceeded 63k). Calibrate range validation limits on user entry forms.",
+            "severity": "warning",
+            "status": "RESOLVED"
+        }
+    ]
+    for doc in remediations:
+        es.index(index="sdoqap_upstream_remediations", id=doc["ticket_id"], document=doc)
 
     print("Seeding completed successfully!")
 

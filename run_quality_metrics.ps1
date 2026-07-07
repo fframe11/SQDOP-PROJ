@@ -1,4 +1,9 @@
-$tables = @("orders","customers","products","inventory")
+try {
+    $res = Invoke-RestMethod -Uri "http://localhost/api/v1/export/tables" -UseBasicParsing
+    $tables = $res.tables.name
+} catch {
+    $tables = @("products","gov_data","sales_records")
+}
 $report = @()
 foreach ($tbl in $tables) {
     $start = Get-Date

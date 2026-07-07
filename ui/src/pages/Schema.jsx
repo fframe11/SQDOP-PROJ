@@ -230,6 +230,15 @@ export default function Schema() {
               Run ID: {selectedProposal.run_id}
             </p>
 
+            {actionResult && (
+              <div 
+                className={`alert-box ${actionResult.success ? 'success' : 'critical'}`} 
+                style={{ marginBottom: '1.25rem', padding: '0.75rem', borderRadius: '6px', fontSize: '0.85rem' }}
+              >
+                {actionResult.message}
+              </div>
+            )}
+
             <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
               {/* Drift details list in mockup style */}
               <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>

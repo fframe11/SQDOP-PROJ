@@ -8,6 +8,7 @@ WORKDIR /app
 COPY requirements.txt .
 COPY wheels ./wheels
 RUN pip install --no-cache-dir --no-index --find-links=wheels -r requirements.txt
+RUN pip install --no-cache-dir pandas pyarrow
 
 COPY . .
 

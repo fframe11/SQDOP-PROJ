@@ -34,8 +34,15 @@ export function useApi(endpoint, options = {}) {
   return { data, loading, error, refetch: fetchData };
 }
 
-export async function postApi(endpoint) {
-  const res = await fetch(`${API_BASE}${endpoint}`, { method: "POST" });
+export async function postApi(endpoint, body = null) {
+  const options = { method: "POST" };
+  if (body) {
+    options.headers = {
+      "Content-Type": "application/json"
+    };
+    options.body = JSON.stringify(body);
+  }
+  const res = await fetch(`${API_BASE}${endpoint}`, options);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }

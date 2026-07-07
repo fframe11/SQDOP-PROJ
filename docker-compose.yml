@@ -36,6 +36,8 @@ services:
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
       - ELASTICSEARCH_USERNAME=kibana_system
       - ELASTICSEARCH_PASSWORD=${ELASTIC_PASSWORD:-sdoqap_secure}
+      - NODE_OPTIONS=--max-old-space-size=768
+      - SERVER_PUBLICBASEURL=http://localhost:5601
     ports:
       - "${KIBANA_PORT}:5601"
     depends_on:
@@ -44,7 +46,13 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512M
+          memory: 1.2G
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5601/api/status || exit 1"]
+      interval: 30s
+      timeout: 15s
+      retries: 8
+      start_period: 120s
     networks:
       - sdoqap_network
 
@@ -74,7 +82,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 768M
+          memory: 512M
     networks:
       - sdoqap_network
 
@@ -136,7 +144,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 2G
+          memory: 1G
     networks:
       - sdoqap_network
 
@@ -152,8 +160,8 @@ services:
     environment:
       - SPARK_MODE=worker
       - SPARK_MASTER_URL=spark://spark-master:7077
-      - SPARK_WORKER_MEMORY=2G
-      - SPARK_WORKER_CORES=2
+      - SPARK_WORKER_MEMORY=1G
+      - SPARK_WORKER_CORES=1
       - SPARK_RPC_AUTHENTICATION_ENABLED=no
       - ELASTICSEARCH_USER=${ELASTICSEARCH_USER:-elastic}
       - ELASTICSEARCH_PASSWORD=${ELASTICSEARCH_PASSWORD:-sdoqap_secure}
@@ -170,7 +178,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 2.7G
+          memory: 1.5G
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8081"]
       interval: 30s
@@ -188,6 +196,7 @@ services:
     environment:
       - N8N_ENFORCE_SETTINGS_FILE_FOR_FILESYSTEM=false
       - N8N_RESTRICT_FILE_ACCESS_TO=/stress_test
+      - NODE_OPTIONS=--max-old-space-size=600
     ports:
       - "${N8N_PORT}:5678"
     volumes:
@@ -196,7 +205,13 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512M
+          memory: 800M
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider http://localhost:5678/healthz || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     networks:
       - sdoqap_network
 
@@ -215,6 +230,8 @@ services:
       - "${API_PORT}:8000"
     # network_mode: host
     container_name: sdoqap-api
+    volumes:
+      - ./scripts:/app/scripts:ro
 
     restart: always
     depends_on:
@@ -258,7 +275,13 @@ services:
     deploy:
       resources:
         limits:
-          memory: 256M
+          memory: 384M
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     networks:
       - sdoqap_network
 
@@ -275,10 +298,17 @@ services:
       - "${POSTGRES_HOST_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - "./stress test/import_sales.sql:/docker-entrypoint-initdb.d/import_sales.sql:ro"
+      - "./stress test/100000 Sales Records.csv:/tmp/sales_records.csv:ro"
     deploy:
       resources:
         limits:
           memory: 256M
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sdoqap -d sdoqap_oltp"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - sdoqap_network
   ui:
@@ -292,6 +322,12 @@ services:
       - api
     networks:
       - sdoqap_network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:80 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 15s
     deploy:
       resources:
         limits:
@@ -310,6 +346,11 @@ services:
       - ui
     networks:
       - sdoqap_network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:80 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     deploy:
       resources:
         limits:
@@ -324,7 +365,12 @@ services:
     deploy:
       resources:
         limits:
-          memory: 256M
+          memory: 384M
+    healthcheck:
+      test: ["CMD-SHELL", "echo srvr | nc localhost 2181 | grep -q Mode || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - sdoqap_network
 
@@ -335,7 +381,8 @@ services:
     ports:
       - "9092:29092"
     depends_on:
-      - zookeeper
+      zookeeper:
+        condition: service_healthy
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
@@ -346,10 +393,17 @@ services:
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_HEAP_OPTS: "-Xms256m -Xmx256m"
     deploy:
       resources:
         limits:
           memory: 512M
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics.sh --bootstrap-server localhost:9092 --list || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     networks:
       - sdoqap_network
 

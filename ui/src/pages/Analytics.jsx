@@ -1,6 +1,6 @@
 import React from 'react';
 import { useApi } from '../hooks/useApi';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts';
+import { ComposedChart, AreaChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell, ReferenceLine, ReferenceArea, Legend } from 'recharts';
 
 export default function Analytics() {
   const projection = useApi('/analytics/projection', { refreshInterval: 60000 });
@@ -13,11 +13,21 @@ export default function Analytics() {
     if (!projection.data || !projection.data.projection_days) return [];
     return projection.data.projection_days.map((d, i) => ({
       day: `Day ${d}`,
-      Score: projection.data.projected_scores[i],
-      High: projection.data.ci_high[i],
-      Low: projection.data.ci_low[i],
+      Score: parseFloat(projection.data.projected_scores[i]?.toFixed(2) ?? 0),
+      High:  parseFloat(projection.data.ci_high[i]?.toFixed(2) ?? 0),
+      Low:   parseFloat(projection.data.ci_low[i]?.toFixed(2) ?? 0),
     }));
   }, [projection.data]);
+
+  // Dynamic Y-axis: zoom into actual data range for visibility
+  const yDomain = React.useMemo(() => {
+    if (!projectionData.length) return [75, 102];
+    const allVals = projectionData.flatMap(d => [d.Score, d.High, d.Low]).filter(Boolean);
+    const minVal = Math.min(...allVals);
+    const maxVal = Math.max(...allVals);
+    const pad = Math.max((maxVal - minVal) * 1.5, 1.5); // at least 1.5% padding
+    return [parseFloat((minVal - pad).toFixed(1)), parseFloat((maxVal + pad * 0.5).toFixed(1))];
+  }, [projectionData]);
 
   // Transform clustering data
   const clusteringData = React.useMemo(() => {
@@ -51,25 +61,87 @@ export default function Analytics() {
           <div className="alert-box critical">Failed to process predictive model data</div>
         ) : projection.data ? (
           <>
-            <div style={{ width: '100%', height: 260 }}>
+            <div style={{ width: '100%', height: 280 }}>
               <ResponsiveContainer>
-                <AreaChart data={projectionData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <ComposedChart data={projectionData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
                   <defs>
-                    <linearGradient id="colorConfidence" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.15}/>
-                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.02}/>
+                    {/* Green-to-transparent fill under High line */}
+                    <linearGradient id="fillHigh" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%"  stopColor="#10b981" stopOpacity={0.30}/>
+                      <stop offset="100%" stopColor="#10b981" stopOpacity={0.04}/>
+                    </linearGradient>
+                    {/* Red-to-transparent fill under Low line */}
+                    <linearGradient id="fillLow" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%"  stopColor="#f43f5e" stopOpacity={0.20}/>
+                      <stop offset="100%" stopColor="#f43f5e" stopOpacity={0.04}/>
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
                   <XAxis dataKey="day" stroke="#64748b" tick={{ fontSize: 11 }} />
-                  <YAxis domain={[75, 100]} stroke="#64748b" tick={{ fontSize: 11 }} />
-                  <Tooltip contentClassName="custom-tooltip" />
-                  {/* Confidence Interval Band */}
-                  <Area type="monotone" dataKey="High" stroke="none" fill="url(#colorConfidence)" />
-                  <Area type="monotone" dataKey="Low" stroke="none" fill="#0a0e1a" />
-                  {/* Forecast Line */}
-                  <Area type="monotone" dataKey="Score" stroke="#3b82f6" fill="none" strokeWidth={2.5} />
-                </AreaChart>
+                  <YAxis
+                    domain={yDomain}
+                    stroke="#64748b"
+                    tick={{ fontSize: 11 }}
+                    tickFormatter={v => `${v}%`}
+                  />
+                  <Tooltip
+                    contentStyle={{ background: '#0f172a', border: '1px solid rgba(0,229,255,0.3)', borderRadius: 8, fontSize: 12 }}
+                    formatter={(val, name) => [
+                      `${typeof val === 'number' ? val.toFixed(2) : val}%`,
+                      name === 'Score' ? '🔵 Forecast' : name === 'High' ? '🟢 Optimistic' : '🔴 Pessimistic'
+                    ]}
+                  />
+                  <Legend
+                    verticalAlign="top"
+                    height={28}
+                    formatter={name =>
+                      name === 'Score' ? <span style={{ color:'#00E5FF', fontWeight:700 }}>▸ Forecast Score</span>
+                      : name === 'High' ? <span style={{ color:'#10b981' }}>▲ Optimistic Bound</span>
+                      : <span style={{ color:'#f43f5e' }}>▼ Pessimistic Bound</span>
+                    }
+                  />
+
+                  {/* SLA threshold reference line */}
+                  <ReferenceLine
+                    y={95}
+                    stroke="#f59e0b"
+                    strokeDasharray="6 3"
+                    strokeWidth={1.5}
+                    label={{ value: 'SLA 95%', position: 'right', fill: '#f59e0b', fontSize: 10 }}
+                  />
+
+                  {/* Optimistic fill + boundary */}
+                  <Area
+                    type="monotone"
+                    dataKey="High"
+                    stroke="#10b981"
+                    strokeWidth={2}
+                    fill="url(#fillHigh)"
+                    dot={{ r: 3, fill: '#10b981', strokeWidth: 0 }}
+                    activeDot={{ r: 5, fill: '#10b981' }}
+                  />
+
+                  {/* Pessimistic fill + boundary */}
+                  <Area
+                    type="monotone"
+                    dataKey="Low"
+                    stroke="#f43f5e"
+                    strokeWidth={2}
+                    fill="url(#fillLow)"
+                    dot={{ r: 3, fill: '#f43f5e', strokeWidth: 0 }}
+                    activeDot={{ r: 5, fill: '#f43f5e' }}
+                  />
+
+                  {/* Forecast line — bold neon cyan on top */}
+                  <Line
+                    type="monotone"
+                    dataKey="Score"
+                    stroke="#00E5FF"
+                    strokeWidth={3}
+                    dot={{ r: 4, fill: '#00E5FF', stroke: '#0f172a', strokeWidth: 2 }}
+                    activeDot={{ r: 7, fill: '#00E5FF', stroke: '#fff', strokeWidth: 1.5 }}
+                  />
+                </ComposedChart>
               </ResponsiveContainer>
             </div>
 

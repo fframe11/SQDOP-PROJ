@@ -87,6 +87,21 @@
     },
     {
       "parameters": {
+        "method": "POST",
+        "url": "http://spark-master:8099/retry",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"table\": \"products\"}",
+        "options": {}
+      },
+      "id": "trigger-spark-products-node",
+      "name": "Trigger Spark Products",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1050, 150]
+    },
+    {
+      "parameters": {
         "url": "https://data.go.th/api/3/action/datastore_search?resource_id=b5c54455-9447-407a-8002-7660703484d7&limit=10000",
         "options": {}
       },
@@ -130,6 +145,21 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
       "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://spark-master:8099/retry",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"table\": \"gov_data\"}",
+        "options": {}
+      },
+      "id": "trigger-spark-gov-node",
+      "name": "Trigger Spark Gov",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1050, 300]
     },
     {
       "parameters": {
@@ -183,6 +213,51 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
       "position": [850, 450]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://spark-master:8099/retry",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"table\": \"sales_records\"}",
+        "options": {}
+      },
+      "id": "trigger-spark-sales-node",
+      "name": "Trigger Spark Sales",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1050, 450]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "daysInterval": 1,
+              "time": "02:00"
+            }
+          ]
+        }
+      },
+      "id": "schedule-cleanup-trigger-node",
+      "name": "Schedule Daily Cleanup",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [250, 600]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://api:8000/api/v1/system/cleanup",
+        "options": {}
+      },
+      "id": "trigger-api-cleanup-node",
+      "name": "Trigger API Retention Cleanup",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [450, 600]
     }
   ],
   "connections": {
@@ -271,6 +346,17 @@
         ]
       ]
     },
+    "Upload Products to HDFS": {
+      "main": [
+        [
+          {
+            "node": "Trigger Spark Products",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Fetch Thai Gov API": {
       "main": [
         [
@@ -293,6 +379,17 @@
         ]
       ]
     },
+    "Upload Gov CSV to HDFS": {
+      "main": [
+        [
+          {
+            "node": "Trigger Spark Gov",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Query Sales Records": {
       "main": [
         [
@@ -309,6 +406,28 @@
         [
           {
             "node": "Upload Sales CSV to HDFS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Sales CSV to HDFS": {
+      "main": [
+        [
+          {
+            "node": "Trigger Spark Sales",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Daily Cleanup": {
+      "main": [
+        [
+          {
+            "node": "Trigger API Retention Cleanup",
             "type": "main",
             "index": 0
           }
