@@ -83,7 +83,10 @@
       "name": "Upload Products to HDFS",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
-      "position": [850, 150]
+      "position": [850, 150],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "delayBetweenRetries": 5000
     },
     {
       "parameters": {
@@ -98,7 +101,10 @@
       "name": "Trigger Spark Products",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
-      "position": [1050, 150]
+      "position": [1050, 150],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "delayBetweenRetries": 5000
     },
     {
       "parameters": {
@@ -109,7 +115,10 @@
       "name": "Fetch Thai Gov API",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
-      "position": [450, 300]
+      "position": [450, 300],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "delayBetweenRetries": 5000
     },
     {
       "parameters": {
@@ -144,7 +153,10 @@
       "name": "Upload Gov CSV to HDFS",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
-      "position": [850, 300]
+      "position": [850, 300],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "delayBetweenRetries": 5000
     },
     {
       "parameters": {
@@ -159,7 +171,10 @@
       "name": "Trigger Spark Gov",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
-      "position": [1050, 300]
+      "position": [1050, 300],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "delayBetweenRetries": 5000
     },
     {
       "parameters": {
@@ -177,7 +192,10 @@
           "id": "c711aa48-356f-4cd2-b67a-12908a85f401",
           "name": "Postgres Local"
         }
-      }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "delayBetweenRetries": 5000
     },
     {
       "parameters": {
@@ -212,7 +230,10 @@
       "name": "Upload Sales CSV to HDFS",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
-      "position": [850, 450]
+      "position": [850, 450],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "delayBetweenRetries": 5000
     },
     {
       "parameters": {
@@ -227,7 +248,10 @@
       "name": "Trigger Spark Sales",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
-      "position": [1050, 450]
+      "position": [1050, 450],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "delayBetweenRetries": 5000
     },
     {
       "parameters": {
@@ -257,7 +281,153 @@
       "name": "Trigger API Retention Cleanup",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
-      "position": [450, 600]
+      "position": [450, 600],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "delayBetweenRetries": 5000
+    },
+    {
+      "parameters": {},
+      "id": "error-trigger-node",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [250, 750]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://api:8000/api/v1/system/alert",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"title\": \"n8n Ingestion Pipeline Failure\",\n  \"message\": \"Workflow execution failed in node: \" + ($json.execution?.error?.message || \"Unknown error\"),\n  \"severity\": \"critical\"\n}",
+        "options": {}
+      },
+      "id": "send-failure-alert-node",
+      "name": "Send Failure Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [450, 750]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "remediation-schedule-node",
+      "name": "Every Hour",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [250, 900]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://elasticsearch:9200/sdoqap_upstream_remediations/_search",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"query\": {\n    \"range\": {\n      \"timestamp\": {\n        \"gte\": \"now-1h\"\n      }\n    }\n  }\n}",
+        "options": {}
+      },
+      "id": "fetch-remediations-node",
+      "name": "Fetch Recent Remediations",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [450, 900],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "delayBetweenRetries": 5000
+    },
+    {
+      "parameters": {
+        "jsCode": "const hits = $json.hits?.hits || [];\nreturn hits.map(hit => ({\n  json: {\n    title: `[Remediation Ticket] ${hit._source.table_name}`,\n    message: `A quality anomaly occurred. Remediation Action required: ${hit._source.remediation_action} (Target: ${hit._source.target_system})`,\n    severity: hit._source.severity || 'warning'\n  }\n}));"
+      },
+      "id": "parse-remediations-node",
+      "name": "Parse Remediation Tickets",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 900]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://api:8000/api/v1/system/alert",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"title\": $json.title,\n  \"message\": $json.message,\n  \"severity\": $json.severity\n}",
+        "options": {}
+      },
+      "id": "route-remediation-alert-node",
+      "name": "Route Remediation Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [850, 900]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "id": "quality-schedule-node",
+      "name": "Every 15 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [250, 1050]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://elasticsearch:9200/sdoqap_quality_runs/_search",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"query\": {\n    \"range\": {\n      \"timestamp\": {\n        \"gte\": \"now-15m\"\n      }\n    }\n  }\n}",
+        "options": {}
+      },
+      "id": "fetch-quality-runs-node",
+      "name": "Fetch Recent Quality Runs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [450, 1050],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "delayBetweenRetries": 5000
+    },
+    {
+      "parameters": {
+        "jsCode": "const hits = $json.hits?.hits || [];\nreturn hits\n  .map(hit => hit._source)\n  .filter(run => run.quarantined_records > 0 || (run.quality_score < (run.effective_quality_threshold || 90.0)))\n  .map(run => ({\n    json: {\n      title: `[Data Quality Alert] Table: ${run.table_name}`,\n      message: `Quality Score dropped to ${run.quality_score.toFixed(2)}% (Threshold: ${run.effective_quality_threshold || 90.0}%). Quarantined records: ${run.quarantined_records} out of ${run.total_records}. Run ID: ${run.run_id}`,\n      severity: run.quarantined_records > 50 ? 'critical' : 'warning'\n    }\n  }));"
+      },
+      "id": "filter-low-quality-runs-node",
+      "name": "Filter Low Quality Runs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 1050]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://api:8000/api/v1/system/alert",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"title\": $json.title,\n  \"message\": $json.message,\n  \"severity\": $json.severity\n}",
+        "options": {}
+      },
+      "id": "route-quality-alert-node",
+      "name": "Route Quality Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [850, 1050]
     }
   ],
   "connections": {
@@ -428,6 +598,83 @@
         [
           {
             "node": "Trigger API Retention Cleanup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Send Failure Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every Hour": {
+      "main": [
+        [
+          {
+            "node": "Fetch Recent Remediations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Recent Remediations": {
+      "main": [
+        [
+          {
+            "node": "Parse Remediation Tickets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Remediation Tickets": {
+      "main": [
+        [
+          {
+            "node": "Route Remediation Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every 15 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Fetch Recent Quality Runs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Recent Quality Runs": {
+      "main": [
+        [
+          {
+            "node": "Filter Low Quality Runs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Low Quality Runs": {
+      "main": [
+        [
+          {
+            "node": "Route Quality Alert",
             "type": "main",
             "index": 0
           }
