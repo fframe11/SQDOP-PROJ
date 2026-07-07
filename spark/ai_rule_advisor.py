@@ -224,7 +224,8 @@ class AIRuleAdvisor:
                 "messages": [
                     {"role": "user", "content": prompt}
                 ],
-                "response_format": {"type": "json_object"}
+                "response_format": {"type": "json_object"},
+                "temperature": 0.0
             }
             try:
                 print(f"[AI_ADVISOR] Routing request to Groq ({groq_model}) via gsk_ API key detected...")
@@ -261,6 +262,7 @@ class AIRuleAdvisor:
                 "contents": [{"parts": [{"text": prompt}]}],
                 "generationConfig": {
                     "responseMimeType": "application/json",
+                    "temperature": 0.0
                 },
             }
             headers = {"Content-Type": "application/json"}
@@ -312,6 +314,12 @@ class AIRuleAdvisor:
 4. Recommend an adjusted quality-score **threshold** if appropriate.
 5. Rate your **confidence** (0.0 to 1.0) in the analysis.
 6. Generate a structured **remediation_ticket** detailing the target upstream system and specific action required by the upstream team to fix the issue at the source.
+
+**CRITICAL THRESHOLD CONSTRAINTS (HARD RULES FOR PROMPT INFERENCE):**
+- You are FORBIDDEN from generating or recommending arbitrary numerical thresholds.
+- If recommending rule changes or thresholds, you MUST strictly use numbers provided within "Column statistics" or "Historical context" that were calculated by the mathematical profiling engine.
+- You are NEVER allowed to guess or invent arbitrary decimal thresholds (e.g. do not lower a 95% target to 73% randomly). If no historical mathematically-derived number is available, leave the recommended threshold null.
+- Under NO circumstances can any quality threshold proposal be below 70.0%.
 
 ## Required JSON Output Schema
 Return ONLY valid JSON matching this schema:
@@ -410,7 +418,10 @@ Return ONLY valid JSON matching this schema:
             "model": self.ollama_model,
             "prompt": prompt,
             "stream": False,
-            "format": "json"
+            "format": "json",
+            "options": {
+                "temperature": 0.0
+            }
         }
         headers = {"Content-Type": "application/json"}
         try:
@@ -1242,13 +1253,36 @@ Return ONLY valid JSON matching this schema:
                     if action == "escalate":
                         continue
 
-                    # Dotted path update
                     parts = rule_path.split(".")
+                    
+                    # ── Hard Guardrails Validation Layer (Task 3) ─────────────────────
+                    # 1. Quality threshold base floor at 70.0%
+                    if any(t in rule_path for t in ["quality_score_threshold", "base_value", "min_value"]) and isinstance(val, (int, float)):
+                        if val < 70.0:
+                            print(f"[GUARDRAIL VIOLATION] Rejected threshold change for '{rule_path}' = {val} on table '{table_name}'. Hard floor is 70.0%")
+                            continue
+                        
+                        # 2. Maximum deviation (decrease) cap of 10% from active configuration
+                        curr = table_config
+                        for part in parts:
+                            if isinstance(curr, dict) and part in curr:
+                                curr = curr[part]
+                            else:
+                                curr = None
+                                break
+                        
+                        if isinstance(curr, (int, float)) and curr > 0:
+                            max_reduction = curr * 0.90
+                            if val < max_reduction:
+                                print(f"[GUARDRAIL VIOLATION] Rejected threshold change from {curr} to {val} on table '{table_name}'. Exceeds maximum 10% allowed decrease (Limit: {max_reduction:.2f})")
+                                continue
+
+                    # Dotted path update
                     d = table_config
                     for part in parts[:-1]:
                         d = d.setdefault(part, {})
                     
-                    # Check guardrails: Null tolerance cap at 0.30
+                    # 3. Check guardrails: Null tolerance cap at 0.30
                     if "tolerance" in parts[-1] and isinstance(val, (int, float)):
                         val = min(val, 0.30)
                     

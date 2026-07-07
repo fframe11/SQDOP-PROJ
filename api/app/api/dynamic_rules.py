@@ -400,11 +400,38 @@ def approve_proposal(proposal_id: str) -> dict:
                     if action == "escalate":
                         continue
                     parts = rule_path.split(".")
+
+                    # ── Hard Guardrails Validation Layer (Task 3) ─────────────────────
+                    # 1. Quality threshold base floor at 70.0%
+                    if any(t in rule_path for t in ["quality_score_threshold", "base_value", "min_value"]) and isinstance(val, (int, float)):
+                        if val < 70.0:
+                            print(f"[GUARDRAIL VIOLATION] API rejected threshold change for '{rule_path}' = {val} on table '{target_table}'. Hard floor is 70.0%")
+                            continue
+                        
+                        # 2. Maximum deviation (decrease) cap of 10% from active configuration
+                        curr = table_config
+                        for part in parts:
+                            if isinstance(curr, dict) and part in curr:
+                                curr = curr[part]
+                            else:
+                                curr = None
+                                break
+                        
+                        if isinstance(curr, (int, float)) and curr > 0:
+                            max_reduction = curr * 0.90
+                            if val < max_reduction:
+                                print(f"[GUARDRAIL VIOLATION] API rejected threshold change from {curr} to {val} on table '{target_table}'. Exceeds 10% allowed decrease (Limit: {max_reduction:.2f})")
+                                continue
+
+                    # Dotted path update
                     d = table_config
                     for part in parts[:-1]:
                         d = d.setdefault(part, {})
+                    
+                    # 3. Check guardrails: Null tolerance cap at 0.30
                     if "tolerance" in parts[-1] and isinstance(val, (int, float)):
                         val = min(val, 0.30)
+                    
                     d[parts[-1]] = val
                     promoted_count += 1
 
