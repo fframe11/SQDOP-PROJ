@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import NavBar from "./components/NavBar";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -13,25 +13,52 @@ import RulesConfig from "./pages/RulesConfig";
 import "./App.css";
 
 export default function App() {
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Collapsed by default
+
+  const toggleSidebar = () => {
+    setIsSidebarOpen(prev => !prev);
+  };
+
   return (
     <BrowserRouter>
       <div className="app-bg" />
-      <NavBar />
-      <ErrorBoundary>
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/analytics" element={<Analytics />} />
-          <Route path="/pipeline" element={<Pipeline />} />
-          <Route path="/schema" element={<Schema />} />
-          <Route path="/rules" element={<RulesConfig />} />
-          <Route path="/rules-config" element={<RulesConfig />} />
-          <Route path="/rules_config" element={<RulesConfig />} />
-          <Route path="/rules config" element={<RulesConfig />} />
-          <Route path="/ingestion" element={<Ingestion />} />
-          <Route path="/export" element={<DataExport />} />
-        </Routes>
-      </ErrorBoundary>
+      <div className={`app-layout ${isSidebarOpen ? "sidebar-visible" : "sidebar-hidden"}`}>
+        <NavBar
+          isOpen={isSidebarOpen}
+          toggleSidebar={toggleSidebar}
+          isSidebarOpen={isSidebarOpen}
+        />
+        <main className="app-main-content">
+          {!isSidebarOpen && (
+            <button
+              className="sidebar-toggle-btn"
+              onClick={toggleSidebar}
+              title="Open Sidebar"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="4" y1="12" x2="20" y2="12" />
+                <line x1="4" y1="6" x2="20" y2="6" />
+                <line x1="4" y1="18" x2="20" y2="18" />
+              </svg>
+            </button>
+          )}
+          <ErrorBoundary>
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/analytics" element={<Analytics />} />
+              <Route path="/pipeline" element={<Pipeline />} />
+              <Route path="/schema" element={<Schema />} />
+              <Route path="/rules" element={<RulesConfig />} />
+              <Route path="/rules-config" element={<RulesConfig />} />
+              <Route path="/rules_config" element={<RulesConfig />} />
+              <Route path="/rules config" element={<RulesConfig />} />
+              <Route path="/ingestion" element={<Ingestion />} />
+              <Route path="/export" element={<DataExport />} />
+            </Routes>
+          </ErrorBoundary>
+        </main>
+      </div>
     </BrowserRouter>
   );
 }
