@@ -988,9 +988,9 @@ def trigger_system_cleanup():
 
 from pydantic import BaseModel
 class SettingsPayload(BaseModel):
-    gemini_api_key: str
-    gemini_model: str = "gemini-1.5-flash"
-    gemini_enabled: bool = True
+    groq_api_key: str
+    groq_model: str = "llama-3.3-70b-versatile"
+    groq_enabled: bool = True
 
 @app.get("/api/v1/system/settings")
 def get_system_settings():
@@ -1002,25 +1002,19 @@ def get_system_settings():
         if es.indices.exists(index="sdoqap_settings"):
             res = es.get(index="sdoqap_settings", id="global")
             doc = res.get("_source", {})
-            api_key = doc.get("gemini_api_key", "")
-            model = doc.get("gemini_model", "")
-            enabled = doc.get("gemini_enabled", False)
+            api_key = doc.get("groq_api_key", "")
+            model = doc.get("groq_model", "")
+            enabled = doc.get("groq_enabled", False)
     except Exception:
         pass
         
     if not api_key:
-        # Check environment variables fallback
+        # Check environment variables fallback for Groq only
         groq_api_key = os.getenv("GROQ_API_KEY", "").strip()
         if groq_api_key:
             api_key = groq_api_key
             model = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile").strip()
             enabled = True
-        else:
-            gemini_api_key_env = os.getenv("GEMINI_API_KEY", "").strip()
-            if gemini_api_key_env:
-                api_key = gemini_api_key_env
-                model = os.getenv("GEMINI_MODEL", "gemini-1.5-flash").strip()
-                enabled = True
 
     masked = ""
     if api_key:
@@ -1030,9 +1024,9 @@ def get_system_settings():
             masked = "********"
 
     return {
-        "gemini_api_key_masked": masked,
-        "gemini_model": model if model else "gemini-1.5-flash",
-        "gemini_enabled": enabled
+        "groq_api_key_masked": masked,
+        "groq_model": model if model else "llama-3.3-70b-versatile",
+        "groq_enabled": enabled
     }
 
 @app.post("/api/v1/system/settings")
@@ -1042,82 +1036,56 @@ def update_system_settings(payload: SettingsPayload):
     try:
         if es.indices.exists(index="sdoqap_settings"):
             res = es.get(index="sdoqap_settings", id="global")
-            existing_key = res.get("_source", {}).get("gemini_api_key", "")
+            existing_key = res.get("_source", {}).get("groq_api_key", "")
     except Exception:
         pass
         
-    new_key = payload.gemini_api_key.strip()
+    new_key = payload.groq_api_key.strip()
     if "..." in new_key or "*" in new_key:
         new_key = existing_key
         
     doc = {
-        "gemini_api_key": new_key,
-        "gemini_model": payload.gemini_model,
-        "gemini_enabled": payload.gemini_enabled if new_key else False
+        "groq_api_key": new_key,
+        "groq_model": payload.groq_model,
+        "groq_enabled": payload.groq_enabled if new_key else False
     }
     
-    if doc["gemini_enabled"] and doc["gemini_api_key"]:
-        if doc["gemini_api_key"].startswith("gsk_"):
-            # Validate the key by sending a test request to Groq API
-            url = "https://api.groq.com/openai/v1/chat/completions"
-            headers = {
-                "Authorization": f"Bearer {doc['gemini_api_key']}",
-                "Content-Type": "application/json",
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-            }
-            payload_test = {
-                "model": "llama-3.3-70b-versatile",
-                "messages": [{"role": "user", "content": "Hello"}],
-                "max_tokens": 5
-            }
-            try:
-                res_test = requests.post(url, headers=headers, json=payload_test, timeout=10)
-                if res_test.status_code != 200:
-                    error_msg = "Invalid API key or model error"
-                    try:
-                        error_msg = res_test.json().get("error", {}).get("message", error_msg)
-                    except Exception:
-                        pass
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Groq API key validation failed: {error_msg}."
-                    )
-            except requests.exceptions.RequestException as req_err:
+    if doc["groq_enabled"] and doc["groq_api_key"]:
+        # Validate the key by sending a test request to Groq API
+        url = "https://api.groq.com/openai/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {doc['groq_api_key']}",
+            "Content-Type": "application/json",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
+        payload_test = {
+            "model": doc["groq_model"] if doc["groq_model"] else "llama-3.3-70b-versatile",
+            "messages": [{"role": "user", "content": "Hello"}],
+            "max_tokens": 5
+        }
+        try:
+            res_test = requests.post(url, headers=headers, json=payload_test, timeout=10)
+            if res_test.status_code != 200:
+                error_msg = "Invalid API key or model error"
+                try:
+                    error_msg = res_test.json().get("error", {}).get("message", error_msg)
+                except Exception:
+                    pass
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Network error trying to validate Groq API key: {str(req_err)}"
+                    detail=f"Groq API key validation failed: {error_msg}."
                 )
-        else:
-            # Validate the key by sending a test request to Gemini API
-            api_base = "https://generativelanguage.googleapis.com/v1beta"
-            url = f"{api_base}/models/{doc['gemini_model']}:generateContent?key={doc['gemini_api_key']}"
-            payload_test = {
-                "contents": [{"parts": [{"text": "Hello"}]}]
-            }
-            headers = {"Content-Type": "application/json"}
-            try:
-                res_test = requests.post(url, headers=headers, json=payload_test, timeout=10)
-                if res_test.status_code != 200:
-                    error_msg = "Invalid API key or model error"
-                    try:
-                        error_msg = res_test.json().get("error", {}).get("message", error_msg)
-                    except Exception:
-                        pass
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Gemini API key validation failed: {error_msg}."
-                    )
-            except requests.exceptions.RequestException as req_err:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Network error trying to validate Gemini API key: {str(req_err)}"
-                )
+        except requests.exceptions.RequestException as req_err:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Network error trying to validate Groq API key: {str(req_err)}"
+            )
             
     try:
         if not es.indices.exists(index="sdoqap_settings"):
             es.indices.create(index="sdoqap_settings")
         es.index(index="sdoqap_settings", id="global", document=doc)
-        return {"status": "success", "message": "System settings updated and Gemini API key validated successfully."}
+        return {"status": "success", "message": "System settings updated and Groq API key validated successfully."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to save settings: {str(e)}")
 

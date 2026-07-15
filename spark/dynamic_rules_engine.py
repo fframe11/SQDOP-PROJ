@@ -720,7 +720,7 @@ def generate_rules_from_schema(table_name, schema_spec, primary_key, date_column
             "ai_advisor": {
                 "enabled": True,
                 "trigger": "on_anomaly",
-                "model": "gemini-2.0-flash",
+                "model": "llama-3.3-70b-versatile",
                 "max_rows_to_analyze": 50,
                 "confidence_threshold": 0.7
             }

@@ -197,7 +197,7 @@ graph TD
 ระบบจะรวบรวมตัวชี้วัดคุณภาพข้อมูล (Data Quality Metrics) และสถิติทั้งหมดในขณะรันส่งบันทึกขึ้นระบบค้นหา Elasticsearch:
 * **ดัชนี sdoqap_quality_runs (ES Logs):** จัดเก็บประวัติเวลาประมวลผล ยอดสัดส่วนข้อมูลที่ผ่านเกณฑ์ และมูลค่าเสียหายสะสมจากข้อมูลชำรุด (Cost of Poor Data Quality - COPDQ)
 * **ดัชนี sdoqap_ai_rule_proposals (ES Proposals):** จัดเก็บข้อเสนอแนะแก้ไขกฎสเปกและตั๋ว Remediation Ticket ที่ออกโดย AI
-* **ดัชนี sdoqap_settings (ES Settings):** จัดเก็บค่าคอนฟิกต่าง ๆ ของระบบและ Gemini API Key
+* **ดัชนี sdoqap_settings (ES Settings):** จัดเก็บค่าคอนฟิกต่าง ๆ ของระบบและ Groq API Key
 
 #### เลเยอร์ที่ 6: ปัญญาประดิษฐ์ผู้วิเคราะห์และสร้างกฎเกณฑ์พลวัต (AI Dynamic Rules Generator - Layer 3)
 ลอจิกการทำงานของปัญญาประดิษฐ์เพื่อทำหน้าที่ปรับแต่งกฎและสเปกข้อมูลอย่างยืดหยุ่น:

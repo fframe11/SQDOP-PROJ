@@ -20,7 +20,7 @@ graph TD
     
     L4["📊&nbsp;4.&nbsp;Observability&nbsp;Stack<br>Elasticsearch&nbsp;DB,&nbsp;Metadata&nbsp;&&nbsp;Run&nbsp;Logs,&nbsp;Lineage&nbsp;&&nbsp;Scores&nbsp;Indexes"]:::Observability
     
-    L5["🧠&nbsp;5.&nbsp;AI&nbsp;&&nbsp;Orchestration&nbsp;Stack<br>Google&nbsp;Gemini&nbsp;&&nbsp;Groq&nbsp;APIs,&nbsp;n8n&nbsp;Engine,&nbsp;Slack&nbsp;&&nbsp;Webhook&nbsp;Alerts"]:::AI
+    L5["🧠&nbsp;5.&nbsp;AI&nbsp;&&nbsp;Orchestration&nbsp;Stack<br>Groq&nbsp;API,&nbsp;n8n&nbsp;Engine,&nbsp;Slack&nbsp;&&&nbsp;Webhook&nbsp;Alerts"]:::AI
     
     L6["🌐&nbsp;6.&nbsp;Serving&nbsp;&&nbsp;Portal&nbsp;Stack<br>FastAPI&nbsp;Backend&nbsp;API,&nbsp;React&nbsp;Web&nbsp;Portal&nbsp;UI,&nbsp;Grafana&nbsp;&&nbsp;Kibana"]:::Serving
 

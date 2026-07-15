@@ -42,7 +42,7 @@
     "ai_advisor": {
       "enabled": true,
       "trigger": "always",
-      "model": "gemini-1.5-flash",
+      "model": "llama-3.3-70b-versatile",
       "max_rows_to_analyze": 50,
       "confidence_threshold": 0.7
     },
@@ -143,7 +143,7 @@
     "ai_advisor": {
       "enabled": true,
       "trigger": "always",
-      "model": "gemini-1.5-flash",
+      "model": "llama-3.3-70b-versatile",
       "max_rows_to_analyze": 50,
       "confidence_threshold": 0.7
     }
@@ -209,7 +209,7 @@
     "ai_advisor": {
       "enabled": true,
       "trigger": "on_anomaly",
-      "model": "gemini-2.0-flash",
+      "model": "llama-3.3-70b-versatile",
       "max_rows_to_analyze": 50,
       "confidence_threshold": 0.7
     }

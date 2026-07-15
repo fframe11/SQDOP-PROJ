@@ -30,7 +30,7 @@ graph TD
     
     L4["📊&nbsp;4.&nbsp;Observability&nbsp;Stack<br>Elasticsearch&nbsp;DB,&nbsp;Metadata&nbsp;&&nbsp;Run&nbsp;Logs,&nbsp;Lineage&nbsp;&&nbsp;Scores&nbsp;Indexes"]:::Observability
     
-    L5["🧠&nbsp;5.&nbsp;AI&nbsp;&&nbsp;Orchestration&nbsp;Stack<br>Google&nbsp;Gemini&nbsp;&&nbsp;Groq&nbsp;APIs,&nbsp;n8n&nbsp;Engine,&nbsp;Slack&nbsp;&&nbsp;Webhook&nbsp;Alerts"]:::AI
+    L5["🧠&nbsp;5.&nbsp;AI&nbsp;&&nbsp;Orchestration&nbsp;Stack<br>Groq&nbsp;API,&nbsp;n8n&nbsp;Engine,&nbsp;Slack&nbsp;&&&nbsp;Webhook&nbsp;Alerts"]:::AI
     
     L6["🌐&nbsp;6.&nbsp;Serving&nbsp;&&nbsp;Portal&nbsp;Stack<br>FastAPI&nbsp;Backend&nbsp;API,&nbsp;React&nbsp;Web&nbsp;Portal&nbsp;UI,&nbsp;Grafana&nbsp;&&nbsp;Kibana"]:::Serving
 
@@ -61,7 +61,7 @@ graph TD
 4. **Observability Layer (การสังเกตการณ์):**
    * **Elasticsearch DB:** จัดทำดัชนีเก็บประวัติการรัน คะแนนตัวชี้วัดคุณภาพข้อมูล (Data Quality Scores) เส้นทางการไหลของข้อมูล (Lineage) และตั๋วงานวิเคราะห์ Drift
 5. **AI & Orchestration Layer (ปัญญาประดิษฐ์และเวิร์กโฟลว์):**
-   * **Google Gemini API / Groq API:** ปัญญาประดิษฐ์ประมวลผลเชิงความหมาย วิเคราะห์สาเหตุข้อบกพร่อง และสร้างกฎ Dynamic Rules
+   * **Groq API:** ปัญญาประดิษฐ์ประมวลผลเชิงความหมาย วิเคราะห์สาเหตุข้อบกพร่อง และสร้างกฎ Dynamic Rules
    * **n8n Automation Engine:** รันระบบทริกเกอร์แจ้งเตือนตั๋วปัญหาอัตโนมัติไปยัง Slack, Email หรือ Microsoft Teams
 6. **Serving & Presentation Layer (การให้บริการข้อมูล):**
    * **FastAPI Backend (Python):** บริการ REST APIs สำหรับแดชบอร์ดและเปิดรับปิดลูปคอนฟิก

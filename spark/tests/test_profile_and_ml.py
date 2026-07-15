@@ -146,7 +146,7 @@ class TestProfileAndML(unittest.TestCase):
         clean_df = self.spark.createDataFrame(clean_data, schema)
         quar_df = self.spark.createDataFrame(quar_data, schema)
 
-        advisor = AIRuleAdvisor(api_key="", model="gemini-2.0-flash")
+        advisor = AIRuleAdvisor(api_key="", model="llama-3.3-70b-versatile")
         # Run rule induction
         result = advisor.induce_rules_from_data(
             self.spark, clean_df, quar_df, ["age", "score"], "users", "test_run_123"

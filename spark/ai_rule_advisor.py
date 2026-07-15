@@ -2,7 +2,7 @@
 SDOQAP AI Rule Advisor — Semantic Analysis Module (Layer 3)
 ============================================================
 
-Uses the Google Gemini API to perform *semantic* root-cause analysis on
+Uses the Groq API to perform *semantic* root-cause analysis on
 quarantined data samples.  This module is the highest layer of the adaptive
 rules stack:
 
@@ -16,7 +16,7 @@ Design principles (Upstream-First Remediation):
       approve before they take effect.
     * Every interaction with the LLM is logged to Elasticsearch for full
       auditability and lineage traceability.
-    * If the ``GEMINI_API_KEY`` is not configured the module degrades
+    * If the ``GROQ_API_KEY`` is not configured the module degrades
       gracefully — the pipeline continues without AI analysis.
 
 Usage from ``spark_quality_engine.py``::
@@ -86,7 +86,6 @@ def _get_es_connection(es_url=None):
 
 # ─── Constants ────────────────────────────────────────────────────────────────
 
-GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 ES_INDEX_PROPOSALS = "sdoqap_ai_rule_proposals"
 
 
@@ -95,7 +94,7 @@ ES_INDEX_PROPOSALS = "sdoqap_ai_rule_proposals"
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class AIRuleAdvisor:
-    """Semantic data-quality advisor powered by Google Gemini.
+    """Semantic data-quality advisor powered by Groq.
 
     The advisor analyses quarantined data samples and proposes rule changes
     with root-cause explanations.  All proposals are persisted to
@@ -104,10 +103,10 @@ class AIRuleAdvisor:
     Parameters
     ----------
     api_key : str
-        Google Gemini API key.  Typically sourced from the
-        ``GEMINI_API_KEY`` environment variable.
+        Groq API key.  Typically sourced from the
+        ``GROQ_API_KEY`` environment variable.
     model : str
-        Gemini model identifier (default ``'gemini-2.0-flash'``).
+        Groq model identifier (default ``'llama-3.3-70b-versatile'``).
     es_url : str | None
         Elasticsearch URL.  Falls back to ``ELASTICSEARCH_URL`` env var.
     """
@@ -166,21 +165,21 @@ class AIRuleAdvisor:
 
     def ai_analyze_quarantined_sample(self, table_name, quarantined_rows,
                                       column_stats, historical_context):
-        """Analyze quarantined sample using Gemini 1.5 if configured, otherwise fallback to Local Heuristic Advisor."""
+        """Analyze quarantined sample using Groq if configured, otherwise fallback to Local Heuristic Advisor."""
         fallback = {
             "root_cause": "AI analysis unavailable",
             "suggested_rules": [],
             "false_positive_indices": [],
             "recommended_threshold": None,
             "confidence": 0.0,
-            "explanation": "Gemini API call failed or was unavailable.",
+            "explanation": "Groq API call failed or was unavailable.",
             "status": "FAILED",
         }
 
-        # ── 1. Check Elasticsearch settings for Gemini credentials ────────────────
-        gemini_api_key = ""
-        gemini_model = "gemini-1.5-flash"
-        gemini_enabled = False
+        # ── 1. Check Elasticsearch settings for Groq credentials ──────────────────
+        groq_api_key = ""
+        groq_model = "llama-3.3-70b-versatile"
+        groq_enabled = False
         
         try:
             if self._base_url:
@@ -188,26 +187,20 @@ class AIRuleAdvisor:
                 res_settings = requests.get(url_settings, auth=self._auth, timeout=3)
                 if res_settings.status_code == 200:
                     settings_doc = res_settings.json().get("_source", {})
-                    gemini_api_key = settings_doc.get("gemini_api_key", "").strip()
-                    gemini_model = settings_doc.get("gemini_model", "gemini-1.5-flash").strip()
-                    gemini_enabled = settings_doc.get("gemini_enabled", False)
+                    groq_api_key = settings_doc.get("groq_api_key", "").strip()
+                    groq_model = settings_doc.get("groq_model", "llama-3.3-70b-versatile").strip()
+                    groq_enabled = settings_doc.get("groq_enabled", False)
         except Exception as e:
             print(f"[AI_ADVISOR] Failed to load settings from ES: {e}")
 
         # Fallback to env var if ES is down or empty
-        if not gemini_api_key:
+        if not groq_api_key:
             groq_api_key = os.getenv("GROQ_API_KEY", "").strip()
-            if groq_api_key:
-                gemini_api_key = groq_api_key
-                gemini_model = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile").strip()
-                gemini_enabled = True
-            else:
-                gemini_api_key = os.getenv("GEMINI_API_KEY", "").strip()
-                gemini_model = os.getenv("GEMINI_MODEL", "gemini-1.5-flash").strip()
-                gemini_enabled = bool(gemini_api_key)
+            groq_model = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile").strip()
+            groq_enabled = bool(groq_api_key)
 
-        if not gemini_enabled or not gemini_api_key:
-            print("[AI_ADVISOR] Gemini is disabled or not configured. Running Local Heuristic Advisor...")
+        if not groq_enabled or not groq_api_key:
+            print("[AI_ADVISOR] Groq is disabled or not configured. Running Local Heuristic Advisor...")
             return self._run_local_heuristic_advisor(table_name, quarantined_rows, column_stats, historical_context)
 
         # ── 2. Build structured prompt ───────────────────────────────────────
@@ -215,83 +208,54 @@ class AIRuleAdvisor:
             table_name, quarantined_rows, column_stats, historical_context,
         )
 
-        # ── 3. Call Gemini API or Groq API ─────────────────────────
-        if gemini_api_key.startswith("gsk_"):
-            # Route to Groq!
-            url = "https://api.groq.com/openai/v1/chat/completions"
-            headers = {
-                "Authorization": f"Bearer {gemini_api_key}",
-                "Content-Type": "application/json",
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-            }
-            # Use llama-3.3-70b-versatile as default for Groq
-            groq_model = gemini_model if "llama" in gemini_model else "llama-3.3-70b-versatile"
-            payload = {
-                "model": groq_model,
-                "messages": [
-                    {"role": "user", "content": prompt}
-                ],
-                "response_format": {"type": "json_object"},
-                "temperature": 0.0
-            }
-            try:
-                print(f"[AI_ADVISOR] Routing request to Groq ({groq_model}) via gsk_ API key detected...")
-                res = requests.post(url, headers=headers, json=payload, timeout=60)
-                if res.status_code != 200:
-                    print(f"[AI_ADVISOR] Groq API returned HTTP {res.status_code}: {res.text[:500]}")
-                    print("[AI_ADVISOR] Falling back to Local Heuristic Advisor...")
-                    return self._run_local_heuristic_advisor(table_name, quarantined_rows, column_stats, historical_context)
-                
-                response_body = res.json()
-                raw_text = response_body.get("choices", [{}])[0].get("message", {}).get("content", "")
-                parsed = json.loads(raw_text)
-                result = {
-                    "root_cause": parsed.get("root_cause", "Unknown"),
-                    "suggested_rules": parsed.get("suggested_rules", []),
-                    "false_positive_indices": parsed.get("false_positive_indices", []),
-                    "recommended_threshold": parsed.get("recommended_threshold"),
-                    "confidence": float(parsed.get("confidence", 0.0) or 0.8),
-                    "explanation": parsed.get("explanation", ""),
-                    "remediation_ticket": parsed.get("remediation_ticket"),
-                    "status": "SUCCESS",
-                }
-                print(f"[AI_ADVISOR] Groq Analysis complete — confidence={result['confidence']:.2f}, "
-                      f"rules_suggested={len(result['suggested_rules'])}")
-                return result
-            except Exception as e:
-                print(f"[AI_ADVISOR] Unexpected error during Groq call: {e}. Falling back to Local Heuristic Advisor...")
+        # ── 3. Call Groq API ─────────────────────────
+        url = "https://api.groq.com/openai/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {groq_api_key}",
+            "Content-Type": "application/json",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
+        payload = {
+            "model": groq_model if groq_model else "llama-3.3-70b-versatile",
+            "messages": [
+                {"role": "user", "content": prompt}
+            ],
+            "response_format": {"type": "json_object"},
+            "temperature": 0.0
+        }
+        try:
+            print(f"[AI_ADVISOR] Routing request to Groq ({groq_model}) via settings configuration...")
+            res = requests.post(url, headers=headers, json=payload, timeout=60)
+            if res.status_code != 200:
+                print(f"[AI_ADVISOR] Groq API returned HTTP {res.status_code}: {res.text[:500]}")
+                print("[AI_ADVISOR] Falling back to Local Heuristic Advisor...")
                 return self._run_local_heuristic_advisor(table_name, quarantined_rows, column_stats, historical_context)
-        else:
-            # Route to Gemini API (Supports Gemini 1.5 / 2.0)
-            api_base = "https://generativelanguage.googleapis.com/v1beta"
-            url = f"{api_base}/models/{gemini_model}:generateContent?key={gemini_api_key}"
-            payload = {
-                "contents": [{"parts": [{"text": prompt}]}],
-                "generationConfig": {
-                    "responseMimeType": "application/json",
-                    "temperature": 0.0
-                },
+            
+            response_body = res.json()
+            raw_text = response_body.get("choices", [{}])[0].get("message", {}).get("content", "")
+            parsed = json.loads(raw_text)
+            result = {
+                "root_cause": parsed.get("root_cause", "Unknown"),
+                "suggested_rules": parsed.get("suggested_rules", []),
+                "false_positive_indices": parsed.get("false_positive_indices", []),
+                "recommended_threshold": parsed.get("recommended_threshold"),
+                "confidence": float(parsed.get("confidence", 0.0) or 0.8),
+                "explanation": parsed.get("explanation", ""),
+                "remediation_ticket": parsed.get("remediation_ticket"),
+                "status": "SUCCESS",
             }
-            headers = {"Content-Type": "application/json"}
-            try:
-                print(f"[AI_ADVISOR] Routing request to Gemini ({gemini_model}) via settings configuration...")
-                res = requests.post(url, headers=headers, json=payload, timeout=60)
-                if res.status_code != 200:
-                    print(f"[AI_ADVISOR] Gemini API returned HTTP {res.status_code}: {res.text[:500]}")
-                    print("[AI_ADVISOR] Falling back to Local Heuristic Advisor...")
-                    return self._run_local_heuristic_advisor(table_name, quarantined_rows, column_stats, historical_context)
-                
-                response_body = res.json()
-                return self._parse_gemini_response(response_body, fallback)
-            except Exception as e:
-                print(f"[AI_ADVISOR] Unexpected error during Gemini call: {e}. Falling back to Local Heuristic Advisor...")
-                return self._run_local_heuristic_advisor(table_name, quarantined_rows, column_stats, historical_context)
+            print(f"[AI_ADVISOR] Groq Analysis complete — confidence={result['confidence']:.2f}, "
+                  f"rules_suggested={len(result['suggested_rules'])}")
+            return result
+        except Exception as e:
+            print(f"[AI_ADVISOR] Unexpected error during Groq call: {e}. Falling back to Local Heuristic Advisor...")
+            return self._run_local_heuristic_advisor(table_name, quarantined_rows, column_stats, historical_context)
 
     # ── Prompt builder (private) ──────────────────────────────────────────
 
     def _build_analysis_prompt(self, table_name, quarantined_rows,
                                column_stats, historical_context):
-        """Assemble a structured prompt that guides Gemini toward actionable
+        """Assemble a structured prompt that guides Groq toward actionable
         root-cause analysis.
 
         The prompt is intentionally explicit about the desired JSON output
@@ -354,67 +318,6 @@ Return ONLY valid JSON matching this schema:
         return prompt
 
     # ── Response parser (private) ─────────────────────────────────────────
-
-    def _parse_gemini_response(self, response_body, fallback):
-        """Extract the structured JSON from Gemini's response envelope.
-
-        Gemini wraps content in ``candidates[0].content.parts[0].text``.
-        The text should already be JSON thanks to ``responseMimeType``, but
-        we handle edge-cases defensively.
-        """
-        try:
-            candidates = response_body.get("candidates", [])
-            if not candidates:
-                print("[AI_ADVISOR] Gemini returned no candidates.")
-                fallback["error"] = "No candidates in response"
-                return fallback
-
-            parts = candidates[0].get("content", {}).get("parts", [])
-            if not parts:
-                print("[AI_ADVISOR] Gemini candidate has no parts.")
-                fallback["error"] = "No parts in candidate"
-                return fallback
-
-            raw_text = parts[0].get("text", "")
-            if not raw_text.strip():
-                print("[AI_ADVISOR] Gemini returned empty text.")
-                fallback["error"] = "Empty response text"
-                return fallback
-
-            # Strip potential markdown fences (```json … ```)
-            cleaned = raw_text.strip()
-            if cleaned.startswith("```"):
-                lines = cleaned.split("\n")
-                # Remove first and last fence lines
-                lines = [l for l in lines if not l.strip().startswith("```")]
-                cleaned = "\n".join(lines)
-
-            parsed = json.loads(cleaned)
-
-            # Validate expected keys — fill missing with safe defaults
-            result = {
-                "root_cause": parsed.get("root_cause", "Unknown"),
-                "suggested_rules": parsed.get("suggested_rules", []),
-                "false_positive_indices": parsed.get("false_positive_indices", []),
-                "recommended_threshold": parsed.get("recommended_threshold"),
-                "confidence": float(parsed.get("confidence", 0.0)),
-                "explanation": parsed.get("explanation", ""),
-                "remediation_ticket": parsed.get("remediation_ticket"),
-                "status": "SUCCESS",
-            }
-            print(f"[AI_ADVISOR] Analysis complete — confidence={result['confidence']:.2f}, "
-                  f"rules_suggested={len(result['suggested_rules'])}")
-            return result
-
-        except json.JSONDecodeError as e:
-            print(f"[AI_ADVISOR] Failed to parse Gemini response as JSON: {e}")
-            fallback["error"] = f"JSONDecodeError: {e}"
-            fallback["raw_response"] = raw_text[:2000] if 'raw_text' in dir() else ""
-            return fallback
-        except Exception as e:
-            print(f"[AI_ADVISOR] Unexpected error parsing Gemini response: {e}")
-            fallback["error"] = str(e)
-            return fallback
 
     def _call_ollama(self, prompt, fallback):
         """Invoke a local LLM via Ollama endpoint.
