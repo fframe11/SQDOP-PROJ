@@ -196,9 +196,15 @@ class AIRuleAdvisor:
 
         # Fallback to env var if ES is down or empty
         if not gemini_api_key:
-            gemini_api_key = os.getenv("GEMINI_API_KEY", "").strip()
-            gemini_model = os.getenv("GEMINI_MODEL", "gemini-1.5-flash").strip()
-            gemini_enabled = bool(gemini_api_key)
+            groq_api_key = os.getenv("GROQ_API_KEY", "").strip()
+            if groq_api_key:
+                gemini_api_key = groq_api_key
+                gemini_model = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile").strip()
+                gemini_enabled = True
+            else:
+                gemini_api_key = os.getenv("GEMINI_API_KEY", "").strip()
+                gemini_model = os.getenv("GEMINI_MODEL", "gemini-1.5-flash").strip()
+                gemini_enabled = bool(gemini_api_key)
 
         if not gemini_enabled or not gemini_api_key:
             print("[AI_ADVISOR] Gemini is disabled or not configured. Running Local Heuristic Advisor...")
@@ -215,7 +221,8 @@ class AIRuleAdvisor:
             url = "https://api.groq.com/openai/v1/chat/completions"
             headers = {
                 "Authorization": f"Bearer {gemini_api_key}",
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
             }
             # Use llama-3.3-70b-versatile as default for Groq
             groq_model = gemini_model if "llama" in gemini_model else "llama-3.3-70b-versatile"

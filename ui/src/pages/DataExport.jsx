@@ -155,35 +155,54 @@ export default function DataExport() {
 
   return (
     <div className="sdoqap-app">
-      <div className="sdoqap-header">
-        <div className="logo-area">
-          <h1>Data Export Center</h1>
-          <p>Download clean, validated datasets directly from HDFS Medallion layers and Elasticsearch reports</p>
+      <div style={{ marginBottom: "1.5rem", width: "100%" }}>
+        <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "0.4rem", fontFamily: "var(--font-sans)", display: "flex", gap: "6px", alignItems: "center" }}>
+          <span>SDOQAP Data Engine</span>
+          <span style={{ opacity: 0.5 }}>&gt;</span>
+          <span style={{ color: "var(--text-main)", fontWeight: 500 }}>Export Hub</span>
         </div>
+        <h1 style={{ fontSize: "1.6rem", fontWeight: 700, color: "var(--text-main)", letterSpacing: "-0.02em", margin: 0 }}>Export Hub</h1>
+        <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", margin: "4px 0 0 0" }}>Download clean, validated datasets directly from HDFS Medallion layers and Elasticsearch reports</p>
       </div>
 
       {/* Tabs */}
-      <div style={{ display: "flex", gap: "10px", marginBottom: "5px" }}>
+      <div style={{ display: "flex", gap: "10px", marginBottom: "15px" }}>
         <button 
           className={`btn ${activeTab === "datasets" ? "btn-primary" : "btn-secondary"}`}
           onClick={() => { setActiveTab("datasets"); setPreviewData(null); }}
-          style={{ padding: "8px 16px" }}
+          style={{ 
+            padding: "0.5rem 1.25rem", 
+            borderRadius: "20px",
+            background: activeTab === "datasets" ? "var(--accent-indigo)" : "#FFFFFF",
+            border: "1px solid #E2E8F0",
+            color: activeTab === "datasets" ? "#FFFFFF" : "var(--text-muted)",
+            cursor: "pointer",
+            fontWeight: 500
+          }}
         >
-          📋 Pipeline Datasets (HDFS)
+          Pipeline Datasets (HDFS)
         </button>
         <button 
           className={`btn ${activeTab === "gold" ? "btn-primary" : "btn-secondary"}`}
           onClick={() => { setActiveTab("gold"); setPreviewData(null); }}
-          style={{ padding: "8px 16px" }}
+          style={{ 
+            padding: "0.5rem 1.25rem", 
+            borderRadius: "20px",
+            background: activeTab === "gold" ? "var(--accent-indigo)" : "#FFFFFF",
+            border: "1px solid #E2E8F0",
+            color: activeTab === "gold" ? "#FFFFFF" : "var(--text-muted)",
+            cursor: "pointer",
+            fontWeight: 500
+          }}
         >
-          📊 Gold BI Reports (Elasticsearch)
+          Gold BI Reports (Elasticsearch)
         </button>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "350px 1fr", gap: "15px", flex: 1, minHeight: 0 }}>
         {/* Left Panel: Control Panel */}
         <div className="glass-card" style={{ display: "flex", flexDirection: "column", gap: "15px", padding: "20px" }}>
-          <h2 style={{ fontSize: "16px", fontWeight: "700", borderBottom: "1px solid rgba(255,255,255,0.06)", paddingBottom: "10px" }}>
+          <h2 style={{ fontSize: "16px", fontWeight: "700", borderBottom: "1px solid #F1F5F9", paddingBottom: "10px" }}>
             Export Configuration
           </h2>
 
@@ -309,7 +328,7 @@ export default function DataExport() {
               <span>Preparing Export File...</span>
             ) : (
               <>
-                <span>📥 Export CSV Attachment</span>
+                <span>Export CSV Attachment</span>
               </>
             )}
           </button>
@@ -321,9 +340,9 @@ export default function DataExport() {
                 padding: "10px", 
                 borderRadius: "6px", 
                 fontSize: "12px",
-                background: exportStatus.loading ? "rgba(56,189,248,0.1)" : exportStatus.success ? "rgba(16,185,129,0.1)" : "rgba(244,63,94,0.1)",
-                color: exportStatus.loading ? "var(--accent-blue)" : exportStatus.success ? "var(--accent-green)" : "var(--accent-red)",
-                border: `1px solid ${exportStatus.loading ? "rgba(56,189,248,0.2)" : exportStatus.success ? "rgba(16,185,129,0.2)" : "rgba(244,63,94,0.2)"}`
+                background: exportStatus.loading ? "rgba(108,71,255,0.05)" : exportStatus.success ? "rgba(16,185,129,0.1)" : "rgba(244,63,94,0.1)",
+                color: exportStatus.loading ? "var(--accent-indigo)" : exportStatus.success ? "var(--accent-green)" : "var(--accent-red)",
+                border: `1px solid ${exportStatus.loading ? "rgba(108,71,255,0.15)" : exportStatus.success ? "rgba(16,185,129,0.2)" : "rgba(244,63,94,0.2)"}`
               }}
             >
               {exportStatus.message}
@@ -333,7 +352,7 @@ export default function DataExport() {
 
         {/* Right Panel: Preview Grid */}
         <div className="glass-card" style={{ display: "flex", flexDirection: "column", padding: "20px", overflow: "hidden" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.06)", paddingBottom: "10px", marginBottom: "15px", flexShrink: 0 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #F1F5F9", paddingBottom: "10px", marginBottom: "15px", flexShrink: 0 }}>
             <h2 style={{ fontSize: "16px", fontWeight: "700" }}>Dataset Preview (First 10 records)</h2>
             {activeTab === "datasets" && selectedLayer !== "reddit" && selectedTable && (
               <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>

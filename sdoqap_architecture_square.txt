@@ -1,0 +1,120 @@
+graph TD
+    %% ==========================================
+    %% CLASS DEFINITIONS (Enforced Massive Font Size for Slides)
+    %% ==========================================
+    classDef source fill:#333333,stroke:#666666,stroke-width:2.5px,rx:5px,ry:5px,color:#ffffff,font-size:28px,font-weight:bold;
+    classDef bronze fill:#1e293b,stroke:#3b82f6,stroke-width:2.5px,rx:5px,ry:5px,color:#ffffff,font-size:28px,font-weight:bold;
+    classDef silver fill:#064e3b,stroke:#10b981,stroke-width:2.5px,rx:5px,ry:5px,color:#ffffff,font-size:28px,font-weight:bold;
+    classDef gold fill:#78350f,stroke:#f59e0b,stroke-width:2.5px,rx:5px,ry:5px,color:#ffffff,font-size:28px,font-weight:bold;
+    classDef engine fill:#4c1d95,stroke:#8b5cf6,stroke-width:2.5px,rx:5px,ry:5px,color:#ffffff,font-size:28px,font-weight:bold;
+    classDef ui fill:#831843,stroke:#ec4899,stroke-width:2.5px,rx:5px,ry:5px,color:#ffffff,font-size:28px,font-weight:bold;
+    classDef block fill:#7f1d1d,stroke:#ef4444,stroke-width:2.5px,rx:5px,ry:5px,color:#ffffff,font-size:28px,font-weight:bold;
+    classDef ai fill:#7c2d12,stroke:#f97316,stroke-width:3px,rx:5px,ry:5px,color:#ffffff,font-size:28px,font-weight:bold;
+
+    %% ==========================================
+    %% 1. Ingestion Layer
+    %% ==========================================
+    subgraph Ingestion_Layer ["1. Ingestion Layer"]
+        Reddit_Stream["Reddit Streamer"]:::source
+        CSV_Files["CSV Ingestion"]:::source
+        REST_API["REST API Ingestion"]:::source
+    end
+
+    %% ==========================================
+    %% 2. Storage Layer
+    %% ==========================================
+    subgraph Storage_Layer ["2. Storage Layer"]
+        Delta_Quarantine["Quarantine Store"]:::block
+        Delta_Active["Active Store"]:::silver
+        Kafka_Broker["Kafka Message Broker"]:::engine
+        HDFS_Raw["HDFS Raw Zone"]:::bronze
+    end
+
+    %% ==========================================
+    %% 3. Spark Layer
+    %% ==========================================
+    subgraph Spark_Layer ["3. Spark Compute Layer"]
+        Spark_Gold["Spark Gold Aggregator"]:::gold
+        Spark_Ingestion["Spark Streaming & Ingestion"]:::engine
+        Spark_Quality["Spark Quality Engine"]:::engine
+        Spark_Rules["Quality Check Rules"]:::engine
+    end
+
+    %% ==========================================
+    %% 4. Elasticsearch Layer
+    %% ==========================================
+    subgraph Elasticsearch_Layer ["4. Elasticsearch DB"]
+        ES_Gold[("ES Gold Aggregates")]:::gold
+        ES_Pipeline[("ES Pipeline Runs")]:::engine
+        ES_Quality[("ES Quality Runs")]:::engine
+        ES_Lineage[("ES Data Lineage")]:::engine
+    end
+
+    %% ==========================================
+    %% 5. Alerts/AI Layer
+    %% ==========================================
+    subgraph Alerts_Layer ["5. Orchestration & AI Layer"]
+        n8n_Alerts["n8n Automation"]:::ui
+        AI_Advisor["AI Rules Generator"]:::ai
+        Slack_Webhook["Slack / Webhook Alerts"]:::ui
+        Remediation_Ticket["Dynamic Rules Proposal"]:::ai
+    end
+
+    %% ==========================================
+    %% 6. Serving Layer
+    %% ==========================================
+    subgraph Serving_Layer ["6. Serving & Analytics Layer"]
+        Grafana["Grafana Dashboards"]:::ui
+        React_Portal["React Web Portal"]:::ui
+        Kibana["Kibana Logs Search"]:::ui
+    end
+
+    %% ==========================================
+    %% FLOW CONNECTIONS (HIGH-LEVEL KEYWORDS)
+    %% ==========================================
+    
+    %% Ingestion to Storage
+    Reddit_Stream -->|Reddit Queue Feed| Kafka_Broker
+    CSV_Files -->|WebHDFS Upload| HDFS_Raw
+    REST_API -->|JSON Ingestion| HDFS_Raw
+    
+    %% Storage to Spark
+    Delta_Active -->|Query Active Data| Spark_Gold
+    Kafka_Broker -->|Stream Ingestion| Spark_Ingestion
+    HDFS_Raw -->|Batch Ingestion| Spark_Ingestion
+    
+    %% Inside Spark
+    Spark_Ingestion -->|Process Sub-Jobs| Spark_Quality
+    Spark_Quality -->|Verify Schema & Rules| Spark_Rules
+    
+    %% Spark loopback to Storage
+    Spark_Rules -->|Unclean Data| Delta_Quarantine
+    Spark_Rules -->|Clean Data| Delta_Active
+    
+    %% Spark to Elasticsearch
+    Spark_Gold -->|Write Gold Metrics| ES_Gold
+    Spark_Ingestion -->|Write Run Logs| ES_Pipeline
+    Spark_Rules -->|Write Quality Scores| ES_Quality
+    Spark_Rules -->|Write Data Lineage| ES_Lineage
+    
+    %% Elasticsearch to Alerts/AI
+    ES_Quality -->|Trigger n8n| n8n_Alerts
+    ES_Lineage -->|Analyze Schema Drifts| AI_Advisor
+    n8n_Alerts -->|Send Alert| Slack_Webhook
+    AI_Advisor -->|Generate Dynamic Rules| Remediation_Ticket
+    
+    %% Elasticsearch/AI to Serving
+    ES_Gold -->|Query Metrics| Grafana
+    ES_Pipeline -->|Query Logs| Kibana
+    ES_Quality -->|Query Scores| React_Portal
+    Remediation_Ticket -->|Approve Rules| React_Portal
+
+    %% ==========================================
+    %% SUBGRAPH TRANSPARENT STYLING (No White Backgrounds)
+    %% ==========================================
+    style Ingestion_Layer fill:none,stroke:#666666,stroke-width:1.5px;
+    style Storage_Layer fill:none,stroke:#666666,stroke-width:1.5px;
+    style Spark_Layer fill:none,stroke:#666666,stroke-width:1.5px;
+    style Elasticsearch_Layer fill:none,stroke:#666666,stroke-width:1.5px;
+    style Alerts_Layer fill:none,stroke:#666666,stroke-width:1.5px;
+    style Serving_Layer fill:none,stroke:#666666,stroke-width:1.5px;

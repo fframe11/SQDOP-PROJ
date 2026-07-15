@@ -301,9 +301,14 @@ export default function RulesConfig() {
 
   return (
     <div className="page-container" style={{ overflowY: "auto", height: "calc(100vh - 56px)", paddingBottom: "2rem" }}>
-      <div className="page-header" style={{ marginBottom: "1.5rem" }}>
-        <h1>Dynamic Rules Hub</h1>
-        <p>Manage data quality thresholds, view profiling ranges, and review AI suggestions</p>
+      <div style={{ marginBottom: "1.5rem", width: "100%" }}>
+        <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "0.4rem", fontFamily: "var(--font-sans)", display: "flex", gap: "6px", alignItems: "center" }}>
+          <span>SDOQAP Data Engine</span>
+          <span style={{ opacity: 0.5 }}>&gt;</span>
+          <span style={{ color: "var(--text-main)", fontWeight: 500 }}>Rules Hub</span>
+        </div>
+        <h1 style={{ fontSize: "1.6rem", fontWeight: 700, color: "var(--text-main)", letterSpacing: "-0.02em", margin: 0 }}>Rules Hub</h1>
+        <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", margin: "4px 0 0 0" }}>Manage data quality thresholds, view profiling ranges, and review AI suggestions</p>
       </div>
 
       {actionResult && (
@@ -319,35 +324,37 @@ export default function RulesConfig() {
           style={{ 
             padding: "0.5rem 1.25rem", 
             borderRadius: "20px",
-            background: activeTab === "tables" ? "var(--accent-blue)" : "rgba(255,255,255,0.03)",
-            border: "1px solid rgba(255,255,255,0.08)",
-            color: "#fff",
-            cursor: "pointer"
+            background: activeTab === "tables" ? "var(--accent-indigo)" : "#FFFFFF",
+            border: "1px solid #E2E8F0",
+            color: activeTab === "tables" ? "#FFFFFF" : "var(--text-muted)",
+            cursor: "pointer",
+            fontWeight: 500
           }}
           onClick={() => {
             setActiveTab("tables");
             setActionResult(null);
           }}
         >
-          📂 Table Quality Rules
+          Table Quality Rules
         </button>
         <button
           className={`btn ${activeTab === "proposals" ? "btn-primary" : "btn-secondary"}`}
           style={{ 
             padding: "0.5rem 1.25rem", 
             borderRadius: "20px",
-            background: activeTab === "proposals" ? "var(--accent-blue)" : "rgba(255,255,255,0.03)",
-            border: "1px solid rgba(255,255,255,0.08)",
-            color: "#fff",
+            background: activeTab === "proposals" ? "var(--accent-indigo)" : "#FFFFFF",
+            border: "1px solid #E2E8F0",
+            color: activeTab === "proposals" ? "#FFFFFF" : "var(--text-muted)",
             cursor: "pointer",
-            position: "relative"
+            position: "relative",
+            fontWeight: 500
           }}
           onClick={() => {
             setActiveTab("proposals");
             setActionResult(null);
           }}
         >
-          🤖 AI Advisor Proposals
+          AI Advisor Proposals
           {proposalsList.length > 0 && (
             <span style={{
               position: "absolute",
@@ -373,35 +380,37 @@ export default function RulesConfig() {
           style={{ 
             padding: "0.5rem 1.25rem", 
             borderRadius: "20px",
-            background: activeTab === "settings" ? "var(--accent-blue)" : "rgba(255,255,255,0.03)",
-            border: "1px solid rgba(255,255,255,0.08)",
-            color: "#fff",
-            cursor: "pointer"
+            background: activeTab === "settings" ? "var(--accent-indigo)" : "#FFFFFF",
+            border: "1px solid #E2E8F0",
+            color: activeTab === "settings" ? "#FFFFFF" : "var(--text-muted)",
+            cursor: "pointer",
+            fontWeight: 500
           }}
           onClick={() => {
             setActiveTab("settings");
             setActionResult(null);
           }}
         >
-          ⚙️ Global AI Settings
+          Global AI Settings
         </button>
         <button
           className={`btn ${activeTab === "remediations" ? "btn-primary" : "btn-secondary"}`}
           style={{ 
             padding: "0.5rem 1.25rem", 
             borderRadius: "20px",
-            background: activeTab === "remediations" ? "var(--accent-blue)" : "rgba(255,255,255,0.03)",
-            border: "1px solid rgba(255,255,255,0.08)",
-            color: "#fff",
+            background: activeTab === "remediations" ? "var(--accent-indigo)" : "#FFFFFF",
+            border: "1px solid #E2E8F0",
+            color: activeTab === "remediations" ? "#FFFFFF" : "var(--text-muted)",
             cursor: "pointer",
-            position: "relative"
+            position: "relative",
+            fontWeight: 500
           }}
           onClick={() => {
             setActiveTab("remediations");
             setActionResult(null);
           }}
         >
-          🛡️ Upstream Governance
+          Upstream Governance
           {remediations.filter(t => t.status === "OPEN").length > 0 && (
             <span style={{
               position: "absolute",
@@ -428,13 +437,13 @@ export default function RulesConfig() {
         <div style={{ display: "grid", gridTemplateColumns: "280px 1fr", gap: "1.5rem", alignItems: "start" }}>
           {/* Left Column: Tables List */}
           <div>
-            <h3 style={{ fontSize: "1rem", fontWeight: 600, color: "#fff", marginBottom: "0.5rem" }}>Dataset Registry</h3>
+            <h3 style={{ fontSize: "1rem", fontWeight: 600, color: "var(--text-main)", marginBottom: "0.5rem" }}>Dataset Registry</h3>
             <div 
               className="glass-card" 
               style={{ 
                 padding: "1rem", 
-                background: "rgba(10, 14, 26, 0.4)",
-                border: "1px solid rgba(255,255,255,0.05)",
+                background: "#FFFFFF",
+                border: "1px solid #E2E8F0",
                 display: "flex", 
                 flexDirection: "column", 
                 gap: "0.5rem", 
@@ -453,9 +462,9 @@ export default function RulesConfig() {
                       padding: "0.75rem 1rem",
                       cursor: "pointer",
                       borderRadius: "8px",
-                      border: isSelected ? "1px solid var(--accent-blue)" : "1px solid rgba(255,255,255,0.06)",
-                      background: isSelected ? "rgba(56, 189, 248, 0.08)" : "rgba(255, 255, 255, 0.01)",
-                      color: isSelected ? "#fff" : "var(--text-muted)",
+                      border: isSelected ? "1px solid var(--accent-indigo)" : "1px solid #E2E8F0",
+                      background: isSelected ? "rgba(108, 71, 255, 0.08)" : "#FFFFFF",
+                      color: isSelected ? "var(--accent-indigo)" : "var(--text-muted)",
                       fontWeight: isSelected ? 600 : 400,
                       transition: "all 0.2s ease"
                     }}
@@ -472,10 +481,10 @@ export default function RulesConfig() {
           </div>
 
           {/* Right Column: Table Configuration & Profile */}
-          <div className="glass-card" style={{ padding: "1.5rem", background: "rgba(10, 14, 26, 0.4)", border: "1px solid rgba(255,255,255,0.05)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.08)", paddingBottom: "10px", marginBottom: "15px" }}>
-              <h2 style={{ fontSize: "1.25rem", color: "#fff" }}>
-                Governance Config: <span style={{ color: "var(--accent-blue)" }}>{selectedTable}</span>
+          <div className="glass-card" style={{ padding: "1.5rem", background: "#FFFFFF", border: "1px solid #E2E8F0" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #F1F5F9", paddingBottom: "10px", marginBottom: "15px" }}>
+              <h2 style={{ fontSize: "1.25rem", color: "var(--text-main)" }}>
+                Governance Config: <span style={{ color: "var(--accent-indigo)" }}>{selectedTable}</span>
               </h2>
               <div style={{ display: "flex", gap: "0.25rem" }}>
                 <button
@@ -483,14 +492,14 @@ export default function RulesConfig() {
                   style={{ padding: "0.3rem 0.8rem", fontSize: "0.75rem", borderRadius: "4px" }}
                   onClick={() => setDetailTab("edit")}
                 >
-                  ⚙️ Rules Editor
+                  Rules Editor
                 </button>
                 <button
                   className={`btn ${detailTab === "profile" ? "btn-primary" : "btn-secondary"}`}
                   style={{ padding: "0.3rem 0.8rem", fontSize: "0.75rem", borderRadius: "4px" }}
                   onClick={() => setDetailTab("profile")}
                 >
-                  📊 Profiling Profiles
+                  Profiling Profiles
                 </button>
               </div>
             </div>
@@ -781,13 +790,13 @@ export default function RulesConfig() {
         <div style={{ display: "grid", gridTemplateColumns: "360px 1fr", gap: "1.5rem", alignItems: "start" }}>
           {/* Left Column: Proposals List */}
           <div>
-            <h3 style={{ fontSize: "1rem", fontWeight: 600, color: "#fff", marginBottom: "0.5rem" }}>Rule Proposals</h3>
+            <h3 style={{ fontSize: "1rem", fontWeight: 600, color: "var(--text-main)", marginBottom: "0.5rem" }}>Rule Proposals</h3>
             <div 
               className="glass-card" 
               style={{ 
                 padding: "1rem", 
-                background: "rgba(10, 14, 26, 0.4)",
-                border: "1px solid rgba(255,255,255,0.05)",
+                background: "#FFFFFF",
+                border: "1px solid #E2E8F0",
                 display: "flex", 
                 flexDirection: "column", 
                 gap: "0.5rem", 
@@ -811,8 +820,8 @@ export default function RulesConfig() {
                         padding: "1rem",
                         cursor: "pointer",
                         borderRadius: "8px",
-                        border: isSelected ? "1px solid var(--accent-blue)" : "1px solid rgba(255,255,255,0.06)",
-                        background: isSelected ? "rgba(56, 189, 248, 0.08)" : "rgba(255, 255, 255, 0.01)",
+                        border: isSelected ? "1px solid var(--accent-indigo)" : "1px solid #E2E8F0",
+                        background: isSelected ? "rgba(108, 71, 255, 0.08)" : "#FFFFFF",
                         transition: "all 0.2s ease"
                       }}
                       onClick={() => {
@@ -821,7 +830,7 @@ export default function RulesConfig() {
                       }}
                     >
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
-                        <span style={{ fontSize: "0.9rem", fontWeight: 700, color: "#fff" }}>{p.table_name}</span>
+                        <span style={{ fontSize: "0.9rem", fontWeight: 700, color: "var(--text-main)" }}>{p.table_name}</span>
                         <span style={{
                           fontSize: "0.68rem",
                           fontWeight: "bold",
@@ -846,14 +855,14 @@ export default function RulesConfig() {
 
           {/* Right Column: Proposal Detail View */}
           {selectedProposal ? (
-            <div className="glass-card animate-in" style={{ padding: "2rem", background: "rgba(10, 14, 26, 0.4)", border: "1px solid rgba(255,255,255,0.05)" }}>
+            <div className="glass-card animate-in" style={{ padding: "2rem", background: "#FFFFFF", border: "1px solid #E2E8F0" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", marginBottom: "1rem" }}>
                 <div>
-                  <h2 style={{ fontSize: "1.5rem", color: "#fff" }}>{selectedProposal.table_name} Rule Proposal</h2>
+                  <h2 style={{ fontSize: "1.5rem", color: "var(--text-main)" }}>{selectedProposal.table_name} Rule Proposal</h2>
                   <p style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>Run ID: {selectedProposal.run_id}</p>
                 </div>
                 <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: "1.25rem", fontWeight: "bold", color: "var(--accent-blue)" }}>
+                  <div style={{ fontSize: "1.25rem", fontWeight: "bold", color: "var(--accent-indigo)" }}>
                     {((selectedProposal.analysis_result?.confidence ?? 0) * 100).toFixed(0)}% Confidence
                   </div>
                   <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>Generated by Gemini Advisor</div>
@@ -965,12 +974,14 @@ export default function RulesConfig() {
                 padding: "4rem", 
                 textAlign: "center", 
                 minHeight: "450px", 
-                background: "rgba(10, 14, 26, 0.4)",
-                border: "1px solid rgba(255,255,255,0.05)",
+                background: "#FFFFFF",
+                border: "1px solid #E2E8F0",
                 borderRadius: "12px"
               }}
             >
-              <div className="card-icon blue" style={{ width: 60, height: 60, fontSize: "2rem", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "1rem" }}>🤖</div>
+              <div className="card-icon blue" style={{ width: 60, height: 60, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "1rem" }}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+              </div>
               <h3 className="section-title">No AI Proposal Selected</h3>
               <p className="section-subtitle" style={{ maxWidth: "320px", margin: "0.5rem auto 0" }}>
                 Select a proposal from the list on the left to inspect root cause analyses, suggested rules, and take actions.
@@ -982,9 +993,9 @@ export default function RulesConfig() {
 
       {activeTab === "settings" && (
         <div style={{ maxWidth: "600px", margin: "2rem auto 0" }} className="glass-card animate-in">
-          <div style={{ borderBottom: "1px solid rgba(255,255,255,0.08)", paddingBottom: "15px", marginBottom: "20px" }}>
-            <h2 style={{ fontSize: "1.25rem", color: "#fff", display: "flex", alignItems: "center", gap: "0.5rem" }}>
-              🤖 Global AI Settings
+          <div style={{ borderBottom: "1px solid #F1F5F9", paddingBottom: "15px", marginBottom: "20px" }}>
+            <h2 style={{ fontSize: "1.25rem", color: "var(--text-main)", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              Global AI Settings
             </h2>
             <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: "0.25rem" }}>
               Configure Gemini or Groq API Credentials to enable AI-powered data quality profiling and automated rule generation.
@@ -1002,7 +1013,7 @@ export default function RulesConfig() {
               )}
 
               <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                <label style={{ fontSize: "0.85rem", fontWeight: 600, color: "#fff" }}>
+                <label style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-main)" }}>
                   AI API Key (Gemini / Groq)
                 </label>
                 <input
@@ -1014,9 +1025,9 @@ export default function RulesConfig() {
                     width: "100%",
                     padding: "0.75rem",
                     borderRadius: "6px",
-                    border: "1px solid rgba(255,255,255,0.08)",
-                    background: "rgba(10, 14, 26, 0.6)",
-                    color: "#fff",
+                    border: "1px solid #E2E8F0",
+                    background: "#FFFFFF",
+                    color: "var(--text-main)",
                     fontSize: "0.85rem"
                   }}
                 />
@@ -1026,7 +1037,7 @@ export default function RulesConfig() {
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                <label style={{ fontSize: "0.85rem", fontWeight: 600, color: "#fff" }}>
+                <label style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-main)" }}>
                   AI Model Version
                 </label>
                 <select
@@ -1036,9 +1047,9 @@ export default function RulesConfig() {
                     width: "100%",
                     padding: "0.75rem",
                     borderRadius: "6px",
-                    border: "1px solid rgba(255,255,255,0.08)",
-                    background: "rgba(10, 14, 26, 0.6)",
-                    color: "#fff",
+                    border: "1px solid #E2E8F0",
+                    background: "#FFFFFF",
+                    color: "var(--text-main)",
                     fontSize: "0.85rem"
                   }}
                 >

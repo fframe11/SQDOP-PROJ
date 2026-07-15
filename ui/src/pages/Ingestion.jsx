@@ -190,13 +190,11 @@ export default function Ingestion() {
       {/* Dynamic Styling Overrides to achieve the premium glassmorphism look from mockup */}
       <style>{`
         .custom-glass-card {
-          background: rgba(10, 18, 36, 0.45);
-          backdrop-filter: blur(30px);
-          -webkit-backdrop-filter: blur(30px);
-          border: 1px solid rgba(56, 189, 248, 0.15);
+          background: #FFFFFF;
+          border: 1px solid #E2E8F0;
           border-radius: 16px;
           padding: 1.5rem;
-          box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.35);
+          box-shadow: 0 4px 20px rgba(15, 23, 42, 0.02);
           transition: all 0.3s ease;
           display: flex;
           flex-direction: column;
@@ -204,26 +202,26 @@ export default function Ingestion() {
           height: 100%;
         }
         .custom-glass-card:hover {
-          border-color: rgba(56, 189, 248, 0.35);
-          box-shadow: 0 8px 32px 0 rgba(56, 189, 248, 0.08);
+          border-color: rgba(108, 71, 255, 0.35);
+          box-shadow: 0 4px 20px rgba(108, 71, 255, 0.05);
           transform: translateY(-2px);
         }
         .custom-input {
           width: 100%;
           padding: 0.65rem;
           border-radius: 8px;
-          background: rgba(0, 0, 0, 0.35);
-          border: 1px solid rgba(56, 189, 248, 0.18);
-          color: #f8fafc;
+          background: #FFFFFF;
+          border: 1px solid #E2E8F0;
+          color: var(--text-main);
           font-family: inherit;
           font-size: 0.85rem;
           transition: all 0.2s ease;
           margin-top: 0.25rem;
         }
         .custom-input:focus {
-          border-color: var(--accent-blue);
+          border-color: var(--accent-indigo);
           outline: none;
-          box-shadow: 0 0 8px rgba(56, 189, 248, 0.2);
+          box-shadow: 0 0 8px rgba(108, 71, 255, 0.2);
         }
         .custom-label {
           display: block;
@@ -233,10 +231,10 @@ export default function Ingestion() {
         }
         .custom-button {
           width: 100%;
-          background: rgba(56, 189, 248, 0.1);
-          border: 1px solid rgba(56, 189, 248, 0.35);
+          background: rgba(108, 71, 255, 0.08);
+          border: 1px solid rgba(108, 71, 255, 0.35);
           border-radius: 8px;
-          color: #38bdf8;
+          color: #6C47FF;
           padding: 0.75rem;
           font-weight: 600;
           font-size: 0.85rem;
@@ -245,9 +243,9 @@ export default function Ingestion() {
           margin-top: 1rem;
         }
         .custom-button:hover:not(:disabled) {
-          background: rgba(56, 189, 248, 0.25);
-          border-color: rgba(56, 189, 248, 0.7);
-          box-shadow: 0 0 10px rgba(56, 189, 248, 0.15);
+          background: rgba(108, 71, 255, 0.15);
+          border-color: rgba(108, 71, 255, 0.7);
+          box-shadow: 0 0 10px rgba(108, 71, 255, 0.15);
         }
         .custom-button:disabled {
           opacity: 0.5;
@@ -255,8 +253,8 @@ export default function Ingestion() {
         }
         .custom-slider {
           width: 100%;
-          accent-color: #38bdf8;
-          background: rgba(255, 255, 255, 0.1);
+          accent-color: #6C47FF;
+          background: #E2E8F0;
           height: 5px;
           border-radius: 3px;
           outline: none;
@@ -292,8 +290,8 @@ export default function Ingestion() {
           left: 0;
           right: 0;
           bottom: 0;
-          background-color: rgba(255,255,255,0.1);
-          border: 1px solid rgba(56, 189, 248, 0.3);
+          background-color: #E2E8F0;
+          border: 1px solid #CBD5E1;
           transition: .4s;
           border-radius: 34px;
         }
@@ -309,17 +307,16 @@ export default function Ingestion() {
           border-radius: 50%;
         }
         input:checked + .slider {
-          background-color: rgba(56, 189, 248, 0.2);
-          border-color: #38bdf8;
+          background-color: rgba(108, 71, 255, 0.2);
+          border-color: #6C47FF;
         }
         input:checked + .slider:before {
           transform: translateX(22px);
-          background-color: #38bdf8;
+          background-color: #6C47FF;
         }
         .terminal-header {
-          background: rgba(15, 23, 42, 0.85);
-          backdrop-filter: blur(10px);
-          border: 1px solid rgba(56, 189, 248, 0.15);
+          background: #F1F5F9;
+          border: 1px solid #E2E8F0;
           border-bottom: none;
           border-radius: 12px 12px 0 0;
           padding: 0.6rem 1rem;
@@ -334,8 +331,8 @@ export default function Ingestion() {
           display: inline-block;
         }
         .terminal-body {
-          background: #040713;
-          border: 1px solid rgba(56, 189, 248, 0.15);
+          background: #0F172A;
+          border: 1px solid #E2E8F0;
           border-radius: 0 0 12px 12px;
           height: 320px;
           overflow-y: auto;
@@ -344,13 +341,18 @@ export default function Ingestion() {
           font-size: 0.8rem;
           line-height: 1.5;
           color: #cbd5e1;
-          box-shadow: inset 0 8px 24px rgba(0,0,0,0.5);
+          box-shadow: inset 0 8px 24px rgba(0,0,0,0.15);
         }
       `}</style>
 
-      <div className="page-header" style={{ marginBottom: "2rem" }}>
-        <h1 style={{ letterSpacing: "-0.03em", fontWeight: 800 }}>Data Ingestion Console</h1>
-        <p style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>Drag &amp; drop datasets, fetch external APIs, or scrape live real-time feeds into the platform</p>
+      <div style={{ marginBottom: "2rem", width: "100%" }}>
+        <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "0.4rem", fontFamily: "var(--font-sans)", display: "flex", gap: "6px", alignItems: "center" }}>
+          <span>SDOQAP Data Engine</span>
+          <span style={{ opacity: 0.5 }}>&gt;</span>
+          <span style={{ color: "var(--text-main)", fontWeight: 500 }}>Ingestion Stage</span>
+        </div>
+        <h1 style={{ fontSize: "1.6rem", fontWeight: 700, color: "var(--text-main)", letterSpacing: "-0.02em", margin: 0 }}>Ingestion Stage</h1>
+        <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", margin: "4px 0 0 0" }}>Drag &amp; drop datasets, fetch external APIs, or scrape live real-time feeds into the platform</p>
       </div>
 
       <div className="card-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "1.5rem", marginBottom: "2rem" }}>
@@ -369,11 +371,11 @@ export default function Ingestion() {
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
                 style={{
-                  border: csvDragging ? "1.5px dashed #38bdf8" : "1px dashed rgba(56, 189, 248, 0.3)",
+                  border: csvDragging ? "1.5px dashed var(--accent-indigo)" : "1px dashed #CBD5E1",
                   borderRadius: "12px",
                   padding: "1.75rem 1rem",
                   textAlign: "center",
-                  background: csvDragging ? "rgba(56, 189, 248, 0.08)" : "rgba(0,0,0,0.25)",
+                  background: csvDragging ? "rgba(108, 71, 255, 0.05)" : "#FAFAFC",
                   cursor: "pointer",
                   transition: "all 0.2s ease"
                 }}
@@ -388,7 +390,7 @@ export default function Ingestion() {
                 />
                 
                 {/* Cloud Upload Icon */}
-                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke={csvFile ? "#10b981" : "#38bdf8"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: "0.5rem" }}>
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke={csvFile ? "#10b981" : "var(--accent-indigo)"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: "0.5rem" }}>
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                   <polyline points="17 8 12 3 7 8" />
                   <line x1="12" y1="3" x2="12" y2="15" />
@@ -401,7 +403,7 @@ export default function Ingestion() {
                   </div>
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
-                    <span style={{ fontSize: "0.85rem", fontWeight: 600 }}>Drag &amp; Drop CSV file or <span style={{ color: "#38bdf8", textDecoration: "underline" }}>browse</span></span>
+                    <span style={{ fontSize: "0.85rem", fontWeight: 600 }}>Drag &amp; Drop CSV file or <span style={{ color: "var(--accent-indigo)", textDecoration: "underline" }}>browse</span></span>
                     <span style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>supports .csv, .tsv, max 500MB</span>
                   </div>
                 )}
@@ -490,7 +492,7 @@ export default function Ingestion() {
                   value={apiMethod}
                   onChange={(e) => setApiMethod(e.target.value)}
                   className="custom-input"
-                  style={{ appearance: "none", backgroundImage: "linear-gradient(45deg, transparent 50%, #38bdf8 50%), linear-gradient(135deg, #38bdf8 50%, transparent 50%)", backgroundPosition: "calc(100% - 18px) calc(1em + 2px), calc(100% - 13px) calc(1em + 2px)", backgroundSize: "5px 5px, 5px 5px", backgroundRepeat: "no-repeat" }}
+                  style={{ appearance: "none", backgroundImage: "linear-gradient(45deg, transparent 50%, var(--accent-indigo) 50%), linear-gradient(135deg, var(--accent-indigo) 50%, transparent 50%)", backgroundPosition: "calc(100% - 18px) calc(1em + 2px), calc(100% - 13px) calc(1em + 2px)", backgroundSize: "5px 5px, 5px 5px", backgroundRepeat: "no-repeat" }}
                 >
                   <option value="GET">GET</option>
                   <option value="POST">POST</option>
@@ -502,7 +504,7 @@ export default function Ingestion() {
               <div style={{ marginTop: "0.25rem" }}>
                 <div style={{ display: "flex", justifyContent: "space-between" }}>
                   <label className="custom-label">Refresh Interval</label>
-                  <span style={{ fontSize: "0.75rem", color: "var(--accent-blue)", fontWeight: 700 }}>{apiInterval}s</span>
+                  <span style={{ fontSize: "0.75rem", color: "var(--accent-indigo)", fontWeight: 700 }}>{apiInterval}s</span>
                 </div>
                 <input
                   type="range"
@@ -627,7 +629,7 @@ export default function Ingestion() {
         {/* Progress Bar inside terminal border */}
         {isStreaming && (
           <div style={{ width: "100%", height: "2px", background: "rgba(255,255,255,0.05)", position: "relative" }}>
-            <div style={{ width: `${getPercentage()}%`, height: "100%", background: "#38bdf8", transition: "width 0.5s ease" }} />
+            <div style={{ width: `${getPercentage()}%`, height: "100%", background: "#6C47FF", transition: "width 0.5s ease" }} />
           </div>
         )}
 
@@ -638,7 +640,7 @@ export default function Ingestion() {
               if (log.includes("[python]")) color = "#10b981"; // green
               if (log.includes("[spark]")) color = "#a855f7"; // purple
               if (log.includes("[ERROR]") || log.includes("failed")) color = "#f43f5e"; // red
-              if (log.includes("[SYSTEM]")) color = "#38bdf8"; // blue
+              if (log.includes("[SYSTEM]")) color = "#6C47FF"; // purple/indigo
               
               return (
                 <div key={i} style={{ color, marginBottom: "0.25rem", whiteSpace: "pre-wrap" }}>

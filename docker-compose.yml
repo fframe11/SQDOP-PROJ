@@ -230,6 +230,8 @@ services:
       - "${API_PORT}:8000"
     # network_mode: host
     container_name: sdoqap-api
+    env_file:
+      - .env
     volumes:
       - ./scripts:/app/scripts:ro
 

@@ -995,28 +995,44 @@ class SettingsPayload(BaseModel):
 @app.get("/api/v1/system/settings")
 def get_system_settings():
     es = Elasticsearch(ELASTICSEARCH_URL)
+    api_key = ""
+    model = ""
+    enabled = False
     try:
         if es.indices.exists(index="sdoqap_settings"):
             res = es.get(index="sdoqap_settings", id="global")
             doc = res.get("_source", {})
             api_key = doc.get("gemini_api_key", "")
-            masked = ""
-            if api_key:
-                if len(api_key) > 8:
-                    masked = api_key[:6] + "..." + api_key[-4:]
-                else:
-                    masked = "********"
-            return {
-                "gemini_api_key_masked": masked,
-                "gemini_model": doc.get("gemini_model", "gemini-1.5-flash"),
-                "gemini_enabled": doc.get("gemini_enabled", False)
-            }
+            model = doc.get("gemini_model", "")
+            enabled = doc.get("gemini_enabled", False)
     except Exception:
         pass
+        
+    if not api_key:
+        # Check environment variables fallback
+        groq_api_key = os.getenv("GROQ_API_KEY", "").strip()
+        if groq_api_key:
+            api_key = groq_api_key
+            model = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile").strip()
+            enabled = True
+        else:
+            gemini_api_key_env = os.getenv("GEMINI_API_KEY", "").strip()
+            if gemini_api_key_env:
+                api_key = gemini_api_key_env
+                model = os.getenv("GEMINI_MODEL", "gemini-1.5-flash").strip()
+                enabled = True
+
+    masked = ""
+    if api_key:
+        if len(api_key) > 8:
+            masked = api_key[:6] + "..." + api_key[-4:]
+        else:
+            masked = "********"
+
     return {
-        "gemini_api_key_masked": "",
-        "gemini_model": "gemini-1.5-flash",
-        "gemini_enabled": False
+        "gemini_api_key_masked": masked,
+        "gemini_model": model if model else "gemini-1.5-flash",
+        "gemini_enabled": enabled
     }
 
 @app.post("/api/v1/system/settings")
@@ -1046,7 +1062,8 @@ def update_system_settings(payload: SettingsPayload):
             url = "https://api.groq.com/openai/v1/chat/completions"
             headers = {
                 "Authorization": f"Bearer {doc['gemini_api_key']}",
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
             }
             payload_test = {
                 "model": "llama-3.3-70b-versatile",

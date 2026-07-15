@@ -107,9 +107,14 @@ export default function Schema() {
 
   return (
     <div className="page-container" style={{ overflowY: "auto", height: "calc(100vh - 56px)", paddingBottom: "2rem" }}>
-      <div className="page-header" style={{ marginBottom: "1.5rem" }}>
-        <h1>Schema Governance</h1>
-        <p>Review and approve/reject schema drift proposals detected by Spark engines</p>
+      <div style={{ marginBottom: "1.5rem", width: "100%" }}>
+        <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "0.4rem", fontFamily: "var(--font-sans)", display: "flex", gap: "6px", alignItems: "center" }}>
+          <span>SDOQAP Data Engine</span>
+          <span style={{ opacity: 0.5 }}>&gt;</span>
+          <span style={{ color: "var(--text-main)", fontWeight: 500 }}>Schema Drift</span>
+        </div>
+        <h1 style={{ fontSize: "1.6rem", fontWeight: 700, color: "var(--text-main)", letterSpacing: "-0.02em", margin: 0 }}>Schema Drift</h1>
+        <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", margin: "4px 0 0 0" }}>Review and approve/reject schema drift proposals detected by Spark engines</p>
       </div>
 
       {actionResult && (
@@ -128,10 +133,11 @@ export default function Schema() {
               padding: "0.5rem 1.25rem", 
               fontSize: "0.85rem",
               borderRadius: "20px",
-              background: statusFilter === tab ? "var(--accent-blue)" : "rgba(255,255,255,0.03)",
-              border: "1px solid rgba(255,255,255,0.08)",
-              color: "#fff",
-              cursor: "pointer"
+              background: statusFilter === tab ? "var(--accent-indigo)" : "#FFFFFF",
+              border: "1px solid #E2E8F0",
+              color: statusFilter === tab ? "#FFFFFF" : "var(--text-muted)",
+              cursor: "pointer",
+              fontWeight: 500
             }}
             onClick={() => {
               setStatusFilter(tab);
@@ -147,7 +153,7 @@ export default function Schema() {
       <div style={{ display: "grid", gridTemplateColumns: "360px 1fr", gap: "1.5rem", alignItems: "start" }}>
         {/* Left Column: Proposals List */}
         <div>
-          <h3 style={{ fontSize: "1rem", fontWeight: 600, color: "#fff", marginBottom: "0.25rem" }}>
+          <h3 style={{ fontSize: "1rem", fontWeight: 600, color: "var(--text-main)", marginBottom: "0.25rem" }}>
             {statusFilter === "PENDING" ? "PENDING" : statusFilter === "APPROVED" ? "APPROVED" : "REJECTED"} Proposals
           </h3>
           <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginBottom: "1rem" }}>
@@ -158,8 +164,8 @@ export default function Schema() {
             className="glass-card" 
             style={{ 
               padding: "1rem", 
-              background: "rgba(10, 14, 26, 0.4)",
-              border: "1px solid rgba(255,255,255,0.05)",
+              background: "#FFFFFF",
+              border: "1px solid #E2E8F0",
               display: "flex", 
               flexDirection: "column", 
               gap: "0.75rem", 
@@ -188,9 +194,9 @@ export default function Schema() {
                       padding: "1rem",
                       cursor: "pointer",
                       borderRadius: "8px",
-                      border: isSelected ? "2px solid #38bdf8" : "1px solid rgba(255,255,255,0.06)",
-                      background: isSelected ? "rgba(56, 189, 248, 0.08)" : "rgba(255, 255, 255, 0.01)",
-                      boxShadow: isSelected ? "0 0 10px rgba(56, 189, 248, 0.15)" : "none",
+                      border: isSelected ? "2px solid var(--accent-indigo)" : "1px solid #E2E8F0",
+                      background: isSelected ? "rgba(108, 71, 255, 0.08)" : "#FFFFFF",
+                      boxShadow: isSelected ? "0 0 10px rgba(108, 71, 255, 0.15)" : "none",
                       transition: "all 0.2s ease"
                     }}
                     onClick={() => {
@@ -198,7 +204,7 @@ export default function Schema() {
                       setActionResult(null);
                     }}
                   >
-                    <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "#fff", marginBottom: "0.5rem" }}>
+                    <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--text-main)", marginBottom: "0.5rem" }}>
                       {p.table_name}
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem", fontSize: "0.75rem", color: "var(--text-muted)" }}>
@@ -218,12 +224,12 @@ export default function Schema() {
             className="glass-card animate-in" 
             style={{ 
               padding: "2rem", 
-              background: "rgba(10, 14, 26, 0.4)",
-              border: "1px solid rgba(255,255,255,0.05)",
+              background: "#FFFFFF",
+              border: "1px solid #E2E8F0",
               borderRadius: "12px"
             }}
           >
-            <h2 style={{ fontSize: "1.5rem", fontWeight: 700, color: "#fff", marginBottom: "0.25rem" }}>
+            <h2 style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--text-main)", marginBottom: "0.25rem" }}>
               {selectedProposal.table_name}
             </h2>
             <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "1.5rem" }}>
@@ -245,7 +251,7 @@ export default function Schema() {
                 {getModificationLines(selectedProposal).map((line, i) => (
                   <div key={i} style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.85rem" }}>
                     <span style={{ color: line.badgeColor }}>•</span>
-                    <span style={{ color: "#fff" }}>{line.typeLabel}:</span>
+                    <span style={{ color: "var(--text-main)" }}>{line.typeLabel}:</span>
                     <span 
                       style={{ 
                         fontSize: "0.68rem", 
@@ -426,12 +432,14 @@ export default function Schema() {
               padding: "4rem", 
               textAlign: "center", 
               minHeight: "450px", 
-              background: "rgba(10, 14, 26, 0.4)",
-              border: "1px solid rgba(255,255,255,0.05)",
+              background: "#FFFFFF",
+              border: "1px solid #E2E8F0",
               borderRadius: "12px"
             }}
           >
-            <div className="card-icon blue" style={{ width: 60, height: 60, fontSize: "2rem", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "1rem" }}>📋</div>
+            <div className="card-icon blue" style={{ width: 60, height: 60, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "1rem" }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            </div>
             <h3 className="section-title">No Proposal Selected</h3>
             <p className="section-subtitle" style={{ maxWidth: "320px", margin: "0.5rem auto 0" }}>
               Select a schema proposal from the list on the left to inspect drift details, configure overrides, and take governance actions.

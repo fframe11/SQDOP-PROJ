@@ -1,0 +1,60 @@
+graph LR
+    %% ==========================================
+    %% CLASS DEFINITIONS (Enforced Large Font Size for Slides)
+    %% ==========================================
+    classDef source fill:#333333,stroke:#666666,stroke-width:2.5px,rx:5px,ry:5px,color:#ffffff,font-size:26px,font-weight:bold;
+    classDef bronze fill:#1e293b,stroke:#3b82f6,stroke-width:2.5px,rx:5px,ry:5px,color:#ffffff,font-size:26px,font-weight:bold;
+    classDef silver fill:#064e3b,stroke:#10b981,stroke-width:2.5px,rx:5px,ry:5px,color:#ffffff,font-size:26px,font-weight:bold;
+    classDef gold fill:#78350f,stroke:#f59e0b,stroke-width:2.5px,rx:5px,ry:5px,color:#ffffff,font-size:26px,font-weight:bold;
+    classDef engine fill:#4c1d95,stroke:#8b5cf6,stroke-width:2.5px,rx:5px,ry:5px,color:#ffffff,font-size:26px,font-weight:bold;
+    classDef ui fill:#831843,stroke:#ec4899,stroke-width:2.5px,rx:5px,ry:5px,color:#ffffff,font-size:26px,font-weight:bold;
+    classDef block fill:#7f1d1d,stroke:#ef4444,stroke-width:2.5px,rx:5px,ry:5px,color:#ffffff,font-size:26px,font-weight:bold;
+    classDef ai fill:#7c2d12,stroke:#f97316,stroke-width:3px,rx:5px,ry:5px,color:#ffffff,font-size:26px,font-weight:bold;
+
+    %% ==========================================
+    %% SCHEMA DRIFT GOVERNANCE NODES
+    %% ==========================================
+    Data_Schema["Ingested Data Schema"]:::source
+    Registry_Spec["Registry Schema (schema_registry.json)"]:::silver
+    
+    Evolution_Gate{"Evolution Gate<br>(Compare Schema)"}:::engine
+    Severity_Calc["Calculate Severity Score"]:::engine
+    
+    Safe_Branch{"Score <= 4?<br>(Safe Drift)"}:::silver
+    Auto_Evolve["Auto-Evolve Registry"]:::silver
+    Delta_Write["Write to Delta Lake"]:::silver
+    
+    Dangerous_Branch{"Score > 4?<br>(Dangerous Drift)"}:::block
+    Block_Cast["Block Spec & Cast String"]:::block
+    ES_Proposal["Log Anomaly & Create Proposal"]:::gold
+    
+    AI_Advisor["AI Rules Generator"]:::ai
+    React_Portal["React Web Portal<br>(Engineer Review)"]:::ui
+    Update_Registry["Update schema_registry.json"]:::silver
+
+    %% ==========================================
+    %% FLOW CONNECTIONS
+    %% ==========================================
+    
+    %% Ingest to Gate
+    Data_Schema --> Evolution_Gate
+    Registry_Spec --> Evolution_Gate
+    
+    %% Compute Severity
+    Evolution_Gate --> Severity_Calc
+    
+    %% Safe Drift Branch
+    Severity_Calc --> Safe_Branch
+    Safe_Branch -->|Yes| Auto_Evolve
+    Auto_Evolve --> Delta_Write
+    
+    %% Dangerous Drift Branch
+    Severity_Calc --> Dangerous_Branch
+    Dangerous_Branch -->|Yes| Block_Cast
+    Block_Cast --> ES_Proposal
+    
+    %% Closed Loop Governance
+    ES_Proposal --> AI_Advisor
+    AI_Advisor --> React_Portal
+    React_Portal -->|Approve Schema| Update_Registry
+    Update_Registry -.->|Next Run| Registry_Spec

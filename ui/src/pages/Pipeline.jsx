@@ -57,10 +57,15 @@ export default function Pipeline() {
     <div className="page-container">
       
       {/* Header & Gold Layer Rebuild Panel side-by-side */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1.5rem', marginBottom: '2rem', flexWrap: 'wrap' }}>
-        <div className="page-header" style={{ margin: 0, flex: 1, minWidth: '300px' }}>
-          <h1 style={{ letterSpacing: '-0.03em', fontWeight: 800 }}>Pipeline Management</h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Monitor and manage Data Pipeline Runs &amp; Business Aggregations</p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1.5rem', marginBottom: '2rem', flexWrap: 'wrap', width: "100%" }}>
+        <div style={{ margin: 0, flex: 1, minWidth: '300px' }}>
+          <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "0.4rem", fontFamily: "var(--font-sans)", display: "flex", gap: "6px", alignItems: "center" }}>
+            <span>SDOQAP Data Engine</span>
+            <span style={{ opacity: 0.5 }}>&gt;</span>
+            <span style={{ color: "var(--text-main)", fontWeight: 500 }}>Pipeline Runs</span>
+          </div>
+          <h1 style={{ fontSize: "1.6rem", fontWeight: 700, color: "var(--text-main)", letterSpacing: "-0.02em", margin: 0 }}>Pipeline Runs</h1>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: "4px 0 0 0" }}>Monitor and manage Data Pipeline Runs &amp; Business Aggregations</p>
         </div>
         
         {/* Gold Layer Aggregation Rebuild panel */}
@@ -69,19 +74,19 @@ export default function Pipeline() {
           style={{ 
             margin: 0, 
             padding: '1.25rem', 
-            background: 'rgba(10, 18, 36, 0.45)', 
-            border: '1px solid rgba(56, 189, 248, 0.15)', 
+            background: '#FFFFFF', 
+            border: '1px solid #E2E8F0', 
             borderRadius: '12px',
             maxWidth: '480px',
             flex: 1,
             minWidth: '300px',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.2)'
+            boxShadow: '0 4px 20px rgba(15, 23, 42, 0.02)'
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
             <div>
-              <h3 style={{ fontSize: '0.95rem', fontWeight: 700, margin: 0, color: '#fff', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                ✨ Gold Layer Aggregation
+              <h3 style={{ fontSize: '0.95rem', fontWeight: 700, margin: 0, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                Gold Layer Aggregation
               </h3>
               <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem', lineHeight: 1.4 }}>
                 Pre-aggregate Silver active storage into business-ready gold indices for BI dashboard performance.
@@ -92,10 +97,10 @@ export default function Pipeline() {
               onClick={handleGoldRebuild}
               disabled={goldRebuilding}
               style={{
-                background: 'rgba(56, 189, 248, 0.1)',
-                border: '1px solid rgba(56, 189, 248, 0.35)',
+                background: 'rgba(108, 71, 255, 0.08)',
+                border: '1px solid rgba(108, 71, 255, 0.35)',
                 borderRadius: '6px',
-                color: '#38bdf8',
+                color: '#6C47FF',
                 padding: '0.5rem 0.85rem',
                 fontSize: '0.78rem',
                 fontWeight: 600,

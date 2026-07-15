@@ -181,32 +181,36 @@ export default function Dashboard() {
 
   return (
     <div className="sdoqap-app">
-      {/* 1. Header Area */}
-      <header className="sdoqap-header">
-        <div className="logo-area">
-          <h1>SDOQAP Observability Portal</h1>
-          <p>Centralized Data Observability & QA Platform</p>
+      {/* 1. Page Header & Breadcrumbs (Clerk Style) */}
+      <div style={{ marginBottom: "1.5rem", width: "100%" }}>
+        <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "0.4rem", fontFamily: "var(--font-sans)", display: "flex", gap: "6px", alignItems: "center" }}>
+          <span>SDOQAP Data Engine</span>
+          <span style={{ opacity: 0.5 }}>&gt;</span>
+          <span style={{ color: "var(--text-main)", fontWeight: 500 }}>Dashboard</span>
         </div>
-
-        {/* Service Hub Connection Pills */}
-        <div className="service-hub">
-          {services.data ? (
-            Object.entries(services.data).map(([name, info]) => (
-              <div key={name} className="service-card" title={info.url || 'Internal Port'}>
-                <span className={`status-dot ${info.status === 'online' ? 'online' : 'offline'}`} />
-                <span className="service-name">{name}</span>
-              </div>
-            ))
-          ) : (
-            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Checking service health...</span>
-          )}
-
-          <div className={`overall-status ${services.error ? 'offline' : ''}`}>
-            <span className={`status-dot ${services.error ? 'offline' : 'online'}`} />
-            <span>{services.error ? 'SYSTEM CONNECTION LOST' : 'System Connection Active'}</span>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+          <div>
+            <h1 style={{ fontSize: "1.6rem", fontWeight: 700, color: "var(--text-main)", letterSpacing: "-0.02em", margin: 0 }}>Dashboard</h1>
+            <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", margin: "4px 0 0 0" }}>View and manage system activities</p>
+          </div>
+          
+          {/* Muted health pills positioned cleanly on the right */}
+          <div className="service-hub" style={{ margin: 0, padding: 0, gap: "6px", background: "transparent", border: "none", display: "flex", alignItems: "center" }}>
+            {services.data ? (
+              Object.entries(services.data).map(([name, info]) => (
+                <div key={name} className="service-card" title={info.url || 'Internal Port'} style={{ padding: "4px 8px", background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: "20px", display: "flex", alignItems: "center", gap: "4px" }}>
+                  <span className={`status-dot ${info.status === 'online' ? 'online' : 'offline'}`} style={{ width: "6px", height: "6px" }} />
+                  <span className="service-name" style={{ fontSize: "10px", color: "var(--text-muted)" }}>{name}</span>
+                </div>
+              ))
+            ) : null}
+            <div className={`overall-status ${services.error ? 'offline' : ''}`} style={{ padding: "4px 8px", background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: "20px", display: "flex", alignItems: "center", gap: "4px" }}>
+              <span className={`status-dot ${services.error ? 'offline' : 'online'}`} style={{ width: "6px", height: "6px" }} />
+              <span style={{ fontSize: "10px", color: services.error ? "var(--accent-red)" : "var(--text-muted)" }}>{services.error ? 'OFFLINE' : 'ONLINE'}</span>
+            </div>
           </div>
         </div>
-      </header>
+      </div>
 
       {/* 2. KPI Metrics Scorecard Row */}
       <div className="kpi-row">
@@ -256,41 +260,50 @@ export default function Dashboard() {
 
           {/* Card 1: Scorecard History */}
           <div className="glass-card animate-in">
-            <div className="card-header">
+            <div className="card-header" style={{ borderBottom: "none", paddingBottom: 0, marginBottom: "0.5rem" }}>
               <div>
                 <h3 className="card-title"><span className="icon">List</span> Scorecard History</h3>
-                <p className="card-subtitle">Pipeline Run History & QA Results</p>
+                <p className="card-subtitle">Pipeline Run History &amp; QA Results</p>
+              </div>
+            </div>
+
+            {/* Clerk-Style Controls Row */}
+            <div className="dashboard-controls-row" style={{ display: "flex", gap: "1rem", alignItems: "center", padding: "0 1.25rem 1rem 1.25rem", borderBottom: "1px solid #F1F5F9", width: "100%", flexWrap: "wrap" }}>
+              <div className="search-container" style={{ flex: 1, margin: 0, minWidth: "200px", position: "relative" }}>
+                <span className="search-icon" style={{ left: "10px", top: "50%", transform: "translateY(-50%)", position: "absolute", display: "flex", alignItems: "center", color: "#64748B" }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                </span>
+                <input
+                  type="text"
+                  placeholder="Search by ID or Table..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  style={{ paddingLeft: "2.25rem", width: "100%", height: "34px", borderRadius: "6px", border: "1px solid #E2E8F0" }}
+                />
               </div>
 
-              <div className="powerbi-actions">
+              <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                <span style={{ fontSize: "12px", color: "var(--text-muted)", whiteSpace: "nowrap" }}>Filter:</span>
                 <select
                   className="filter-select"
                   value={selectedSourceFilter}
-                  onChange={(e) => setSelectedSourceFilter(e.target.value)}
+                  onChange={(setSelected) => setSelectedSourceFilter(setSelected.target.value)}
+                  style={{ width: "auto", minWidth: "150px", padding: "6px 12px", background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: "6px", fontSize: "13px", color: "var(--text-main)", height: "34px" }}
                 >
                   <option value="All">All Sources</option>
                   {availableTables.map(table => (
                     <option key={table} value={table}>{table}</option>
                   ))}
                 </select>
-                <button
-                  className="btn-export"
-                  onClick={() => handleExportCSV(filteredRuns, "SDOQAP_Pipeline_Runs")}
-                  title="Export to CSV"
-                >
-                  Export
-                </button>
               </div>
-            </div>
 
-            <div className="search-container">
-              <span className="search-icon">Srch</span>
-              <input
-                type="text"
-                placeholder="Search by ID or Table..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
+              <button
+                className="btn btn-primary"
+                onClick={() => handleExportCSV(filteredRuns, "SDOQAP_Pipeline_Runs")}
+                style={{ padding: "0 1.25rem", borderRadius: "6px", fontSize: "13px", height: "34px" }}
+              >
+                Export CSV
+              </button>
             </div>
 
             <div className="table-wrapper">
@@ -518,9 +531,9 @@ export default function Dashboard() {
                       })}
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" />
-                    <XAxis dataKey="time" stroke="#64748b" tick={{ fontSize: 9.5, fontFamily: "Outfit, sans-serif" }} />
-                    <YAxis domain={[0, 100]} stroke="#64748b" tick={{ fontSize: 9.5, fontFamily: "Outfit, sans-serif" }} />
-                    <Tooltip contentClassName="custom-tooltip" wrapperStyle={{ fontFamily: "Outfit, sans-serif" }} />
+                    <XAxis dataKey="time" stroke="#64748b" tick={{ fontSize: 9.5, fontFamily: "Inter, sans-serif" }} />
+                    <YAxis domain={[0, 100]} stroke="#64748b" tick={{ fontSize: 9.5, fontFamily: "Inter, sans-serif" }} />
+                    <Tooltip contentClassName="custom-tooltip" wrapperStyle={{ fontFamily: "Inter, sans-serif" }} />
                     {seriesKeys.map((k, idx) => {
                         const colors = ["#38bdf8", "#10b981", "#fbbf24", "#f43f5e", "#a855f7"];
                         const color = colors[idx % colors.length];
@@ -612,24 +625,24 @@ export default function Dashboard() {
                             </linearGradient>
                           </defs>
                           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                          <XAxis dataKey="day" stroke="#64748b" tick={{ fontSize: 9, fontFamily: "Outfit, sans-serif" }} />
+                          <XAxis dataKey="day" stroke="#64748b" tick={{ fontSize: 9, fontFamily: "Inter, sans-serif" }} />
                           <YAxis
                             domain={yForecastDomain}
                             stroke="#64748b"
-                            tick={{ fontSize: 9, fontFamily: "Outfit, sans-serif" }}
+                            tick={{ fontSize: 9, fontFamily: "Inter, sans-serif" }}
                             tickFormatter={v => `${v}%`}
                           />
                           <Tooltip
-                            contentStyle={{ background: '#0f172a', border: '1px solid rgba(0,229,255,0.25)', borderRadius: 6, fontSize: 11, fontFamily: "Outfit, sans-serif" }}
+                            contentStyle={{ background: '#0f172a', border: '1px solid rgba(108, 71, 255, 0.25)', borderRadius: 6, fontSize: 11, fontFamily: "Inter, sans-serif" }}
                             formatter={(val, name) => [`${typeof val === 'number' ? val.toFixed(2) : val}%`, name]}
                           />
-                          <Legend verticalAlign="top" height={22} wrapperStyle={{ fontSize: 9, fontFamily: "Outfit, sans-serif" }} />
+                          <Legend verticalAlign="top" height={22} wrapperStyle={{ fontSize: 9, fontFamily: "Inter, sans-serif" }} />
                           <ReferenceLine
                             y={95}
                             stroke="#f59e0b"
                             strokeDasharray="5 3"
                             strokeWidth={1.5}
-                            label={{ value: 'SLA', position: 'right', fill: '#f59e0b', fontSize: 9, fontFamily: "Outfit, sans-serif" }}
+                            label={{ value: 'SLA', position: 'right', fill: '#f59e0b', fontSize: 9, fontFamily: "Inter, sans-serif" }}
                           />
                           <Area type="monotone" dataKey="Optimistic" stroke="#10b981" strokeWidth={2} fill="url(#dashFillHigh)" dot={{ r: 2.5, fill: '#10b981', strokeWidth: 0 }} />
                           <Area type="monotone" dataKey="Pessimistic" stroke="#f43f5e" strokeWidth={2} fill="url(#dashFillLow)" dot={{ r: 2.5, fill: '#f43f5e', strokeWidth: 0 }} />

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import NavBar from "./components/NavBar";
 import ErrorBoundary from "./components/ErrorBoundary";
 import Home from "./pages/Home";
@@ -12,17 +12,24 @@ import DataExport from "./pages/DataExport";
 import RulesConfig from "./pages/RulesConfig";
 import "./App.css";
 
-export default function App() {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Collapsed by default
-
-  const toggleSidebar = () => {
-    setIsSidebarOpen(prev => !prev);
-  };
+function AppContent({ isSidebarOpen, toggleSidebar }) {
+  const location = useLocation();
+  const isHome = location.pathname === "/";
 
   return (
-    <BrowserRouter>
+    <>
       <div className="app-bg" />
-      <div className={`app-layout ${isSidebarOpen ? "sidebar-visible" : "sidebar-hidden"}`}>
+      
+      {/* Top Black Banner (Only rendered on Home page) */}
+      {isHome && (
+        <div className="top-banner">
+          <span>SDOQAP Platform v2.0 is now live</span>
+        </div>
+      )}
+      
+      {/* Clerk White Header has been removed completely as requested */}
+
+      <div className={`app-layout ${isSidebarOpen ? "sidebar-visible" : "sidebar-hidden"} ${isHome ? "layout-with-banner" : "layout-full-height"}`}>
         <NavBar
           isOpen={isSidebarOpen}
           toggleSidebar={toggleSidebar}
@@ -59,6 +66,20 @@ export default function App() {
           </ErrorBoundary>
         </main>
       </div>
+    </>
+  );
+}
+
+export default function App() {
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Collapsed by default
+
+  const toggleSidebar = () => {
+    setIsSidebarOpen(prev => !prev);
+  };
+
+  return (
+    <BrowserRouter>
+      <AppContent isSidebarOpen={isSidebarOpen} toggleSidebar={toggleSidebar} />
     </BrowserRouter>
   );
 }

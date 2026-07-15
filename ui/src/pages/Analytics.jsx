@@ -44,9 +44,14 @@ export default function Analytics() {
 
   return (
     <div className="page-container">
-      <div className="page-header">
-        <h1>Analytics</h1>
-        <p>Data Quality Analysis, Prediction & Business Impact</p>
+      <div style={{ marginBottom: "1.5rem", width: "100%" }}>
+        <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "0.4rem", fontFamily: "var(--font-sans)", display: "flex", gap: "6px", alignItems: "center" }}>
+          <span>SDOQAP Data Engine</span>
+          <span style={{ opacity: 0.5 }}>&gt;</span>
+          <span style={{ color: "var(--text-main)", fontWeight: 500 }}>Live Analytics</span>
+        </div>
+        <h1 style={{ fontSize: "1.6rem", fontWeight: 700, color: "var(--text-main)", letterSpacing: "-0.02em", margin: 0 }}>Live Analytics</h1>
+        <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", margin: "4px 0 0 0" }}>Data Quality Analysis, Prediction &amp; Business Impact</p>
       </div>
 
       {/* Quality Projection */}
@@ -76,16 +81,16 @@ export default function Analytics() {
                       <stop offset="100%" stopColor="#f43f5e" stopOpacity={0.04}/>
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                  <XAxis dataKey="day" stroke="#64748b" tick={{ fontSize: 11 }} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(15, 23, 42, 0.05)" />
+                  <XAxis dataKey="day" stroke="#64748b" tick={{ fontSize: 11, fontFamily: "Inter, sans-serif" }} />
                   <YAxis
                     domain={yDomain}
                     stroke="#64748b"
-                    tick={{ fontSize: 11 }}
+                    tick={{ fontSize: 11, fontFamily: "Inter, sans-serif" }}
                     tickFormatter={v => `${v}%`}
                   />
                   <Tooltip
-                    contentStyle={{ background: '#0f172a', border: '1px solid rgba(0,229,255,0.3)', borderRadius: 8, fontSize: 12 }}
+                    contentStyle={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 8, fontSize: 12, fontFamily: 'Inter, sans-serif', color: 'var(--text-main)' }}
                     formatter={(val, name) => [
                       `${typeof val === 'number' ? val.toFixed(2) : val}%`,
                       name === 'Score' ? '🔵 Forecast' : name === 'High' ? '🟢 Optimistic' : '🔴 Pessimistic'
@@ -95,7 +100,7 @@ export default function Analytics() {
                     verticalAlign="top"
                     height={28}
                     formatter={name =>
-                      name === 'Score' ? <span style={{ color:'#00E5FF', fontWeight:700 }}>▸ Forecast Score</span>
+                      name === 'Score' ? <span style={{ color:'var(--accent-indigo)', fontWeight:700 }}>▸ Forecast Score</span>
                       : name === 'High' ? <span style={{ color:'#10b981' }}>▲ Optimistic Bound</span>
                       : <span style={{ color:'#f43f5e' }}>▼ Pessimistic Bound</span>
                     }
@@ -239,7 +244,7 @@ export default function Analytics() {
                     CRITICAL: 'badge-danger'
                   };
                   return (
-                    <div key={i} style={{ padding: '0.75rem', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', border: '1px solid var(--border-glass)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div key={i} style={{ padding: '0.75rem', background: '#FAFAFC', borderRadius: '8px', border: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div>
                         <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>{kpi.kpi_name}</div>
                         <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>
