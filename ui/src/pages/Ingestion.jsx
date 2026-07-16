@@ -16,6 +16,17 @@ export default function Ingestion() {
   const [apiStatus, setApiStatus] = useState(null);
   const [apiKey, setApiKey] = useState("");
 
+  // RDBMS Ingest State
+  const [rdbmsTableName, setRdbmsTableName] = useState("");
+  const [dbType, setDbType] = useState("postgresql");
+  const [dbHost, setDbHost] = useState("");
+  const [dbPort, setDbPort] = useState(5432);
+  const [dbUser, setDbUser] = useState("");
+  const [dbPass, setDbPass] = useState("");
+  const [dbName, setDbName] = useState("");
+  const [dbQuery, setDbQuery] = useState("");
+  const [rdbmsStatus, setRdbmsStatus] = useState(null);
+
   // Reddit Streaming State
   const [redditTopic, setRedditTopic] = useState("#Technology, #AI");
   const [redditDuration, setRedditDuration] = useState(40);
@@ -177,6 +188,37 @@ export default function Ingestion() {
       } catch (err) {
         setRedditStatus({ success: false, message: `Error: ${err.message}` });
       }
+    }
+  };
+
+  const handleRdbmsSubmit = async (e) => {
+    e.preventDefault();
+    if (!rdbmsTableName || !dbHost || !dbPort || !dbUser || !dbName || !dbQuery) {
+      setRdbmsStatus({ success: false, message: "Please fill in all required fields." });
+      return;
+    }
+
+    setRdbmsStatus({ loading: true, message: "Connecting to database and running Spark ingestion..." });
+    try {
+      const res = await postApi("/pipeline/ingest/rdbms", {
+        table_name: rdbmsTableName,
+        db_type: dbType,
+        host: dbHost,
+        port: parseInt(dbPort),
+        username: dbUser,
+        password: dbPass,
+        database: dbName,
+        query: dbQuery
+      });
+      setRdbmsStatus({ success: true, message: res.message });
+      setRdbmsTableName("");
+      setDbHost("");
+      setDbUser("");
+      setDbPass("");
+      setDbName("");
+      setDbQuery("");
+    } catch (err) {
+      setRdbmsStatus({ success: false, message: `Error: ${err.message}` });
     }
   };
 
@@ -609,6 +651,140 @@ export default function Ingestion() {
                 </label>
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* RDBMS Database Ingest Card */}
+        <div className="custom-glass-card">
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+            <h3 style={{ fontSize: "1.05rem", fontWeight: 700, display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              RDBMS Database Ingestion
+            </h3>
+            
+            <form onSubmit={handleRdbmsSubmit} style={{ display: "flex", flexDirection: "column", gap: "0.6rem", marginTop: "0.25rem" }}>
+              <div style={{ display: "flex", gap: "0.5rem" }}>
+                <div style={{ flex: 1 }}>
+                  <label className="custom-label">Target Table</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. pg_sales"
+                    value={rdbmsTableName}
+                    onChange={(e) => setRdbmsTableName(e.target.value.replace(/[^a-zA-Z0-9_]/g, "_"))}
+                    className="custom-input"
+                    required
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label className="custom-label">Database Type</label>
+                  <select
+                    value={dbType}
+                    onChange={(e) => {
+                      setDbType(e.target.value);
+                      if (e.target.value === "postgresql") setDbPort(5432);
+                      else if (e.target.value === "mysql") setDbPort(3306);
+                      else if (e.target.value === "sqlserver") setDbPort(1433);
+                      else if (e.target.value === "oracle") setDbPort(1521);
+                    }}
+                    className="custom-input"
+                  >
+                    <option value="postgresql">PostgreSQL</option>
+                    <option value="mysql">MySQL</option>
+                    <option value="sqlserver">SQL Server</option>
+                    <option value="oracle">Oracle</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", gap: "0.5rem" }}>
+                <div style={{ flex: 2 }}>
+                  <label className="custom-label">Host</label>
+                  <input
+                    type="text"
+                    placeholder="localhost"
+                    value={dbHost}
+                    onChange={(e) => setDbHost(e.target.value)}
+                    className="custom-input"
+                    required
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label className="custom-label">Port</label>
+                  <input
+                    type="number"
+                    value={dbPort}
+                    onChange={(e) => setDbPort(e.target.value)}
+                    className="custom-input"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: "flex", gap: "0.5rem" }}>
+                <div style={{ flex: 1 }}>
+                  <label className="custom-label">User</label>
+                  <input
+                    type="text"
+                    placeholder="postgres"
+                    value={dbUser}
+                    onChange={(e) => setDbUser(e.target.value)}
+                    className="custom-input"
+                    required
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label className="custom-label">Password</label>
+                  <input
+                    type="password"
+                    placeholder="Password"
+                    value={dbPass}
+                    onChange={(e) => setDbPass(e.target.value)}
+                    className="custom-input"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="custom-label">Database Name</label>
+                <input
+                  type="text"
+                  placeholder="sdoqap_oltp"
+                  value={dbName}
+                  onChange={(e) => setDbName(e.target.value)}
+                  className="custom-input"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="custom-label">SQL Query or Table Name</label>
+                <textarea
+                  placeholder="SELECT * FROM public.sales_records"
+                  value={dbQuery}
+                  onChange={(e) => setDbQuery(e.target.value)}
+                  className="custom-input"
+                  style={{ height: "48px", resize: "none" }}
+                  required
+                />
+              </div>
+
+              {rdbmsStatus && (
+                <div
+                  className={`alert-box ${rdbmsStatus.loading ? "info" : rdbmsStatus.success ? "success" : "critical"}`}
+                  style={{ fontSize: "0.8rem", padding: "0.4rem", borderRadius: "6px" }}
+                >
+                  {rdbmsStatus.message}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                className="custom-button"
+                disabled={rdbmsStatus?.loading || !dbHost || !dbName || !dbQuery || !rdbmsTableName}
+                style={{ marginTop: "0.4rem" }}
+              >
+                {rdbmsStatus?.loading ? "Ingesting..." : "Ingest Database"}
+              </button>
+            </form>
           </div>
         </div>
 
