@@ -869,44 +869,44 @@ export default function RulesConfig() {
                 </div>
               </div>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem", marginTop: "1rem" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "1.2rem", marginTop: "1rem" }}>
                 {/* Root Cause Analysis */}
-                <div style={{ background: "rgba(56,189,248,0.05)", border: "1px solid rgba(56,189,248,0.1)", padding: "1rem", borderRadius: "8px" }}>
-                  <h4 style={{ fontSize: "0.9rem", color: "var(--accent-blue)", marginBottom: "0.4rem" }}>🔍 AI Root Cause Analysis</h4>
-                  <p style={{ fontSize: "0.85rem", color: "#fff", lineHeight: "1.4" }}>{selectedProposal.analysis_result?.root_cause}</p>
+                <div style={{ background: "rgba(14, 165, 233, 0.06)", border: "1px solid rgba(14, 165, 233, 0.15)", padding: "1rem", borderRadius: "8px" }}>
+                  <h4 style={{ fontSize: "0.9rem", color: "var(--accent-blue)", marginBottom: "0.4rem", fontWeight: 700 }}>🔍 AI Root Cause Analysis</h4>
+                  <p style={{ fontSize: "0.85rem", color: "var(--text-main)", lineHeight: "1.45" }}>{selectedProposal.analysis_result?.root_cause}</p>
                 </div>
 
                 {/* Explanation */}
                 <div>
-                  <h4 style={{ fontSize: "0.9rem", color: "#fff", marginBottom: "0.4rem" }}>Detailed Explanation</h4>
-                  <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", lineHeight: "1.4" }}>{selectedProposal.analysis_result?.explanation}</p>
+                  <h4 style={{ fontSize: "0.9rem", color: "var(--text-main)", marginBottom: "0.4rem", fontWeight: 600 }}>Detailed Explanation</h4>
+                  <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)", lineHeight: "1.45" }}>{selectedProposal.analysis_result?.explanation}</p>
                 </div>
 
                 {/* Recommended Rules list */}
                 {selectedProposal.analysis_result?.suggested_rules && selectedProposal.analysis_result?.suggested_rules.length > 0 && (
                   <div>
-                    <h4 style={{ fontSize: "0.9rem", color: "#fff", marginBottom: "0.5rem" }}>Suggested Rule Changes</h4>
+                    <h4 style={{ fontSize: "0.9rem", color: "var(--text-main)", marginBottom: "0.5rem", fontWeight: 600 }}>Suggested Rule Changes</h4>
                     <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
                       {selectedProposal.analysis_result.suggested_rules.map((rule, idx) => (
                         <div 
                           key={idx} 
                           style={{ 
-                            background: "rgba(255,255,255,0.02)", 
-                            border: "1px solid rgba(255,255,255,0.05)", 
+                            background: "var(--bg-card-subtle, #F8FAFC)", 
+                            border: "1px solid var(--border-card-subtle, #E2E8F0)", 
                             padding: "0.85rem", 
                             borderRadius: "6px",
                             fontSize: "0.85rem"
                           }}
                         >
-                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.25rem" }}>
-                            <span style={{ fontWeight: "bold", color: "var(--accent-blue)" }}>{rule.column || rule.rule_path}</span>
-                            <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", fontStyle: "italic" }}>{rule.rule_type || rule.action}</span>
+                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.35rem", alignItems: "center" }}>
+                            <span style={{ fontWeight: 700, color: "var(--accent-indigo)" }}>{rule.column || rule.rule_path}</span>
+                            <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", fontStyle: "italic", background: "rgba(108, 71, 255, 0.06)", padding: "2px 6px", borderRadius: "4px" }}>{rule.rule_type || rule.action}</span>
                           </div>
-                          <div style={{ color: "#fff", marginBottom: "0.4rem" }}>
-                            Parameters: <code>{JSON.stringify(rule.params || rule.value)}</code>
+                          <div style={{ color: "var(--text-main)", marginBottom: "0.4rem" }}>
+                            <strong>Parameters:</strong> <code>{JSON.stringify(rule.params || rule.value)}</code>
                           </div>
-                          <div style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>
-                            Reasoning: {rule.reason}
+                          <div style={{ fontSize: "0.8rem", color: "var(--text-secondary)", borderTop: "1px dashed #E2E8F0", paddingTop: "4px", marginTop: "4px" }}>
+                            <strong>Reasoning:</strong> {rule.reason}
                           </div>
                         </div>
                       ))}
@@ -916,9 +916,9 @@ export default function RulesConfig() {
 
                 {/* Recommended Quality Score threshold */}
                 {selectedProposal.analysis_result?.recommended_threshold && (
-                  <div style={{ display: "flex", alignItems: "center", gap: "10px", background: "rgba(16,185,129,0.05)", border: "1px solid rgba(16,185,129,0.1)", padding: "0.75rem 1rem", borderRadius: "6px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px", background: "rgba(16,185,129,0.06)", border: "1px solid rgba(16,185,129,0.15)", padding: "0.75rem 1rem", borderRadius: "6px" }}>
                     <span style={{ fontSize: "1.25rem" }}>🛡️</span>
-                    <span style={{ fontSize: "0.85rem", color: "#fff" }}>
+                    <span style={{ fontSize: "0.85rem", color: "var(--text-main)" }}>
                       AI Recommended Quality Score Threshold: <strong>{selectedProposal.analysis_result.recommended_threshold.toFixed(1)}%</strong>
                     </span>
                   </div>
