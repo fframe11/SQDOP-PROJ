@@ -1008,11 +1008,13 @@ export default function Dashboard() {
                     </div>
                   </div>
                   <div className="stat-card" style={{ flex: 1, padding: '8px 12px' }}>
-                    <span className="stat-label">SLA LATENCY LIMIT</span>
-                    <span className="stat-value" style={{ color: 'var(--accent-red)', fontSize: '18px', margin: '2px 0' }}>
-                      {perf.data.sla_latency_limit_seconds}s
+                    <span className="stat-label">SPARK SUCCESS RATE</span>
+                    <span className="stat-value" style={{ color: 'var(--accent-green)', fontSize: '18px', margin: '2px 0' }}>
+                      {perf.data.spark_success_rate ?? 100.0}%
                     </span>
-                    <div style={{ width: '100%', height: '4px', borderTop: '2px dashed var(--accent-red)', opacity: 0.5, marginTop: '6px' }} />
+                    <div style={{ width: '100%', height: '4px', background: '#E2E8F0', borderRadius: '2px', overflow: 'hidden', marginTop: '4px' }}>
+                      <div style={{ width: `${perf.data.spark_success_rate ?? 100.0}%`, height: '100%', background: 'var(--accent-green)', borderRadius: '2px' }} />
+                    </div>
                   </div>
                 </div>
               </div>

@@ -871,6 +871,20 @@ def get_performance_metrics():
     current_cpu = real_cpu
     current_memory = real_mem
     average_latency = sum(processing_latency_seconds) / len(processing_latency_seconds) if processing_latency_seconds else 0.0
+
+    # Calculate real-time Spark success rate from latest 100 runs
+    spark_success_rate = 100.0
+    try:
+        if es.indices.exists(index="sdoqap_pipeline_runs"):
+            res_all = es.search(index="sdoqap_pipeline_runs", body={"size": 100})
+            hits_all = res_all.get("hits", {}).get("hits", [])
+            total_runs = len(hits_all)
+            failed_runs = sum(1 for h in hits_all if h["_source"].get("state") == "failed")
+            if total_runs > 0:
+                spark_success_rate = round(((total_runs - failed_runs) / total_runs) * 100.0, 1)
+    except Exception:
+        pass
+
     return {
         "timestamps": timestamps,
         "cpu_usage_pct": [round(c, 1) for c in cpu_history],
@@ -879,7 +893,8 @@ def get_performance_metrics():
         "current_cpu": round(current_cpu, 1),
         "current_memory": round(current_memory, 1),
         "sla_latency_limit_seconds": 300,
-        "average_latency_seconds": round(average_latency, 1)
+        "average_latency_seconds": round(average_latency, 1),
+        "spark_success_rate": spark_success_rate
     }
 
 @app.get("/api/v1/system/activity")
