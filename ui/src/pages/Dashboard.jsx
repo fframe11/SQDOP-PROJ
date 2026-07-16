@@ -2,6 +2,30 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useApi, postApi } from '../hooks/useApi';
 import { ComposedChart, AreaChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Legend } from 'recharts';
 
+const getIngestionSource = (run) => {
+  if (!run) return "Unknown Ingest";
+  const name = (run.table_name || "").toLowerCase();
+  const rid = (run.run_id || "").toLowerCase();
+  if (name.includes("reddit") || name.includes("stream") || rid.includes("stream")) {
+    return "Reddit Real-time Stream";
+  } else if (name.includes("products") || name.includes("api") || rid.includes("api")) {
+    return "JSON API Fetcher";
+  } else if (name.includes("sales") || name.includes("pg") || rid.includes("pg")) {
+    return "RDBMS Database Ingestion";
+  } else {
+    return "Local CSV Dataset Ingest";
+  }
+};
+
+const getQualityGrade = (score) => {
+  if (score === null || score === undefined) return { grade: "N/A", color: "var(--text-muted)" };
+  if (score === 100) return { grade: "A+ Excellent", color: "var(--accent-green)" };
+  if (score >= 95) return { grade: "A Healthy", color: "var(--accent-green)" };
+  if (score >= 90) return { grade: "B+ Warning", color: "var(--accent-yellow)" };
+  if (score >= 85) return { grade: "B Caution", color: "var(--accent-yellow)" };
+  return { grade: "F Critical Anomaly", color: "var(--accent-red)" };
+};
+
 export default function Dashboard() {
   // 1. Interactive States (Slicers & Filters)
   const [searchTerm, setSearchTerm] = useState('');
@@ -414,17 +438,91 @@ export default function Dashboard() {
 
                   {leftTab === 'Ratio' && (
                     <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '4px' }}>
-                        <span style={{ color: 'var(--accent-green)' }}>Clean: {((selectedRun.clean_records / selectedRun.total_records) * 100).toFixed(1)}%</span>
-                        <span style={{ color: 'var(--accent-red)' }}>Quarantined: {((selectedRun.quarantined_records / selectedRun.total_records) * 100).toFixed(1)}%</span>
+                      {/* Gauge Chart and Raw Counts Row */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', padding: '0.25rem 0' }}>
+                        <div style={{ position: 'relative', width: '80px', height: '80px', flexShrink: 0 }}>
+                          <svg width="80" height="80" viewBox="0 0 36 36" style={{ transform: 'rotate(-90deg)' }}>
+                            <circle cx="18" cy="18" r="15.915" fill="transparent" stroke="rgba(226, 232, 240, 0.2)" strokeWidth="3" />
+                            <circle cx="18" cy="18" r="15.915" fill="transparent" stroke="var(--accent-green)" strokeWidth="3.2"
+                                    strokeDasharray={`${selectedRun.quality_score} ${100 - selectedRun.quality_score}`}
+                                    strokeDashoffset="0" style={{ transition: 'stroke-dasharray 0.5s ease' }} />
+                          </svg>
+                          <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center' }}>
+                            <span style={{ fontSize: '15px', fontWeight: 800, color: 'var(--text-main)', display: 'block', fontFamily: 'var(--font-mono)' }}>
+                              {selectedRun.quality_score}%
+                            </span>
+                            <span style={{ fontSize: '7px', color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', fontWeight: 600 }}>
+                              Quality
+                            </span>
+                          </div>
+                        </div>
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
+                            <span style={{ color: 'var(--text-muted)' }}>Clean (Active)</span>
+                            <span style={{ color: 'var(--accent-green)', fontWeight: 700 }}>{selectedRun.clean_records.toLocaleString()} rows</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
+                            <span style={{ color: 'var(--text-muted)' }}>Quarantine (Bad)</span>
+                            <span style={{ color: 'var(--accent-red)', fontWeight: 700 }}>{selectedRun.quarantined_records.toLocaleString()} rows</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', borderTop: '1px solid #E2E8F0', paddingTop: '4px', marginTop: '2px' }}>
+                            <span style={{ color: 'var(--text-muted)' }}>Total Audited</span>
+                            <span style={{ color: 'var(--text-main)', fontWeight: 700 }}>{selectedRun.total_records.toLocaleString()} rows</span>
+                          </div>
+                        </div>
                       </div>
-                      <div style={{ height: '14px', width: '100%', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '6px', overflow: 'hidden', display: 'flex' }}>
-                        <div style={{ width: `${(selectedRun.clean_records / selectedRun.total_records) * 100}%`, backgroundColor: 'var(--accent-green)' }} />
-                        <div style={{ width: `${(selectedRun.quarantined_records / selectedRun.total_records) * 100}%`, backgroundColor: 'var(--accent-red)' }} />
+
+                      {/* Spark Quality Engine - Rules Checklist */}
+                      <div style={{ marginTop: '0.6rem', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '0.5rem 0.75rem' }}>
+                        <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.4rem', letterSpacing: '0.5px' }}>
+                          Spark Quality Engine - Rules Audit
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                          {/* Rule 1: Null check */}
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '10.5px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span style={{ color: selectedRun.quarantined_records > 0 && selectedRun.quarantine_breakdown && Object.keys(selectedRun.quarantine_breakdown).some(k => k.toLowerCase().includes('null') || k.toLowerCase().includes('missing')) ? 'var(--accent-red)' : 'var(--accent-green)', fontWeight: 700 }}>
+                                {selectedRun.quarantined_records > 0 && selectedRun.quarantine_breakdown && Object.keys(selectedRun.quarantine_breakdown).some(k => k.toLowerCase().includes('null') || k.toLowerCase().includes('missing')) ? '✕' : '✓'}
+                              </span>
+                              <span style={{ color: 'var(--text-main)' }}>Null Constraint Check</span>
+                            </div>
+                            <span style={{ fontSize: '9px', color: selectedRun.quarantined_records > 0 && selectedRun.quarantine_breakdown && Object.keys(selectedRun.quarantine_breakdown).some(k => k.toLowerCase().includes('null') || k.toLowerCase().includes('missing')) ? 'var(--accent-red)' : 'var(--accent-green)', background: selectedRun.quarantined_records > 0 && selectedRun.quarantine_breakdown && Object.keys(selectedRun.quarantine_breakdown).some(k => k.toLowerCase().includes('null') || k.toLowerCase().includes('missing')) ? 'rgba(244,63,94,0.08)' : 'rgba(16,185,129,0.08)', padding: '1px 5px', borderRadius: '3px', fontWeight: 700 }}>
+                              {selectedRun.quarantined_records > 0 && selectedRun.quarantine_breakdown && Object.keys(selectedRun.quarantine_breakdown).some(k => k.toLowerCase().includes('null') || k.toLowerCase().includes('missing')) ? 'VIOLATED' : 'PASSED'}
+                            </span>
+                          </div>
+
+                          {/* Rule 2: Schema consistency */}
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '10.5px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span style={{ color: selectedRun.quarantined_records > 0 && selectedRun.quarantine_breakdown && Object.keys(selectedRun.quarantine_breakdown).some(k => k.toLowerCase().includes('schema') || k.toLowerCase().includes('drift') || k.toLowerCase().includes('format')) ? 'var(--accent-red)' : 'var(--accent-green)', fontWeight: 700 }}>
+                                {selectedRun.quarantined_records > 0 && selectedRun.quarantine_breakdown && Object.keys(selectedRun.quarantine_breakdown).some(k => k.toLowerCase().includes('schema') || k.toLowerCase().includes('drift') || k.toLowerCase().includes('format')) ? '✕' : '✓'}
+                              </span>
+                              <span style={{ color: 'var(--text-main)' }}>Schema Consistency Check</span>
+                            </div>
+                            <span style={{ fontSize: '9px', color: selectedRun.quarantined_records > 0 && selectedRun.quarantine_breakdown && Object.keys(selectedRun.quarantine_breakdown).some(k => k.toLowerCase().includes('schema') || k.toLowerCase().includes('drift') || k.toLowerCase().includes('format')) ? 'var(--accent-red)' : 'var(--accent-green)', background: selectedRun.quarantined_records > 0 && selectedRun.quarantine_breakdown && Object.keys(selectedRun.quarantine_breakdown).some(k => k.toLowerCase().includes('schema') || k.toLowerCase().includes('drift') || k.toLowerCase().includes('format')) ? 'rgba(244,63,94,0.08)' : 'rgba(16,185,129,0.08)', padding: '1px 5px', borderRadius: '3px', fontWeight: 700 }}>
+                              {selectedRun.quarantined_records > 0 && selectedRun.quarantine_breakdown && Object.keys(selectedRun.quarantine_breakdown).some(k => k.toLowerCase().includes('schema') || k.toLowerCase().includes('drift') || k.toLowerCase().includes('format')) ? 'VIOLATED' : 'PASSED'}
+                            </span>
+                          </div>
+
+                          {/* Rule 3: Type validation */}
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '10.5px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span style={{ color: selectedRun.quarantined_records > 0 && selectedRun.quarantine_breakdown && Object.keys(selectedRun.quarantine_breakdown).some(k => k.toLowerCase().includes('type') || k.toLowerCase().includes('invalid') || k.toLowerCase().includes('cast')) ? 'var(--accent-red)' : 'var(--accent-green)', fontWeight: 700 }}>
+                                {selectedRun.quarantined_records > 0 && selectedRun.quarantine_breakdown && Object.keys(selectedRun.quarantine_breakdown).some(k => k.toLowerCase().includes('type') || k.toLowerCase().includes('invalid') || k.toLowerCase().includes('cast')) ? '✕' : '✓'}
+                              </span>
+                              <span style={{ color: 'var(--text-main)' }}>DataType Conformity</span>
+                            </div>
+                            <span style={{ fontSize: '9px', color: selectedRun.quarantined_records > 0 && selectedRun.quarantine_breakdown && Object.keys(selectedRun.quarantine_breakdown).some(k => k.toLowerCase().includes('type') || k.toLowerCase().includes('invalid') || k.toLowerCase().includes('cast')) ? 'var(--accent-red)' : 'var(--accent-green)', background: selectedRun.quarantined_records > 0 && selectedRun.quarantine_breakdown && Object.keys(selectedRun.quarantine_breakdown).some(k => k.toLowerCase().includes('type') || k.toLowerCase().includes('invalid') || k.toLowerCase().includes('cast')) ? 'rgba(244,63,94,0.08)' : 'rgba(16,185,129,0.08)', padding: '1px 5px', borderRadius: '3px', fontWeight: 700 }}>
+                              {selectedRun.quarantined_records > 0 && selectedRun.quarantine_breakdown && Object.keys(selectedRun.quarantine_breakdown).some(k => k.toLowerCase().includes('type') || k.toLowerCase().includes('invalid') || k.toLowerCase().includes('cast')) ? 'VIOLATED' : 'PASSED'}
+                            </span>
+                          </div>
+                        </div>
                       </div>
-                      <div className="stat-card" style={{ marginTop: '12px' }}>
-                        <span className="stat-label">QA Status</span>
-                        <span className={`quality-badge ${getQualityBadgeClass(selectedRun.quality_score)}`} style={{ textAlign: 'center', marginTop: '4px' }}>
+
+                      {/* QA Status Box */}
+                      <div className="stat-card" style={{ marginTop: '0.6rem', padding: '6px 10px' }}>
+                        <span className="stat-label">QA Status Rating</span>
+                        <span className={`quality-badge ${getQualityBadgeClass(selectedRun.quality_score)}`} style={{ textAlign: 'center', marginTop: '4px', fontWeight: 700 }}>
                           {selectedRun.quality_score >= 95 ? 'HEALTHY PIPELINE' : selectedRun.quality_score >= 85 ? 'WARNING DRIFT' : 'CRITICAL ANOMALY'}
                         </span>
                       </div>
@@ -481,30 +579,36 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                <div className="detail-stats-panel">
+                 <div className="detail-stats-panel">
                   <div className="stat-card">
                     <span className="stat-label">DATASET / TABLE</span>
-                    <span className="stat-value" style={{ color: 'var(--accent-blue)' }}>{selectedRun.table_name}</span>
+                    <span className="stat-value" style={{ color: 'var(--accent-blue)', textTransform: 'capitalize' }}>{selectedRun.table_name}</span>
                   </div>
                   <div className="stat-card">
-                    <span className="stat-label">RUN ID</span>
-                    <span className="stat-value" style={{ fontSize: '11px' }}>{selectedRun.run_id}</span>
+                    <span className="stat-label">INGESTION CHANNEL</span>
+                    <span className="stat-value" style={{ fontSize: '11px', color: 'var(--accent-indigo)' }}>
+                      {getIngestionSource(selectedRun)}
+                    </span>
                   </div>
                   <div className="stat-card">
-                    <span className="stat-label">TOTAL RECORDS</span>
-                    <span className="stat-value">{(selectedRun.total_records || 0).toLocaleString()}</span>
+                    <span className="stat-label">RUN TIMESTAMP</span>
+                    <span className="stat-value" style={{ fontSize: '11px', color: 'var(--text-main)' }}>
+                      {selectedRun.timestamp ? new Date(selectedRun.timestamp).toLocaleString('en-US', { hour12: false }) : 'N/A'}
+                    </span>
                   </div>
                   <div className="stat-card">
-                    <span className="stat-label">CLEAN (ACTIVE)</span>
-                    <span className="stat-value" style={{ color: 'var(--accent-green)' }}>{(selectedRun.clean_records || 0).toLocaleString()}</span>
-                  </div>
-                  <div className="stat-card">
-                    <span className="stat-label">QUARANTINE (BAD)</span>
-                    <span className="stat-value" style={{ color: 'var(--accent-red)' }}>{(selectedRun.quarantined_records || 0).toLocaleString()}</span>
+                    <span className="stat-label">QUALITY RATING GRADE</span>
+                    <span className="stat-value" style={{ color: getQualityGrade(selectedRun.quality_score).color }}>
+                      {getQualityGrade(selectedRun.quality_score).grade}
+                    </span>
                   </div>
                   <div className="stat-card">
                     <span className="stat-label">FRESHNESS LAG</span>
                     <span className="stat-value" style={{ color: 'var(--accent-yellow)' }}>{selectedRun.freshness_lag_hours ? `${selectedRun.freshness_lag_hours.toFixed(2)} hrs` : '0.12 hrs'}</span>
+                  </div>
+                  <div className="stat-card">
+                    <span className="stat-label">RUN ID</span>
+                    <span className="stat-value" style={{ fontSize: '9px', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={selectedRun.run_id}>{selectedRun.run_id}</span>
                   </div>
                 </div>
               </div>
