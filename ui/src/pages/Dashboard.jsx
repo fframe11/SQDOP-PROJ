@@ -221,7 +221,13 @@ export default function Dashboard() {
             </span>
             <span className="kpi-label">TOTAL RECORDS INGESTED</span>
           </div>
-          <span className="kpi-icon">Bar</span>
+          <span className="kpi-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block' }}>
+              <ellipse cx="12" cy="5" rx="9" ry="3" />
+              <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
+              <path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3" />
+            </svg>
+          </span>
         </div>
         <div className="kpi-card quality-kpi animate-in">
           <div className="kpi-card-left">
@@ -230,7 +236,11 @@ export default function Dashboard() {
             </span>
             <span className="kpi-label">GLOBAL QUALITY SCORE</span>
           </div>
-          <span className="kpi-icon">Shld</span>
+          <span className="kpi-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block' }}>
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+            </svg>
+          </span>
         </div>
         <div className="kpi-card quarantine-kpi animate-in">
           <div className="kpi-card-left">
@@ -239,7 +249,13 @@ export default function Dashboard() {
             </span>
             <span className="kpi-label">QUARANTINED RECORDS</span>
           </div>
-          <span className="kpi-icon">Warn</span>
+          <span className="kpi-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block' }}>
+              <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+              <line x1="12" y1="9" x2="12" y2="13" />
+              <line x1="12" y1="17" x2="12.01" y2="17" />
+            </svg>
+          </span>
         </div>
         <div className="kpi-card amber animate-in">
           <div className="kpi-card-left">
@@ -248,7 +264,12 @@ export default function Dashboard() {
             </span>
             <span className="kpi-label">MTTD (MEAN TIME TO DETECT)</span>
           </div>
-          <span className="kpi-icon">Time</span>
+          <span className="kpi-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block' }}>
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
+            </svg>
+          </span>
         </div>
       </div>
 
