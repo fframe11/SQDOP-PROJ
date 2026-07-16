@@ -241,7 +241,7 @@ export default function Dashboard() {
         <div className="kpi-card blue animate-in">
           <div className="kpi-card-left">
             <span className="kpi-val">
-              {kpi.data ? `${(kpi.data.total_records_ingested / 1000000).toFixed(2)}M` : '1.52M'}
+              {kpi.loading ? 'Loading...' : (kpi.data ? `${(kpi.data.total_records_ingested / 1000000).toFixed(2)}M` : '0.00M')}
             </span>
             <span className="kpi-label">TOTAL RECORDS INGESTED</span>
           </div>
@@ -256,7 +256,7 @@ export default function Dashboard() {
         <div className="kpi-card quality-kpi animate-in">
           <div className="kpi-card-left">
             <span className="kpi-val">
-              {kpi.data ? `${kpi.data.global_quality_score}%` : '98.4%'}
+              {kpi.loading ? 'Loading...' : (kpi.data ? `${kpi.data.global_quality_score}%` : '0.00%')}
             </span>
             <span className="kpi-label">GLOBAL QUALITY SCORE</span>
           </div>
@@ -269,7 +269,7 @@ export default function Dashboard() {
         <div className="kpi-card quarantine-kpi animate-in">
           <div className="kpi-card-left">
             <span className="kpi-val">
-              {kpi.data ? (kpi.data.quarantined_records || 0).toLocaleString() : '24,320'}
+              {kpi.loading ? 'Loading...' : (kpi.data ? (kpi.data.quarantined_records || 0).toLocaleString() : '0')}
             </span>
             <span className="kpi-label">QUARANTINED RECORDS</span>
           </div>
@@ -284,7 +284,7 @@ export default function Dashboard() {
         <div className="kpi-card amber animate-in">
           <div className="kpi-card-left">
             <span className="kpi-val">
-              {kpi.data ? `${kpi.data.mttd_minutes} mins` : '2.4 mins'}
+              {kpi.loading ? 'Loading...' : (kpi.data ? `${kpi.data.mttd_minutes} mins` : '0.0 mins')}
             </span>
             <span className="kpi-label">MTTD (MEAN TIME TO DETECT)</span>
           </div>
@@ -778,9 +778,9 @@ export default function Dashboard() {
                   </div>
                   <div style={{ fontSize: '11px', display: 'flex', flexDirection: 'column', gap: '6px', overflowY: 'auto' }}>
                     <div style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '4px', fontWeight: 'bold', color: 'var(--accent-blue)' }}>7-Day Quality Forecast:</div>
-                    <div>• <strong>Data Stability Index:</strong> <span style={{ color: 'var(--accent-green)' }}>{projection.data?.stability_index || '78.4%'}</span></div>
-                    <div>• <strong>SLA Breach Probability:</strong> <span style={{ color: 'var(--accent-red)' }}>{projection.data?.sla_breach_probability || '45.2%'}</span></div>
-                    <div style={{ color: 'var(--text-muted)', fontSize: '10.5px' }}>{projection.data?.historical_trend}</div>
+                    <div>• <strong>Data Stability Index:</strong> <span style={{ color: 'var(--accent-green)' }}>{projection.loading ? 'Calculating...' : (projection.data?.stability_index || 'N/A')}</span></div>
+                    <div>• <strong>SLA Breach Probability:</strong> <span style={{ color: 'var(--accent-red)' }}>{projection.loading ? 'Calculating...' : (projection.data?.sla_breach_probability || 'N/A')}</span></div>
+                    <div style={{ color: 'var(--text-muted)', fontSize: '10.5px' }}>{projection.loading ? 'Analyzing historical trends...' : (projection.data?.historical_trend || 'No historical trend data available.')}</div>
 
                     {projection.data?.crisis_forecast && projection.data.crisis_forecast.severity !== 'LOW' && (
                       <div className="bp-alert">
