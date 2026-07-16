@@ -1012,9 +1012,7 @@ export default function Dashboard() {
                     <span className="stat-value" style={{ color: 'var(--accent-red)', fontSize: '18px', margin: '2px 0' }}>
                       {perf.data.sla_latency_limit_seconds}s
                     </span>
-                    <div style={{ width: '100%', height: '4px', background: '#E2E8F0', borderRadius: '2px', overflow: 'hidden', marginTop: '4px' }}>
-                      <div style={{ width: '100%', height: '100%', background: 'var(--accent-red)', borderRadius: '2px' }} />
-                    </div>
+                    <div style={{ width: '100%', height: '4px', borderTop: '2px dashed var(--accent-red)', opacity: 0.5, marginTop: '6px' }} />
                   </div>
                 </div>
               </div>
