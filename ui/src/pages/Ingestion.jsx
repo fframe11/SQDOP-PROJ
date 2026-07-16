@@ -26,6 +26,9 @@ export default function Ingestion() {
   const [dbName, setDbName] = useState("");
   const [dbQuery, setDbQuery] = useState("");
   const [rdbmsStatus, setRdbmsStatus] = useState(null);
+  const [isRdbmsUnlocked, setIsRdbmsUnlocked] = useState(false);
+  const [showRdbmsLearnMore, setShowRdbmsLearnMore] = useState(false);
+  const [hasAcknowledgedRdbms, setHasAcknowledgedRdbms] = useState(false);
 
   // Reddit Streaming State
   const [redditTopic, setRedditTopic] = useState("#Technology, #AI");
@@ -655,8 +658,46 @@ export default function Ingestion() {
         </div>
 
         {/* RDBMS Database Ingest Card */}
-        <div className="custom-glass-card">
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+        <div className="custom-glass-card" style={{ position: "relative", overflow: "hidden" }}>
+          {!isRdbmsUnlocked && (
+            <div style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: "rgba(255, 255, 255, 0.8)",
+              backdropFilter: "blur(5px)",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "center",
+              alignItems: "center",
+              padding: "1.5rem",
+              textAlign: "center",
+              zIndex: 10
+            }}>
+              {/* Padlock Icon */}
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--accent-indigo)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: "1rem" }}>
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
+              <h3 style={{ fontSize: "1.05rem", fontWeight: 700, marginBottom: "0.5rem" }}>
+                RDBMS Connection Locked
+              </h3>
+              <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "1.5rem", lineHeight: "1.5" }}>
+                Direct database connections require network route validation (VPN or Intranet). Please review configuration requirements to unlock.
+              </p>
+              <button
+                onClick={() => setShowRdbmsLearnMore(true)}
+                className="custom-button"
+                style={{ width: "auto", padding: "0.5rem 1.5rem", margin: 0 }}
+              >
+                Learn More &amp; Unlock
+              </button>
+            </div>
+          )}
+
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", opacity: isRdbmsUnlocked ? 1 : 0.3, pointerEvents: isRdbmsUnlocked ? "auto" : "none", height: "100%" }}>
             <h3 style={{ fontSize: "1.05rem", fontWeight: 700, display: "flex", alignItems: "center", gap: "0.5rem" }}>
               RDBMS Database Ingestion
             </h3>
@@ -787,6 +828,94 @@ export default function Ingestion() {
             </form>
           </div>
         </div>
+
+        {/* RDBMS Learn More Modal */}
+        {showRdbmsLearnMore && (
+          <div style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(15, 23, 42, 0.4)",
+            backdropFilter: "blur(4px)",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 1000
+          }}>
+            <div style={{
+              background: "#FFFFFF",
+              border: "1px solid #E2E8F0",
+              borderRadius: "16px",
+              width: "500px",
+              padding: "2rem",
+              boxShadow: "0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04)"
+            }}>
+              <h3 style={{ fontSize: "1.2rem", fontWeight: 700, marginBottom: "1rem", color: "var(--text-main)" }}>
+                RDBMS Ingestion Prerequisites
+              </h3>
+              <div style={{ fontSize: "0.85rem", color: "var(--text-muted)", display: "flex", flexDirection: "column", gap: "0.75rem", lineHeight: "1.6", textAlign: "left" }}>
+                <p>
+                  <strong>1. Network & Firewall Access:</strong> Production databases are protected by security firewalls. 
+                  To connect, the SDOQAP server must run inside the same intranet (Private Subnet) or connect via 
+                  a secure <strong>VPN (Virtual Private Network)</strong> tunnel.
+                </p>
+                <p>
+                  <strong>2. Host & Port Exposure:</strong> Ensure the database host is resolvable and the target port 
+                  (e.g., 5432 for PostgreSQL, 3306 for MySQL) is open and accessible from this machine.
+                </p>
+                <p>
+                  <strong>3. Authentication:</strong> Use native database credentials or configure centralized LDAP/SSO mapping 
+                  in the database server configuration prior to connecting.
+                </p>
+              </div>
+
+              <div style={{ marginTop: "1.5rem", borderTop: "1px solid #E2E8F0", paddingTop: "1rem", textAlign: "left" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={hasAcknowledgedRdbms}
+                    onChange={(e) => setHasAcknowledgedRdbms(e.target.checked)}
+                    style={{ width: "16px", height: "16px", accentColor: "#6C47FF" }}
+                  />
+                  <span style={{ fontSize: "0.85rem", color: "var(--text-main)", fontWeight: 500 }}>
+                    I understand and have verified these network prerequisites.
+                  </span>
+                </label>
+              </div>
+
+              <div style={{ display: "flex", gap: "0.5rem", marginTop: "1.5rem" }}>
+                <button
+                  onClick={() => {
+                    if (hasAcknowledgedRdbms) {
+                      setIsRdbmsUnlocked(true);
+                    }
+                    setShowRdbmsLearnMore(false);
+                  }}
+                  disabled={!hasAcknowledgedRdbms}
+                  className="custom-button"
+                  style={{ 
+                    margin: 0, 
+                    flex: 1, 
+                    background: hasAcknowledgedRdbms ? "#6C47FF" : "rgba(108, 71, 255, 0.08)", 
+                    color: hasAcknowledgedRdbms ? "#FFFFFF" : "#6C47FF", 
+                    borderColor: hasAcknowledgedRdbms ? "#6C47FF" : "rgba(108, 71, 255, 0.35)" 
+                  }}
+                >
+                  Unlock Card
+                </button>
+                <button
+                  onClick={() => setShowRdbmsLearnMore(false)}
+                  className="custom-button"
+                  style={{ margin: 0, flex: 1, background: "transparent", color: "var(--text-muted)", borderColor: "#CBD5E1" }}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
       </div>
 
