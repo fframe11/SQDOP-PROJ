@@ -848,20 +848,49 @@ export default function Dashboard() {
             </div>
 
             {perf.data ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flexGrow: 1, justifyContent: 'center' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', flexGrow: 1, justifyContent: 'center' }}>
+                {/* Row 1: CPU and Memory */}
                 <div style={{ display: 'flex', gap: '12px' }}>
-                  <div className="stat-card" style={{ flex: 1 }}>
+                  <div className="stat-card" style={{ flex: 1, padding: '8px 12px' }}>
                     <span className="stat-label">CPU USAGE</span>
-                    <span className="stat-value" style={{ color: 'var(--accent-blue)' }}>{perf.data.current_cpu}%</span>
+                    <span className="stat-value" style={{ color: 'var(--accent-blue)', fontSize: '18px', margin: '2px 0' }}>
+                      {perf.data.current_cpu}%
+                    </span>
+                    <div style={{ width: '100%', height: '4px', background: '#E2E8F0', borderRadius: '2px', overflow: 'hidden', marginTop: '4px' }}>
+                      <div style={{ width: `${perf.data.current_cpu}%`, height: '100%', background: 'var(--accent-blue)', borderRadius: '2px' }} />
+                    </div>
                   </div>
-                  <div className="stat-card" style={{ flex: 1 }}>
-                    <span className="stat-label">SLA LATENCY LIMIT</span>
-                    <span className="stat-value" style={{ color: 'var(--accent-red)' }}>{perf.data.sla_latency_limit_seconds}s</span>
+                  <div className="stat-card" style={{ flex: 1, padding: '8px 12px' }}>
+                    <span className="stat-label">MEMORY USAGE</span>
+                    <span className="stat-value" style={{ color: 'var(--accent-purple)', fontSize: '18px', margin: '2px 0' }}>
+                      {perf.data.current_memory}%
+                    </span>
+                    <div style={{ width: '100%', height: '4px', background: '#E2E8F0', borderRadius: '2px', overflow: 'hidden', marginTop: '4px' }}>
+                      <div style={{ width: `${perf.data.current_memory}%`, height: '100%', background: 'var(--accent-purple)', borderRadius: '2px' }} />
+                    </div>
                   </div>
                 </div>
-                <div className="stat-card">
-                  <span className="stat-label">AVG PROCESSING LATENCY</span>
-                  <span className="stat-value" style={{ color: 'var(--accent-green)' }}>{perf.data.average_latency_seconds} seconds</span>
+
+                {/* Row 2: Latency and SLA Limit */}
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <div className="stat-card" style={{ flex: 1, padding: '8px 12px' }}>
+                    <span className="stat-label">AVG PROCESSING LATENCY</span>
+                    <span className="stat-value" style={{ color: 'var(--accent-green)', fontSize: '18px', margin: '2px 0' }}>
+                      {perf.data.average_latency_seconds}s
+                    </span>
+                    <div style={{ width: '100%', height: '4px', background: '#E2E8F0', borderRadius: '2px', overflow: 'hidden', marginTop: '4px' }}>
+                      <div style={{ width: `${Math.min(100, (perf.data.average_latency_seconds / perf.data.sla_latency_limit_seconds) * 100)}%`, height: '100%', background: 'var(--accent-green)', borderRadius: '2px' }} />
+                    </div>
+                  </div>
+                  <div className="stat-card" style={{ flex: 1, padding: '8px 12px' }}>
+                    <span className="stat-label">SLA LATENCY LIMIT</span>
+                    <span className="stat-value" style={{ color: 'var(--accent-red)', fontSize: '18px', margin: '2px 0' }}>
+                      {perf.data.sla_latency_limit_seconds}s
+                    </span>
+                    <div style={{ width: '100%', height: '4px', background: '#E2E8F0', borderRadius: '2px', overflow: 'hidden', marginTop: '4px' }}>
+                      <div style={{ width: '100%', height: '100%', background: 'var(--accent-red)', borderRadius: '2px' }} />
+                    </div>
+                  </div>
                 </div>
               </div>
             ) : (
