@@ -282,23 +282,24 @@ export default function Schema() {
                   return (
                     <div 
                       style={{
-                        background: "rgba(0, 0, 0, 0.4)",
+                        background: "#0f172a",
                         borderRadius: "8px",
-                        border: "1px solid rgba(255,255,255,0.06)",
+                        border: "1px solid #1e293b",
                         fontFamily: "var(--font-mono)",
                         fontSize: "0.78rem",
                         maxHeight: "none",
                         overflowY: "auto",
                         display: "flex",
-                        padding: "0.75rem 0"
+                        padding: "0.75rem 0",
+                        boxShadow: "inset 0 2px 4px 0 rgba(0,0,0,0.2)"
                       }}
                     >
                       <div 
                         style={{
-                          color: "#4b5563",
+                          color: "#475569",
                           textAlign: "right",
                           padding: "0 0.75rem",
-                          borderRight: "1px solid rgba(255,255,255,0.08)",
+                          borderRight: "1px solid #1e293b",
                           userSelect: "none",
                           minWidth: "2rem"
                         }}
@@ -308,11 +309,37 @@ export default function Schema() {
                       <div 
                         style={{
                           paddingLeft: "1rem",
-                          color: "#38bdf8",
-                          whiteSpace: "pre"
+                          whiteSpace: "pre",
+                          width: "100%"
                         }}
                       >
-                        {lines.map((line, i) => <div key={i}>{line}</div>)}
+                        {lines.map((line, i) => {
+                          // Simple regex highlighting for JSON
+                          let highlighted = <span style={{ color: "#cbd5e1" }}>{line}</span>;
+                          const trimmed = line.trim();
+                          
+                          if (trimmed === "{" || trimmed === "}" || trimmed === "}," || trimmed === "[" || trimmed === "]") {
+                            highlighted = <span style={{ color: "#64748b" }}>{line}</span>;
+                          } else {
+                            const match = line.match(/^(\s*)(".*?")(\s*:\s*)(".*?"|\d+|true|false|null)(,?)(\s*)$/);
+                            if (match) {
+                              const [_, indent, key, colon, value, comma, trailing] = match;
+                              const isTypeVal = value.includes("Type") || !value.startsWith('"');
+                              const valColor = isTypeVal ? "#f59e0b" : "#38bdf8";
+                              highlighted = (
+                                <span>
+                                  {indent}
+                                  <span style={{ color: "#a5b4fc" }}>{key}</span>
+                                  <span style={{ color: "#64748b" }}>{colon}</span>
+                                  <span style={{ color: valColor }}>{value}</span>
+                                  {comma && <span style={{ color: "#64748b" }}>{comma}</span>}
+                                  {trailing}
+                                </span>
+                              );
+                            }
+                          }
+                          return <div key={i}>{highlighted}</div>;
+                        })}
                       </div>
                     </div>
                   );

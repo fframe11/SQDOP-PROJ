@@ -876,16 +876,18 @@ export default function RulesConfig() {
                   <p style={{ fontSize: "0.85rem", color: "var(--text-main)", lineHeight: "1.45" }}>{selectedProposal.analysis_result?.root_cause}</p>
                 </div>
 
-                {/* Explanation */}
-                <div>
-                  <h4 style={{ fontSize: "0.9rem", color: "var(--text-main)", marginBottom: "0.4rem", fontWeight: 600 }}>Detailed Explanation</h4>
+                {/* Explanation - Wrapped in a cohesive card matching Root Cause card */}
+                <div style={{ background: "var(--bg-card-subtle, #F8FAFC)", border: "1px solid var(--border-card-subtle, #E2E8F0)", padding: "1rem", borderRadius: "8px" }}>
+                  <h4 style={{ fontSize: "0.9rem", color: "var(--text-main)", marginBottom: "0.4rem", fontWeight: 700 }}>ℹ️ Detailed Explanation</h4>
                   <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)", lineHeight: "1.45" }}>{selectedProposal.analysis_result?.explanation}</p>
                 </div>
 
-                {/* Recommended Rules list */}
+                {/* Recommended Rules list - Anchored with top divider and icon */}
                 {selectedProposal.analysis_result?.suggested_rules && selectedProposal.analysis_result?.suggested_rules.length > 0 && (
-                  <div>
-                    <h4 style={{ fontSize: "0.9rem", color: "var(--text-main)", marginBottom: "0.5rem", fontWeight: 600 }}>Suggested Rule Changes</h4>
+                  <div style={{ borderTop: "1px solid #E2E8F0", paddingTop: "1rem", marginTop: "0.2rem" }}>
+                    <h4 style={{ fontSize: "0.9rem", color: "var(--text-main)", marginBottom: "0.65rem", fontWeight: 700, display: "flex", alignItems: "center", gap: "6px" }}>
+                      <span>🛠️</span> Suggested Rule Changes
+                    </h4>
                     <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
                       {selectedProposal.analysis_result.suggested_rules.map((rule, idx) => (
                         <div 
