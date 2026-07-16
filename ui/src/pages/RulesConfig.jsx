@@ -872,13 +872,26 @@ export default function RulesConfig() {
               <div style={{ display: "flex", flexDirection: "column", gap: "1.2rem", marginTop: "1rem" }}>
                 {/* Root Cause Analysis */}
                 <div style={{ background: "rgba(14, 165, 233, 0.06)", border: "1px solid rgba(14, 165, 233, 0.15)", padding: "1rem", borderRadius: "8px" }}>
-                  <h4 style={{ fontSize: "0.9rem", color: "var(--accent-blue)", marginBottom: "0.4rem", fontWeight: 700 }}>🔍 AI Root Cause Analysis</h4>
+                  <h4 style={{ fontSize: "0.9rem", color: "var(--accent-blue)", marginBottom: "0.4rem", fontWeight: 700 }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: "inline-block", verticalAlign: "middle", marginRight: "6px", marginTop: "-2px" }}>
+                      <circle cx="11" cy="11" r="8" />
+                      <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                    </svg>
+                    AI Root Cause Analysis
+                  </h4>
                   <p style={{ fontSize: "0.85rem", color: "var(--text-main)", lineHeight: "1.45" }}>{selectedProposal.analysis_result?.root_cause}</p>
                 </div>
 
                 {/* Explanation - Wrapped in a cohesive card matching Root Cause card */}
                 <div style={{ background: "var(--bg-card-subtle, #F8FAFC)", border: "1px solid var(--border-card-subtle, #E2E8F0)", padding: "1rem", borderRadius: "8px" }}>
-                  <h4 style={{ fontSize: "0.9rem", color: "var(--text-main)", marginBottom: "0.4rem", fontWeight: 700 }}>ℹ️ Detailed Explanation</h4>
+                  <h4 style={{ fontSize: "0.9rem", color: "var(--text-main)", marginBottom: "0.4rem", fontWeight: 700 }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: "inline-block", verticalAlign: "middle", marginRight: "6px", marginTop: "-2px" }}>
+                      <circle cx="12" cy="12" r="10" />
+                      <line x1="12" y1="16" x2="12" y2="12" />
+                      <line x1="12" y1="8" x2="12.01" y2="8" />
+                    </svg>
+                    Detailed Explanation
+                  </h4>
                   <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)", lineHeight: "1.45" }}>{selectedProposal.analysis_result?.explanation}</p>
                 </div>
 
@@ -886,7 +899,10 @@ export default function RulesConfig() {
                 {selectedProposal.analysis_result?.suggested_rules && selectedProposal.analysis_result?.suggested_rules.length > 0 && (
                   <div style={{ borderTop: "1px solid #E2E8F0", paddingTop: "1rem", marginTop: "0.2rem" }}>
                     <h4 style={{ fontSize: "0.9rem", color: "var(--text-main)", marginBottom: "0.65rem", fontWeight: 700, display: "flex", alignItems: "center", gap: "6px" }}>
-                      <span>🛠️</span> Suggested Rule Changes
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: "inline-block", verticalAlign: "middle", marginRight: "6px", marginTop: "-2px" }}>
+                        <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+                      </svg>
+                      Suggested Rule Changes
                     </h4>
                     <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
                       {selectedProposal.analysis_result.suggested_rules.map((rule, idx) => (
@@ -919,7 +935,9 @@ export default function RulesConfig() {
                 {/* Recommended Quality Score threshold */}
                 {selectedProposal.analysis_result?.recommended_threshold && (
                   <div style={{ display: "flex", alignItems: "center", gap: "10px", background: "rgba(16,185,129,0.06)", border: "1px solid rgba(16,185,129,0.15)", padding: "0.75rem 1rem", borderRadius: "6px" }}>
-                    <span style={{ fontSize: "1.25rem" }}>🛡️</span>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: "inline-block", verticalAlign: "middle", marginRight: "2px", color: "var(--accent-green)" }}>
+                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                    </svg>
                     <span style={{ fontSize: "0.85rem", color: "var(--text-main)" }}>
                       AI Recommended Quality Score Threshold: <strong>{selectedProposal.analysis_result.recommended_threshold.toFixed(1)}%</strong>
                     </span>
