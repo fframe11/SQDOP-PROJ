@@ -209,7 +209,7 @@
     "ai_advisor": {
       "enabled": true,
       "trigger": "on_anomaly",
-      "model": "llama-3.3-70b-versatile",
+      "model": "gemini-2.0-flash",
       "max_rows_to_analyze": 50,
       "confidence_threshold": 0.7
     }

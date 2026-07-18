@@ -1,0 +1,243 @@
+/* ═══════════════════════════════════════════════════
+   GRIDGEIST DATA EXPORT — SDOQAP Clerk White/Purple
+   ═══════════════════════════════════════════════════ */
+
+.gs-export {
+  padding: 20px 24px;
+  height: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.gs-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 14px;
+  flex-shrink: 0;
+}
+.gs-page-title {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--text-main);
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  margin: 0;
+}
+.gs-page-title span { color: var(--accent-purple); }
+.gs-page-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.gs-export-tabs {
+  display: flex;
+  gap: 4px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  padding: 3px;
+  border-radius: 8px;
+}
+.gs-export-btn {
+  background: transparent;
+  border: none;
+  padding: 5px 12px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--text-muted);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: var(--font-sans);
+}
+.gs-export-btn.active {
+  background: var(--accent-purple);
+  color: #ffffff;
+}
+
+.gs-export-layout {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 16px;
+  flex-grow: 1;
+  min-height: 0;
+}
+.gs-ecard {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-sm);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.gs-ecard:hover {
+  border-color: rgba(108,71,255,0.15);
+  box-shadow: var(--shadow-md);
+}
+.gs-ecard h3 {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--text-main);
+  text-transform: uppercase;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 8px;
+  flex-shrink: 0;
+}
+
+.gs-input-grp {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+.gs-input-grp label {
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.gs-input-grp select, .gs-input-grp input {
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 11.5px;
+  color: var(--text-main);
+  background: #ffffff;
+  font-family: var(--font-sans);
+}
+.gs-input-grp select:focus, .gs-input-grp input:focus {
+  border-color: var(--accent-purple);
+  outline: none;
+  box-shadow: 0 0 6px rgba(108,71,255,0.15);
+}
+
+.gs-layer-status {
+  padding: 8px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  margin-top: 4px;
+}
+.gs-layer-status strong {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  display: block;
+  margin-bottom: 4px;
+}
+.gs-layer-pills {
+  display: flex;
+  gap: 4px;
+}
+.gs-layer-pill {
+  font-size: 8.5px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+}
+.gs-layer-pill.yes { background: #d1fae5; color: #059669; }
+.gs-layer-pill.no { background: #fee2e2; color: #dc2626; }
+
+.gs-btn-download {
+  width: 100%;
+  background: linear-gradient(135deg, var(--accent-purple), #8B5CF6);
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-transform: uppercase;
+  font-family: var(--font-mono);
+  box-shadow: 0 3px 8px rgba(108,71,255,0.15);
+  margin-top: auto;
+}
+.gs-btn-download:hover:not(:disabled) {
+  box-shadow: 0 5px 12px rgba(108,71,255,0.25);
+  transform: translateY(-1px);
+}
+.gs-btn-download:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.gs-preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 10px;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+.gs-preview-header h3 {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: var(--text-main);
+  text-transform: uppercase;
+  margin: 0;
+  border: none;
+  padding: 0;
+}
+.gs-preview-header span {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+.gs-preview-wrap {
+  flex-grow: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.gs-preview-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11.5px;
+}
+.gs-preview-table th {
+  padding: 8px 10px;
+  font-weight: 700;
+  color: var(--accent-purple);
+  text-align: left;
+  border-bottom: 2px solid var(--border-color);
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+.gs-preview-table td {
+  padding: 8px 10px;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--bg-primary);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  max-width: 180px;
+}
+.gs-preview-table tr:hover td {
+  background: var(--bg-primary);
+}
+
+.gs-toast {
+  padding: 8px 12px; border-radius: 6px; font-size: 10.5px; font-family: var(--font-mono); margin-top: 8px;
+}
+.gs-toast.ok { background: #d1fae5; color: #059669; border: 1px solid #10b981; }
+.gs-toast.err { background: #fee2e2; color: #dc2626; border: 1px solid #ef4444; }
+.gs-toast.loading { background: #eff6ff; color: #2563eb; border: 1px solid #3b82f6; }
+.gs-empty {
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-muted); font-size: 11px; font-family: var(--font-mono);
+  height: 100%;
+}

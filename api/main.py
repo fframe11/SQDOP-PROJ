@@ -120,7 +120,10 @@ def get_services_status():
         "Grafana": {"host": "grafana", "port": 3000, "url": "http://localhost:3000"},
         "n8n Orchestrator": {"host": "n8n", "port": 5678, "url": "http://localhost:5678"},
         "Spark Master": {"host": "spark-master", "port": 8080, "url": "http://localhost:8081"},
-        "Spark Worker": {"host": "spark-worker", "port": 8081, "url": None}
+        "Spark Worker": {"host": "spark-worker", "port": 8081, "url": None},
+        "Kafka Broker": {"host": "kafka", "port": 9092, "url": None},
+        "Postgres DB": {"host": "postgres", "port": 5432, "url": None},
+        "REST Ingestion API": {"host": "api", "port": 8000, "url": "http://localhost:8002"}
     }
 
     results = {}

@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useApi, postApi } from '../hooks/useApi';
 import { ComposedChart, AreaChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Legend } from 'recharts';
+import "./Dashboard.css";
 
 const getIngestionSource = (run) => {
   if (!run) return "Unknown Ingest";
@@ -38,7 +39,7 @@ export default function Dashboard() {
 
   // Pagination states
   const [historyPage, setHistoryPage] = useState(1);
-  const historyPageSize = 8;
+  const historyPageSize = 5;
 
   useEffect(() => {
     setHistoryPage(1);
@@ -48,6 +49,7 @@ export default function Dashboard() {
   const kpi = useApi('/kpi/stats', { refreshInterval: 15000 });
   const anomaly = useApi('/anomaly/sources', { refreshInterval: 15000 });
   const services = useApi('/services/status', { refreshInterval: 10000 });
+  const isHealthy = services.data && !services.error;
   const activity = useApi('/system/activity?limit=15', { refreshInterval: 15000 });
   const perf = useApi('/performance/metrics', { refreshInterval: 15000 });
   const qualityHistory = useApi('/quality?limit=50', { refreshInterval: 15000 });
@@ -204,161 +206,226 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="sdoqap-app">
-      {/* 1. Page Header & Breadcrumbs (Clerk Style) */}
-      <div style={{ marginBottom: "1.5rem", width: "100%" }}>
-        <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "0.4rem", fontFamily: "var(--font-sans)", display: "flex", gap: "6px", alignItems: "center" }}>
-          <span>SDOQAP Data Engine</span>
-          <span style={{ opacity: 0.5 }}>&gt;</span>
-          <span style={{ color: "var(--text-main)", fontWeight: 500 }}>Dashboard</span>
+    <div className="gs-dashboard">
+      {/* 1. Page Header & Info */}
+      <div className="gs-topbar">
+        <div>
+          <h1 className="gs-title">SDOQAP <span>Data Engine Cockpit</span></h1>
+          <p className="gs-subtitle">Continuous quality auditing, schema drift evolutions, and quarantine logs</p>
         </div>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
-          <div>
-            <h1 style={{ fontSize: "1.6rem", fontWeight: 700, color: "var(--text-main)", letterSpacing: "-0.02em", margin: 0 }}>Dashboard</h1>
-            <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", margin: "4px 0 0 0" }}>View and manage system activities</p>
+        
+        <div className="gs-topbar-right">
+          <div className="gs-status-cluster">
+            <span className={`gs-status-dot ${isHealthy ? 'online' : 'offline'}`} />
+            <span className="gs-status-label">{isHealthy ? 'API ONLINE' : 'API WARNING'}</span>
           </div>
-          
-          {/* Muted health pills positioned cleanly on the right */}
-          <div className="service-hub" style={{ margin: 0, padding: 0, gap: "6px", background: "transparent", border: "none", display: "flex", alignItems: "center" }}>
-            {services.data ? (
-              Object.entries(services.data).map(([name, info]) => (
-                <div key={name} className="service-card" title={info.url || 'Internal Port'} style={{ padding: "4px 8px", background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: "20px", display: "flex", alignItems: "center", gap: "4px" }}>
-                  <span className={`status-dot ${info.status === 'online' ? 'online' : 'offline'}`} style={{ width: "6px", height: "6px" }} />
-                  <span className="service-name" style={{ fontSize: "10px", color: "var(--text-muted)" }}>{name}</span>
-                </div>
-              ))
-            ) : null}
-            <div className={`overall-status ${services.error ? 'offline' : ''}`} style={{ padding: "4px 8px", background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: "20px", display: "flex", alignItems: "center", gap: "4px" }}>
-              <span className={`status-dot ${services.error ? 'offline' : 'online'}`} style={{ width: "6px", height: "6px" }} />
-              <span style={{ fontSize: "10px", color: services.error ? "var(--accent-red)" : "var(--text-muted)" }}>{services.error ? 'OFFLINE' : 'ONLINE'}</span>
-            </div>
-          </div>
+          <select
+            className="gs-source-select"
+            value={selectedSourceFilter}
+            onChange={(e) => setSelectedSourceFilter(e.target.value)}
+          >
+            <option value="All">All Ingestion Sources</option>
+            {availableTables.map(table => (
+              <option key={table} value={table}>{table}</option>
+            ))}
+          </select>
         </div>
       </div>
 
       {/* 2. KPI Metrics Scorecard Row */}
-      <div className="kpi-row">
-        <div className="kpi-card blue animate-in">
-          <div className="kpi-card-left">
-            <span className="kpi-val">
-              {kpi.loading ? 'Loading...' : (kpi.data ? `${(kpi.data.total_records_ingested / 1000000).toFixed(2)}M` : '0.00M')}
-            </span>
-            <span className="kpi-label">TOTAL RECORDS INGESTED</span>
+      <div className="gs-kpi-row">
+        <div className="gs-kpi gs-kpi-purple">
+          <div className="gs-kpi-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/></svg>
           </div>
-          <span className="kpi-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block' }}>
-              <ellipse cx="12" cy="5" rx="9" ry="3" />
-              <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
-              <path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3" />
-            </svg>
-          </span>
+          <div className="gs-kpi-body">
+            <span className="gs-kpi-value">
+              {kpi.loading ? '...' : (kpi.data ? `${(kpi.data.total_records_ingested / 1000000).toFixed(2)}M` : '0.00M')}
+            </span>
+            <span className="gs-kpi-label">TOTAL INGESTED</span>
+          </div>
         </div>
-        <div className="kpi-card quality-kpi animate-in">
-          <div className="kpi-card-left">
-            <span className="kpi-val">
-              {kpi.loading ? 'Loading...' : (kpi.data ? `${kpi.data.global_quality_score}%` : '0.00%')}
-            </span>
-            <span className="kpi-label">GLOBAL QUALITY SCORE</span>
+        <div className="gs-kpi gs-kpi-green">
+          <div className="gs-kpi-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
           </div>
-          <span className="kpi-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block' }}>
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-            </svg>
-          </span>
+          <div className="gs-kpi-body">
+            <span className="gs-kpi-value">
+              {kpi.loading ? '...' : (kpi.data ? `${kpi.data.global_quality_score}%` : '0%')}
+            </span>
+            <span className="gs-kpi-label">GLOBAL QUALITY SCORE</span>
+          </div>
         </div>
-        <div className="kpi-card quarantine-kpi animate-in">
-          <div className="kpi-card-left">
-            <span className="kpi-val">
-              {kpi.loading ? 'Loading...' : (kpi.data ? (kpi.data.quarantined_records || 0).toLocaleString() : '0')}
-            </span>
-            <span className="kpi-label">QUARANTINED RECORDS</span>
+        <div className="gs-kpi gs-kpi-red">
+          <div className="gs-kpi-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
           </div>
-          <span className="kpi-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block' }}>
-              <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
-              <line x1="12" y1="9" x2="12" y2="13" />
-              <line x1="12" y1="17" x2="12.01" y2="17" />
-            </svg>
-          </span>
+          <div className="gs-kpi-body">
+            <span className="gs-kpi-value">
+              {kpi.loading ? '...' : (kpi.data ? (kpi.data.quarantined_records || 0).toLocaleString() : '0')}
+            </span>
+            <span className="gs-kpi-label">QUARANTINED RECORDS</span>
+          </div>
         </div>
-        <div className="kpi-card amber animate-in">
-          <div className="kpi-card-left">
-            <span className="kpi-val">
-              {kpi.loading ? 'Loading...' : (kpi.data ? `${kpi.data.mttd_minutes} mins` : '0.0 mins')}
-            </span>
-            <span className="kpi-label">MTTD (MEAN TIME TO DETECT)</span>
+        <div className="gs-kpi gs-kpi-amber">
+          <div className="gs-kpi-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
           </div>
-          <span className="kpi-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block' }}>
-              <circle cx="12" cy="12" r="10" />
-              <polyline points="12 6 12 12 16 14" />
-            </svg>
-          </span>
+          <div className="gs-kpi-body">
+            <span className="gs-kpi-value">
+              {kpi.loading ? '...' : (kpi.data ? `${kpi.data.mttd_minutes} mins` : '0m')}
+            </span>
+            <span className="gs-kpi-label">MTTD ANOMALY</span>
+          </div>
         </div>
       </div>
 
-      {/* 3. Main Analytical Grid */}
-      <div className="main-grid">
+      {/* 3. Product Native Motif: End-to-End Data Lineage Map */}
+      <div className="gs-lineage-hero">
+        <div className="gs-lineage-header">
+          <h2>Medallion Flow Data Lineage</h2>
+          <span className="gs-lineage-route">Route: Bronze → Silver → Gold / Serving</span>
+        </div>
+        {(() => {
+          const activeRun = selectedRun || (qualityHistory.data && qualityHistory.data[0]);
+          const totalRecs = activeRun?.total_records || 0;
+          const quarRecs = activeRun?.quarantined_records || 0;
+          const hasError = activeRun && quarRecs > 0;
+          const hasClean = activeRun && (totalRecs - quarRecs > 0);
+          const isExecutionFailed = activeRun && (activeRun.quality_score === 0 || activeRun.quality_score === null);
+          return (
+            <div className="gs-lineage-track" style={{ display: 'flex', alignItems: 'center', width: '100%', justifyContent: 'space-between' }}>
+              {/* Node 1: Ingest Source */}
+              <div className={`gs-node active`}>
+                <span className="gs-node-icon" style={{ display: 'flex', alignItems: 'center', color: 'var(--accent-purple)' }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
+                </span>
+                <div className="gs-node-text">
+                  <strong>{activeRun ? activeRun.data_source : 'Ingest Source'}</strong>
+                  <small>Bronze Layer Inflow</small>
+                  {activeRun && <span className="gs-node-stat">{totalRecs.toLocaleString()} rows</span>}
+                </div>
+              </div>
 
-        {/* ================= COLUMN LEFT ================= */}
-        <div className="col-left">
+              <div className={`gs-connector ${isExecutionFailed ? 'danger' : (activeRun ? 'active' : '')}`}>
+                <div className="gs-connector-line"></div>
+                <div className="gs-connector-arrow">→</div>
+              </div>
 
-          {/* Card 1: Scorecard History */}
-          <div className="glass-card animate-in">
-            <div className="card-header" style={{ borderBottom: "none", paddingBottom: 0, marginBottom: "0.5rem" }}>
-              <div>
-                <h3 className="card-title"><span className="icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', verticalAlign: 'middle', marginTop: '-2px' }}><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" /></svg></span> Scorecard History</h3>
-                <p className="card-subtitle">Pipeline Run History &amp; QA Results</p>
+              {/* Node 2: Spark QA Audit */}
+              <div className={`gs-node ${activeRun ? 'active' : ''} ${isExecutionFailed ? 'danger' : ''}`}>
+                <span className="gs-node-icon" style={{ display: 'flex', alignItems: 'center', color: 'var(--accent-purple)' }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                </span>
+                <div className="gs-node-text">
+                  <strong>Spark QA Audit</strong>
+                  <small>Silver Validation</small>
+                </div>
+              </div>
+
+              <div className={`gs-connector ${isExecutionFailed ? 'danger' : (activeRun ? 'active' : '')}`}>
+                <div className="gs-connector-line"></div>
+                <div className="gs-connector-arrow">→</div>
+              </div>
+
+              {/* Branch Container (OK vs. Quarantine) */}
+              <div className="lineage-branches-container" style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                {/* Left Fork */}
+                <div style={{ display: 'flex', flexDirection: 'column', width: '16px', height: '90px', minWidth: '16px', flexShrink: 0 }}>
+                  <div style={{ height: '45px', borderLeft: '2px solid var(--accent-purple)', borderTop: '2px solid var(--accent-purple)', borderTopLeftRadius: '6px' }}></div>
+                  <div style={{ height: '45px', borderLeft: `2px solid ${hasError ? 'var(--accent-red)' : 'var(--accent-purple)'}`, borderBottom: `2px solid ${hasError ? 'var(--accent-red)' : 'var(--accent-purple)'}`, borderBottomLeftRadius: '6px' }}></div>
+                </div>
+
+                {/* Branches List */}
+                <div className="lineage-branches" style={{ display: 'flex', flexDirection: 'column', gap: '8px', margin: '0 8px', flexShrink: 0 }}>
+                  {/* Node 3: Active Store (Clean) */}
+                  <div className={`gs-node ${hasClean ? 'active' : ''}`}>
+                    <span className="gs-node-icon" style={{ display: 'flex', alignItems: 'center', color: 'var(--accent-green)' }}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    </span>
+                    <div className="gs-node-text">
+                      <strong>Active Store</strong>
+                      <small>Clean Delta Lake</small>
+                      {activeRun && <span className="gs-node-stat">{(totalRecs - quarRecs).toLocaleString()} rows</span>}
+                    </div>
+                  </div>
+
+                  {/* Node 4: Quarantine */}
+                  <div className={`gs-node ${hasError ? 'danger' : ''}`}>
+                    <span className="gs-node-icon" style={{ display: 'flex', alignItems: 'center', color: 'var(--accent-red)' }}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    </span>
+                    <div className="gs-node-text">
+                      <strong>Quarantine</strong>
+                      <small>Bad Data Isolation</small>
+                      {activeRun && <span className="gs-node-stat">{quarRecs.toLocaleString()} rows</span>}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right Fork (Only connects Active Store onwards to Serving API) */}
+                <div style={{ display: 'flex', flexDirection: 'column', width: '16px', height: '90px', minWidth: '16px', flexShrink: 0 }}>
+                  <div style={{ height: '45px', borderRight: '2px solid var(--accent-purple)', borderTop: '2px solid var(--accent-purple)', borderTopRightRadius: '6px' }}></div>
+                  <div style={{ height: '45px', borderRight: '2px solid transparent', borderBottom: '2px solid transparent' }}></div>
+                </div>
+              </div>
+
+              <div className={`gs-connector ${hasClean ? 'active' : ''}`}>
+                <div className="gs-connector-line"></div>
+                <div className="gs-connector-arrow">→</div>
+              </div>
+
+              {/* Node 5: Serving API */}
+              <div className={`gs-node ${hasClean ? 'active' : ''}`}>
+                <span className="gs-node-icon" style={{ display: 'flex', alignItems: 'center', color: 'var(--accent-purple)' }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"/></svg>
+                </span>
+                <div className="gs-node-text">
+                  <strong>Serving API</strong>
+                  <small>BI & Analytics</small>
+                </div>
               </div>
             </div>
+          );
+        })()}
+      </div>
 
-            {/* Clerk-Style Controls Row */}
-            <div className="dashboard-controls-row" style={{ display: "flex", gap: "1rem", alignItems: "center", padding: "0 1.25rem 1rem 1.25rem", borderBottom: "1px solid #F1F5F9", width: "100%", flexWrap: "wrap" }}>
-              <div className="search-container" style={{ flex: 1, margin: 0, minWidth: "200px", position: "relative" }}>
-                <span className="search-icon" style={{ left: "10px", top: "50%", transform: "translateY(-50%)", position: "absolute", display: "flex", alignItems: "center", color: "#64748B" }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                </span>
+      {/* 4. Main Observability Grid */}
+      <div className="gs-main">
+        {/* Left Column */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          
+          {/* Card 1: Scorecard History */}
+          <div className="gs-card gs-card-tall">
+            <div className="gs-card-head">
+              <div>
+                <h3>Scorecard History</h3>
+                <p>Pipeline run history and audit records</p>
+              </div>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                 <input
                   type="text"
-                  placeholder="Search by ID or Table..."
+                  placeholder="Search table/run..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  style={{ paddingLeft: "2.25rem", width: "100%", height: "34px", borderRadius: "6px", border: "1px solid #E2E8F0" }}
+                  className="gs-search"
                 />
-              </div>
-
-              <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-                <span style={{ fontSize: "12px", color: "var(--text-muted)", whiteSpace: "nowrap" }}>Filter:</span>
-                <select
-                  className="filter-select"
-                  value={selectedSourceFilter}
-                  onChange={(setSelected) => setSelectedSourceFilter(setSelected.target.value)}
-                  style={{ width: "auto", minWidth: "150px", padding: "6px 12px", background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: "6px", fontSize: "13px", color: "var(--text-main)", height: "34px" }}
+                <button
+                  className="gs-btn-outline"
+                  onClick={() => handleExportCSV(filteredRuns, "SDOQAP_Pipeline_Runs")}
                 >
-                  <option value="All">All Sources</option>
-                  {availableTables.map(table => (
-                    <option key={table} value={table}>{table}</option>
-                  ))}
-                </select>
+                  Export CSV
+                </button>
               </div>
-
-              <button
-                className="btn btn-primary"
-                onClick={() => handleExportCSV(filteredRuns, "SDOQAP_Pipeline_Runs")}
-                style={{ padding: "0 1.25rem", borderRadius: "6px", fontSize: "13px", height: "34px" }}
-              >
-                Export CSV
-              </button>
             </div>
 
-            <div className="table-wrapper">
+            <div className="gs-ptable-wrap" style={{ flexGrow: 1, minHeight: 0 }}>
               {qualityHistory.loading ? (
-                <div className="loading-state"><span>Fetching history...</span></div>
+                <div className="gs-empty">Fetching history logs...</div>
               ) : filteredRuns.length === 0 ? (
-                <div className="loading-state" style={{ color: 'var(--text-muted)' }}>No run history found</div>
+                <div className="gs-empty">No run history found</div>
               ) : (
-                <>
-                  <table>
+                <table className="gs-ptable">
                   <thead>
                     <tr>
                       <th>TIMESTAMP</th>
@@ -372,280 +439,188 @@ export default function Dashboard() {
                     {paginatedRuns.map((run) => (
                       <tr
                         key={run.run_id}
-                        className={`clickable-row ${selectedRun && selectedRun.run_id === run.run_id ? 'selected' : ''}`}
+                        className={`gs-run-item ${selectedRun && selectedRun.run_id === run.run_id ? 'selected' : ''}`}
                         onClick={() => {
                           setSelectedRun(run);
                           setUserSelectedRunId(run.run_id === qualityHistory.data[0]?.run_id ? null : run.run_id);
                         }}
                       >
-                        <td>{new Date(run.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}</td>
+                        <td className="gs-mono">{new Date(run.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}</td>
                         <td><strong>{run.table_name}</strong></td>
-                        <td style={{ fontFamily: 'var(--font-mono)' }}>{(run.run_id || '').slice(0, 15)}...</td>
-                        <td style={{ fontFamily: 'var(--font-mono)' }}>{(run.total_records || 0).toLocaleString()}</td>
-                        <td className="score-text" style={{ color: run.quality_score >= 95 ? 'var(--accent-green)' : 'var(--accent-red)' }}>
+                        <td className="gs-mono">{(run.run_id || '').slice(0, 12)}...</td>
+                        <td className="gs-mono">{(run.total_records || 0).toLocaleString()}</td>
+                        <td className="gs-mono" style={{ color: run.quality_score >= 95 ? 'var(--accent-green)' : 'var(--accent-red)', fontWeight: 700 }}>
                           {run.quality_score}%
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem', padding: '0 0.5rem' }}>
-                  <button 
-                    className="btn btn-secondary" 
-                    disabled={historyPage === 1} 
-                    onClick={() => setHistoryPage(p => Math.max(p - 1, 1))}
-                    style={{ padding: '0.25rem 0.75rem', fontSize: '0.75rem', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer', borderRadius: '4px' }}
-                  >
-                    Previous
-                  </button>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                    Page {historyPage} of {Math.ceil(filteredRuns.length / historyPageSize) || 1}
-                  </span>
-                  <button 
-                    className="btn btn-secondary" 
-                    disabled={historyPage >= Math.ceil(filteredRuns.length / historyPageSize)} 
-                    onClick={() => setHistoryPage(p => p + 1)}
-                    style={{ padding: '0.25rem 0.75rem', fontSize: '0.75rem', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer', borderRadius: '4px' }}
-                  >
-                    Next
-                  </button>
-                </div>
-              </>
-            )}
+              )}
+            </div>
+
+            <div className="gs-pagination">
+              <button 
+                disabled={historyPage === 1} 
+                onClick={() => setHistoryPage(p => Math.max(p - 1, 1))}
+              >
+                Prev
+              </button>
+              <span className="gs-muted">
+                Page {historyPage} of {Math.ceil(filteredRuns.length / historyPageSize) || 1}
+              </span>
+              <button 
+                disabled={historyPage >= Math.ceil(filteredRuns.length / historyPageSize)} 
+                onClick={() => setHistoryPage(p => p + 1)}
+              >
+                Next
+              </button>
             </div>
           </div>
 
           {/* Card 2: Selected Run Analysis */}
-          <div className="glass-card animate-in">
-            <div className="card-header">
+          <div className="gs-card">
+            <div className="gs-card-head">
               <div>
-                <h3 className="card-title"><span className="icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', verticalAlign: 'middle', marginTop: '-2px' }}><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="6" /><circle cx="12" cy="12" r="2" /></svg></span> Selected Run Analysis</h3>
-                <p className="card-subtitle">Data Filtering Details (Clean vs Quarantined)</p>
+                <h3>Selected Run Details</h3>
+                <p>Metrics audit breakdown</p>
               </div>
-              <div className="tab-btn-group">
-                <button className={`btn-tab ${leftTab === 'Ratio' ? 'active' : ''}`} onClick={() => setLeftTab('Ratio')}>Ratio</button>
-                <button className={`btn-tab ${leftTab === 'Quarantine' ? 'active' : ''}`} onClick={() => setLeftTab('Quarantine')}>Quarantine</button>
-                <button className={`btn-tab ${leftTab === 'Insights' ? 'active' : ''}`} onClick={() => setLeftTab('Insights')}>Insights</button>
+              <div style={{ display: 'flex', gap: '4px' }}>
+                <button className={`gs-btn-outline ${leftTab === 'Ratio' ? 'active' : ''}`} onClick={() => setLeftTab('Ratio')}>Ratio</button>
+                <button className={`gs-btn-outline ${leftTab === 'Quarantine' ? 'active' : ''}`} onClick={() => setLeftTab('Quarantine')}>Quarantine</button>
+                <button className={`gs-btn-outline ${leftTab === 'Insights' ? 'active' : ''}`} onClick={() => setLeftTab('Insights')}>Insights</button>
               </div>
             </div>
 
             {selectedRun ? (
-              <div className="detail-container">
-                <div className="detail-charts-panel">
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' }}>
-                    Dataset: <strong>{selectedRun.table_name}</strong> | ID: <strong>{selectedRun.run_id}</strong>
-                  </div>
-
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '16px' }}>
                   {leftTab === 'Ratio' && (
-                    <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                      {/* Gauge Chart and Raw Counts Row */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', padding: '0.25rem 0' }}>
-                        <div style={{ position: 'relative', width: '80px', height: '80px', flexShrink: 0 }}>
-                          <svg width="80" height="80" viewBox="0 0 36 36" style={{ transform: 'rotate(-90deg)' }}>
-                            <circle cx="18" cy="18" r="15.915" fill="transparent" stroke="rgba(226, 232, 240, 0.2)" strokeWidth="3" />
-                            <circle cx="18" cy="18" r="15.915" fill="transparent" stroke="var(--accent-green)" strokeWidth="3.2"
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <div className="gs-detail-grid">
+                        <div className="gs-gauge-container">
+                          <svg className="gs-gauge" viewBox="0 0 36 36">
+                            <circle cx="18" cy="18" r="15.915" fill="transparent" stroke="var(--border-color)" strokeWidth="3.5" />
+                            <circle cx="18" cy="18" r="15.915" fill="transparent" stroke="var(--accent-purple)" strokeWidth="3.5"
                                     strokeDasharray={`${selectedRun.quality_score} ${100 - selectedRun.quality_score}`}
-                                    strokeDashoffset="0" style={{ transition: 'stroke-dasharray 0.5s ease' }} />
+                                    strokeDashoffset="0" />
+                            <text x="18" y="20.5" className="gs-gauge-text" textAnchor="middle">{selectedRun.quality_score}%</text>
                           </svg>
-                          <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center' }}>
-                            <span style={{ fontSize: '15px', fontWeight: 800, color: 'var(--text-main)', display: 'block', fontFamily: 'var(--font-mono)' }}>
-                              {selectedRun.quality_score}%
-                            </span>
-                            <span style={{ fontSize: '7px', color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', fontWeight: 600 }}>
-                              Quality
-                            </span>
-                          </div>
                         </div>
-                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
-                            <span style={{ color: 'var(--text-muted)' }}>Clean (Active)</span>
-                            <span style={{ color: 'var(--accent-green)', fontWeight: 700 }}>{selectedRun.clean_records.toLocaleString()} rows</span>
+                        <div className="gs-detail-stats">
+                          <div className="gs-stat">
+                            <span className="gs-stat-n">{(selectedRun.total_records - selectedRun.quarantined_records).toLocaleString()}</span>
+                            <span className="gs-stat-l">Clean Rows</span>
                           </div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
-                            <span style={{ color: 'var(--text-muted)' }}>Quarantine (Bad)</span>
-                            <span style={{ color: 'var(--accent-red)', fontWeight: 700 }}>{selectedRun.quarantined_records.toLocaleString()} rows</span>
-                          </div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', borderTop: '1px solid #E2E8F0', paddingTop: '4px', marginTop: '2px' }}>
-                            <span style={{ color: 'var(--text-muted)' }}>Total Audited</span>
-                            <span style={{ color: 'var(--text-main)', fontWeight: 700 }}>{selectedRun.total_records.toLocaleString()} rows</span>
+                          <div className="gs-stat">
+                            <span className="gs-stat-n" style={{ color: selectedRun.quarantined_records > 0 ? 'var(--accent-red)' : 'var(--text-main)' }}>{selectedRun.quarantined_records.toLocaleString()}</span>
+                            <span className="gs-stat-l">Isolated Rows</span>
                           </div>
                         </div>
                       </div>
 
-                      {/* Spark Quality Engine - Rules Checklist */}
-                      <div style={{ marginTop: '0.6rem', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '0.5rem 0.75rem' }}>
-                        <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.4rem', letterSpacing: '0.5px' }}>
-                          Spark Quality Engine - Rules Audit
+                      <div className="gs-rules-grid">
+                        <div className={`gs-rule ${selectedRun.quarantined_records > 0 ? 'fail' : 'pass'}`}>
+                          <span>{selectedRun.quarantined_records > 0 ? '✕' : '✓'}</span> Null Constraint Check
                         </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                          {/* Rule 1: Null check */}
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '10.5px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <span style={{ color: selectedRun.quarantined_records > 0 && selectedRun.quarantine_breakdown && Object.keys(selectedRun.quarantine_breakdown).some(k => k.toLowerCase().includes('null') || k.toLowerCase().includes('missing')) ? 'var(--accent-red)' : 'var(--accent-green)', fontWeight: 700 }}>
-                                {selectedRun.quarantined_records > 0 && selectedRun.quarantine_breakdown && Object.keys(selectedRun.quarantine_breakdown).some(k => k.toLowerCase().includes('null') || k.toLowerCase().includes('missing')) ? '✕' : '✓'}
-                              </span>
-                              <span style={{ color: 'var(--text-main)' }}>Null Constraint Check</span>
-                            </div>
-                            <span style={{ fontSize: '9px', color: selectedRun.quarantined_records > 0 && selectedRun.quarantine_breakdown && Object.keys(selectedRun.quarantine_breakdown).some(k => k.toLowerCase().includes('null') || k.toLowerCase().includes('missing')) ? 'var(--accent-red)' : 'var(--accent-green)', background: selectedRun.quarantined_records > 0 && selectedRun.quarantine_breakdown && Object.keys(selectedRun.quarantine_breakdown).some(k => k.toLowerCase().includes('null') || k.toLowerCase().includes('missing')) ? 'rgba(244,63,94,0.08)' : 'rgba(16,185,129,0.08)', padding: '1px 5px', borderRadius: '3px', fontWeight: 700 }}>
-                              {selectedRun.quarantined_records > 0 && selectedRun.quarantine_breakdown && Object.keys(selectedRun.quarantine_breakdown).some(k => k.toLowerCase().includes('null') || k.toLowerCase().includes('missing')) ? 'VIOLATED' : 'PASSED'}
-                            </span>
-                          </div>
-
-                          {/* Rule 2: Schema consistency */}
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '10.5px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <span style={{ color: selectedRun.quarantined_records > 0 && selectedRun.quarantine_breakdown && Object.keys(selectedRun.quarantine_breakdown).some(k => k.toLowerCase().includes('schema') || k.toLowerCase().includes('drift') || k.toLowerCase().includes('format')) ? 'var(--accent-red)' : 'var(--accent-green)', fontWeight: 700 }}>
-                                {selectedRun.quarantined_records > 0 && selectedRun.quarantine_breakdown && Object.keys(selectedRun.quarantine_breakdown).some(k => k.toLowerCase().includes('schema') || k.toLowerCase().includes('drift') || k.toLowerCase().includes('format')) ? '✕' : '✓'}
-                              </span>
-                              <span style={{ color: 'var(--text-main)' }}>Schema Consistency Check</span>
-                            </div>
-                            <span style={{ fontSize: '9px', color: selectedRun.quarantined_records > 0 && selectedRun.quarantine_breakdown && Object.keys(selectedRun.quarantine_breakdown).some(k => k.toLowerCase().includes('schema') || k.toLowerCase().includes('drift') || k.toLowerCase().includes('format')) ? 'var(--accent-red)' : 'var(--accent-green)', background: selectedRun.quarantined_records > 0 && selectedRun.quarantine_breakdown && Object.keys(selectedRun.quarantine_breakdown).some(k => k.toLowerCase().includes('schema') || k.toLowerCase().includes('drift') || k.toLowerCase().includes('format')) ? 'rgba(244,63,94,0.08)' : 'rgba(16,185,129,0.08)', padding: '1px 5px', borderRadius: '3px', fontWeight: 700 }}>
-                              {selectedRun.quarantined_records > 0 && selectedRun.quarantine_breakdown && Object.keys(selectedRun.quarantine_breakdown).some(k => k.toLowerCase().includes('schema') || k.toLowerCase().includes('drift') || k.toLowerCase().includes('format')) ? 'VIOLATED' : 'PASSED'}
-                            </span>
-                          </div>
-
-                          {/* Rule 3: Type validation */}
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '10.5px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <span style={{ color: selectedRun.quarantined_records > 0 && selectedRun.quarantine_breakdown && Object.keys(selectedRun.quarantine_breakdown).some(k => k.toLowerCase().includes('type') || k.toLowerCase().includes('invalid') || k.toLowerCase().includes('cast')) ? 'var(--accent-red)' : 'var(--accent-green)', fontWeight: 700 }}>
-                                {selectedRun.quarantined_records > 0 && selectedRun.quarantine_breakdown && Object.keys(selectedRun.quarantine_breakdown).some(k => k.toLowerCase().includes('type') || k.toLowerCase().includes('invalid') || k.toLowerCase().includes('cast')) ? '✕' : '✓'}
-                              </span>
-                              <span style={{ color: 'var(--text-main)' }}>DataType Conformity</span>
-                            </div>
-                            <span style={{ fontSize: '9px', color: selectedRun.quarantined_records > 0 && selectedRun.quarantine_breakdown && Object.keys(selectedRun.quarantine_breakdown).some(k => k.toLowerCase().includes('type') || k.toLowerCase().includes('invalid') || k.toLowerCase().includes('cast')) ? 'var(--accent-red)' : 'var(--accent-green)', background: selectedRun.quarantined_records > 0 && selectedRun.quarantine_breakdown && Object.keys(selectedRun.quarantine_breakdown).some(k => k.toLowerCase().includes('type') || k.toLowerCase().includes('invalid') || k.toLowerCase().includes('cast')) ? 'rgba(244,63,94,0.08)' : 'rgba(16,185,129,0.08)', padding: '1px 5px', borderRadius: '3px', fontWeight: 700 }}>
-                              {selectedRun.quarantined_records > 0 && selectedRun.quarantine_breakdown && Object.keys(selectedRun.quarantine_breakdown).some(k => k.toLowerCase().includes('type') || k.toLowerCase().includes('invalid') || k.toLowerCase().includes('cast')) ? 'VIOLATED' : 'PASSED'}
-                            </span>
-                          </div>
+                        <div className={`gs-rule ${selectedRun.quarantined_records > 0 ? 'fail' : 'pass'}`}>
+                          <span>{selectedRun.quarantined_records > 0 ? '✕' : '✓'}</span> Schema Consistency
                         </div>
-                      </div>
-
-                      {/* QA Status Box */}
-                      <div className="stat-card" style={{ marginTop: '0.6rem', padding: '6px 10px' }}>
-                        <span className="stat-label">QA Status Rating</span>
-                        <span className={`quality-badge ${getQualityBadgeClass(selectedRun.quality_score)}`} style={{ textAlign: 'center', marginTop: '4px', fontWeight: 700 }}>
-                          {selectedRun.quality_score >= 95 ? 'HEALTHY PIPELINE' : selectedRun.quality_score >= 85 ? 'WARNING DRIFT' : 'CRITICAL ANOMALY'}
-                        </span>
                       </div>
                     </div>
                   )}
 
                   {leftTab === 'Quarantine' && (
-                    <div style={{ flexGrow: 1, overflowY: 'auto' }}>
-                      <div style={{ fontSize: '11px', fontWeight: 'bold', marginBottom: '6px', color: 'var(--accent-red)' }}>Quarantine Reasons:</div>
+                    <div style={{ height: '120px', overflowY: 'auto' }}>
                       {selectedRun.quarantine_breakdown && Object.keys(selectedRun.quarantine_breakdown).length > 0 ? (
                         Object.entries(selectedRun.quarantine_breakdown).map(([reason, count]) => (
-                          <div key={reason} style={{ fontSize: '11px', padding: '4px 6px', background: 'rgba(244,63,94,0.04)', border: '1px solid rgba(244,63,94,0.12)', borderRadius: '4px', marginBottom: '4px', display: 'flex', justifyContent: 'space-between' }}>
-                            <span>[X] {reason}</span>
-                            <span style={{ fontFamily: 'var(--font-mono)' }}>{(count || 0).toLocaleString()} rows</span>
+                          <div key={reason} style={{ fontSize: '11px', display: 'flex', justifyContent: 'space-between', padding: '4px 6px', background: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: '4px', marginBottom: '4px' }}>
+                            <span>[✕] {reason}</span>
+                            <strong className="gs-mono">{(count || 0).toLocaleString()} rows</strong>
                           </div>
                         ))
                       ) : (
-                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center', marginTop: '10px' }}>100% Clean! No bad records found</div>
+                        <div className="gs-empty">100% Clean data. No records routed to quarantine.</div>
                       )}
                     </div>
                   )}
 
                   {leftTab === 'Insights' && (
-                    <div style={{ flexGrow: 1, overflowY: 'auto', fontSize: '11.5px', lineHeight: '1.45', color: 'var(--text-secondary)' }}>
+                    <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
                       {selectedRun.quality_score === 100 ? (
-                        <div>100% Clean data. No Type Mismatch or Null Constraint issues detected.</div>
+                        <div>All columns conformed perfectly to constraints. Zero anomalies.</div>
                       ) : (
                         <div>
-                          Found bad records at {(((selectedRun.quarantined_records || 0) / (selectedRun.total_records || 1)) * 100).toFixed(1)}% (<strong>{(selectedRun.quarantined_records || 0).toLocaleString()} rows</strong>)
-                          Isolated to HDFS Quarantine to protect downstream pipelines.
-                          <br /><br />
-                          <strong>AI Suggestion:</strong> Check if source API or CSV has Schema Drift.
+                          Detected {selectedRun.quarantined_records.toLocaleString()} anomalous rows.
+                          Auto-routed to <code>/data/quarantine/{selectedRun.table_name}</code> on HDFS to protect downstream systems.
                         </div>
                       )}
                     </div>
                   )}
 
-                  <div style={{ marginTop: 'auto', display: 'flex', gap: '8px' }}>
-                    <button
-                      className="btn-tab"
-                      style={{ flexGrow: 1, backgroundColor: 'rgba(56, 189, 248, 0.1)', color: 'var(--accent-blue)', borderColor: 'rgba(56, 189, 248, 0.3)', padding: '5px' }}
-                      onClick={() => triggerPipelineRetry(selectedRun.run_id)}
-                      disabled={retrying}
-                    >
-                      {retrying ? 'Retrying...' : 'Retry Ingest & Audit'}
-                    </button>
-                    <button
-                      className="btn-tab"
-                      style={{ padding: '5px 10px' }}
-                      onClick={() => handleExportCSV([selectedRun], `Selected_Run_${selectedRun.run_id}`)}
-                    >
-                      Export
-                    </button>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <div className="gs-stat" style={{ padding: '6px' }}>
+                      <span className="gs-stat-l">INGESTION SOURCE</span>
+                      <span className="gs-stat-n" style={{ fontSize: '11px', color: 'var(--accent-purple)' }}>{getIngestionSource(selectedRun)}</span>
+                    </div>
+                    <div className="gs-stat" style={{ padding: '6px' }}>
+                      <span className="gs-stat-l">GRADE RATING</span>
+                      <span className="gs-stat-n" style={{ fontSize: '11px', color: getQualityGrade(selectedRun.quality_score).color }}>{getQualityGrade(selectedRun.quality_score).grade}</span>
+                    </div>
                   </div>
                 </div>
 
-                 <div className="detail-stats-panel">
-                  <div className="stat-card">
-                    <span className="stat-label">DATASET / TABLE</span>
-                    <span className="stat-value" style={{ color: 'var(--accent-blue)', textTransform: 'capitalize' }}>{selectedRun.table_name}</span>
-                  </div>
-                  <div className="stat-card">
-                    <span className="stat-label">INGESTION CHANNEL</span>
-                    <span className="stat-value" style={{ fontSize: '11px', color: 'var(--accent-indigo)' }}>
-                      {getIngestionSource(selectedRun)}
-                    </span>
-                  </div>
-                  <div className="stat-card">
-                    <span className="stat-label">RUN TIMESTAMP</span>
-                    <span className="stat-value" style={{ fontSize: '11px', color: 'var(--text-main)' }}>
-                      {selectedRun.timestamp ? new Date(selectedRun.timestamp).toLocaleString('en-US', { hour12: false }) : 'N/A'}
-                    </span>
-                  </div>
-                  <div className="stat-card">
-                    <span className="stat-label">QUALITY RATING GRADE</span>
-                    <span className="stat-value" style={{ color: getQualityGrade(selectedRun.quality_score).color }}>
-                      {getQualityGrade(selectedRun.quality_score).grade}
-                    </span>
-                  </div>
-                  <div className="stat-card">
-                    <span className="stat-label">FRESHNESS LAG</span>
-                    <span className="stat-value" style={{ color: 'var(--accent-yellow)' }}>{selectedRun.freshness_lag_hours ? `${selectedRun.freshness_lag_hours.toFixed(2)} hrs` : '0.12 hrs'}</span>
-                  </div>
-                  <div className="stat-card">
-                    <span className="stat-label">RUN ID</span>
-                    <span className="stat-value" style={{ fontSize: '9px', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={selectedRun.run_id}>{selectedRun.run_id}</span>
-                  </div>
+                <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                  <button
+                    className="gs-btn-primary"
+                    style={{ flexGrow: 1, padding: '8px' }}
+                    onClick={() => triggerPipelineRetry(selectedRun.run_id)}
+                    disabled={retrying}
+                  >
+                    {retrying ? 'Triggering Retry...' : 'Retry Ingestion & Audit'}
+                  </button>
+                  <button
+                    className="gs-btn-outline"
+                    onClick={() => handleExportCSV([selectedRun], `Run_${selectedRun.run_id}`)}
+                  >
+                    Export Single Run
+                  </button>
                 </div>
               </div>
             ) : (
-              <div className="loading-state"><span>Select a run history to inspect</span></div>
+              <div className="gs-empty">Select a run history log to audit</div>
             )}
           </div>
 
         </div>
 
-        {/* ================= COLUMN CENTER ================= */}
-        <div className="col-center">
-
-          {/* Card 1: System Health (Quality Trend Chart) */}
-          <div className="glass-card animate-in">
-            <div className="card-header">
+        {/* Right Column */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          
+          {/* Card 1: System Health Trend */}
+          <div className="gs-card gs-card-tall">
+            <div className="gs-card-head">
               <div>
-                <h3 className="card-title"><span className="icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', verticalAlign: 'middle', marginTop: '-2px' }}><path d="M3 3v18h18" /><path d="m18.7 8-5.1 5.2-2.8-2.7L7 14.3" /></svg></span> System Health: Data Quality Anomaly Detection</h3>
-                <p className="card-subtitle">Data Quality Trend by Source</p>
+                <h3>Data Quality Trends</h3>
+                <p>Continuous validation tracking by table</p>
               </div>
               <button
-                className="btn-export"
+                className="gs-btn-outline"
                 onClick={() => handleExportCSV(qualityTrendData, "SDOQAP_Time_Series_Quality")}
               >
                 Export Trend
               </button>
             </div>
 
-            <div style={{ flexGrow: 1, minHeight: 0, width: '100%', height: '100%' }}>
+            <div className="gs-chart-area">
               {anomaly.loading ? (
-                <div className="loading-state"><span>Fetching anomaly stats...</span></div>
+                <div className="gs-empty">Loading anomaly data...</div>
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={qualityTrendData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
                     <defs>
                       {seriesKeys.map((k, idx) => {
-                        const colors = ["#38bdf8", "#10b981", "#fbbf24", "#f43f5e", "#a855f7"];
+                        const colors = ["#6C47FF", "#10B981", "#3B82F6", "#F59E0B", "#EF4444"];
                         const color = colors[idx % colors.length];
                         return (
                           <linearGradient key={k} id={`color-${k}`} x1="0" y1="0" x2="0" y2="1">
@@ -655,15 +630,15 @@ export default function Dashboard() {
                         );
                       })}
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" />
-                    <XAxis dataKey="time" stroke="#64748b" tick={{ fontSize: 9.5, fontFamily: "Inter, sans-serif" }} />
-                    <YAxis domain={[0, 100]} stroke="#64748b" tick={{ fontSize: 9.5, fontFamily: "Inter, sans-serif" }} />
-                    <Tooltip contentClassName="custom-tooltip" wrapperStyle={{ fontFamily: "Inter, sans-serif" }} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.05)" />
+                    <XAxis dataKey="time" stroke="#64748b" tick={{ fontSize: 9, fontFamily: "Inter" }} />
+                    <YAxis domain={[0, 100]} stroke="#64748b" tick={{ fontSize: 9, fontFamily: "Inter" }} />
+                    <Tooltip contentStyle={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 8 }} />
                     {seriesKeys.map((k, idx) => {
-                        const colors = ["#38bdf8", "#10b981", "#fbbf24", "#f43f5e", "#a855f7"];
+                        const colors = ["#6C47FF", "#10B981", "#3B82F6", "#F59E0B", "#EF4444"];
                         const color = colors[idx % colors.length];
                         return (
-                          <Area key={k} type="monotone" dataKey={k} stroke={color} fillOpacity={1} fill={`url(#color-${k})`} strokeWidth={1.8} />
+                          <Area key={k} type="monotone" dataKey={k} stroke={color} fillOpacity={1} fill={`url(#color-${k})`} strokeWidth={2} />
                         );
                     })}
                   </AreaChart>
@@ -672,411 +647,150 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Card 2: Live Alerts Log */}
-          <div className="glass-card animate-in" style={{ flex: 'none', height: '120px' }}>
-            <div className="card-header">
+          {/* Card 2: Blueprint Tabs (Forecast, Cause, Impact, Actions) */}
+          <div className="gs-card">
+            <div className="gs-card-head">
               <div>
-                <h3 className="card-title" style={{ color: 'var(--accent-red)' }}><span className="icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', verticalAlign: 'middle', marginTop: '-2px' }}><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></svg></span> Live Alerts Log</h3>
-                <p className="card-subtitle">Real-time Alerts (Failures & Schema Drifts)</p>
+                <h3>Global Observability Blueprint</h3>
+                <p>Statistical intelligence &amp; closed-loop recommendations</p>
               </div>
             </div>
-            <div className="alerts-log-container">
-              {anomaly.data && anomaly.data.anomaly ? (
-                <>
-                  <div className="alert-item">
-                    <span className="alert-time">[{anomaly.data.anomaly.time}]</span>
-                    <span>[!] <strong>[Drift Detected - {anomaly.data.anomaly.source}]</strong> {anomaly.data.anomaly.reason} (Score dropped to {anomaly.data.anomaly.score}%)</span>
-                  </div>
-                  <div className="alert-item info">
-                    <span className="alert-time">[{anomaly.data.anomaly.time}]</span>
-                    <span>[i] <strong>System Automation:</strong> Isolated problematic raw data to HDFS Quarantine without blocking the main pipeline.</span>
-                  </div>
-                </>
-              ) : (
-                <div className="alert-item info">
-                  <span className="alert-time">[Stream Normal]</span>
-                  <span>[OK] Data streaming consistently. No quality violations or schema drifts detected.</span>
-                </div>
-              )}
-            </div>
-          </div>
 
-          {/* Card 3: SDOQAP Analytical Intelligence Blueprint */}
-          <div className="glass-card animate-in">
-            <div className="card-header" style={{ paddingBottom: '0', borderBottom: 'none' }}>
-              <div>
-                <h3 className="card-title"><span className="icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', verticalAlign: 'middle', marginTop: '-2px' }}><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.44 2.5 2.5 0 0 1 0-3.12 3 3 0 0 1 0-3.88 2.5 2.5 0 0 1 0-3.12A2.5 2.5 0 0 1 9.5 2Z" /><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.44 2.5 2.5 0 0 0 0-3.12 3 3 0 0 0 0-3.88 2.5 2.5 0 0 0 0-3.12A2.5 2.5 0 0 0 14.5 2Z" /></svg></span> Global Analytical Blueprint</h3>
-                <p className="card-subtitle">Global Pipeline Overview</p>
-              </div>
-              <button
-                className="btn-export"
-                onClick={() => {
-                  let dataToExport = [];
-                  if (centerTab === 'Trends') dataToExport = forecastData;
-                  else if (centerTab === 'RootCause') dataToExport = clustering.data?.clusters || [];
-                  else if (centerTab === 'Impact') dataToExport = impact.data?.kpi_connections || [];
-                  else dataToExport = recommendations.data?.recommendations || [];
-                  handleExportCSV(dataToExport, `Analysis_${centerTab}`);
-                }}
-              >
-                Export Analytics
-              </button>
+            <div style={{ display: 'flex', gap: '4px', background: 'var(--bg-primary)', border: '1px solid var(--border-color)', padding: '3px', borderRadius: '8px', marginBottom: '12px' }}>
+              <button style={{ flex: 1, padding: '6px', fontSize: '10px' }} className={`gs-btn-outline ${centerTab === 'Trends' ? 'active' : ''}`} onClick={() => setCenterTab('Trends')}>Projection</button>
+              <button style={{ flex: 1, padding: '6px', fontSize: '10px' }} className={`gs-btn-outline ${centerTab === 'RootCause' ? 'active' : ''}`} onClick={() => setCenterTab('RootCause')}>Root Cause</button>
+              <button style={{ flex: 1, padding: '6px', fontSize: '10px' }} className={`gs-btn-outline ${centerTab === 'Impact' ? 'active' : ''}`} onClick={() => setCenterTab('Impact')}>Impact Map</button>
+              <button style={{ flex: 1, padding: '6px', fontSize: '10px' }} className={`gs-btn-outline ${centerTab === 'Actionable' ? 'active' : ''}`} onClick={() => setCenterTab('Actionable')}>Recommendations</button>
             </div>
 
-            <div className="blueprint-tabs" style={{ marginTop: '8px' }}>
-              <button className={`blueprint-tab-btn ${centerTab === 'Trends' ? 'active' : ''}`} onClick={() => setCenterTab('Trends')}>1. Trends & Projection</button>
-              <button className={`blueprint-tab-btn ${centerTab === 'RootCause' ? 'active' : ''}`} onClick={() => setCenterTab('RootCause')}>2. Root Cause Diagnostic</button>
-              <button className={`blueprint-tab-btn ${centerTab === 'Impact' ? 'active' : ''}`} onClick={() => setCenterTab('Impact')}>3. Business Impact Map</button>
-              <button className={`blueprint-tab-btn ${centerTab === 'Actionable' ? 'active' : ''}`} onClick={() => setCenterTab('Actionable')}>4. Actionable Engine</button>
-            </div>
-
-            <div className="blueprint-content">
+            <div style={{ height: '140px', overflowY: 'auto' }}>
               {centerTab === 'Trends' && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '12px', height: '100%', minHeight: 0 }}>
-                  <div style={{ height: '100%', minHeight: 0 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '12px', height: '100%' }}>
+                  <div style={{ height: '100%' }}>
                     {projection.loading ? (
-                      <div className="loading-state"><span>Processing predictive model...</span></div>
+                      <div className="gs-empty">Processing model...</div>
                     ) : (
                       <ResponsiveContainer width="100%" height="100%">
-                        <ComposedChart data={forecastData} margin={{ top: 5, right: 20, left: -10, bottom: 0 }}>
-                          <defs>
-                            <linearGradient id="dashFillHigh" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%"  stopColor="#10b981" stopOpacity={0.28}/>
-                              <stop offset="100%" stopColor="#10b981" stopOpacity={0.03}/>
-                            </linearGradient>
-                            <linearGradient id="dashFillLow" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%"  stopColor="#f43f5e" stopOpacity={0.18}/>
-                              <stop offset="100%" stopColor="#f43f5e" stopOpacity={0.03}/>
-                            </linearGradient>
-                          </defs>
-                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                          <XAxis dataKey="day" stroke="#64748b" tick={{ fontSize: 9, fontFamily: "Inter, sans-serif" }} />
-                          <YAxis
-                            domain={yForecastDomain}
-                            stroke="#64748b"
-                            tick={{ fontSize: 9, fontFamily: "Inter, sans-serif" }}
-                            tickFormatter={v => `${v}%`}
-                          />
-                          <Tooltip
-                            contentStyle={{ background: '#0f172a', border: '1px solid rgba(108, 71, 255, 0.25)', borderRadius: 6, fontSize: 11, fontFamily: "Inter, sans-serif" }}
-                            formatter={(val, name) => [`${typeof val === 'number' ? val.toFixed(2) : val}%`, name]}
-                          />
-                          <Legend verticalAlign="top" height={22} wrapperStyle={{ fontSize: 9, fontFamily: "Inter, sans-serif" }} />
-                          <ReferenceLine
-                            y={95}
-                            stroke="#f59e0b"
-                            strokeDasharray="5 3"
-                            strokeWidth={1.5}
-                            label={{ value: 'SLA', position: 'right', fill: '#f59e0b', fontSize: 9, fontFamily: "Inter, sans-serif" }}
-                          />
-                          <Area type="monotone" dataKey="Optimistic" stroke="#10b981" strokeWidth={2} fill="url(#dashFillHigh)" dot={{ r: 2.5, fill: '#10b981', strokeWidth: 0 }} />
-                          <Area type="monotone" dataKey="Pessimistic" stroke="#f43f5e" strokeWidth={2} fill="url(#dashFillLow)" dot={{ r: 2.5, fill: '#f43f5e', strokeWidth: 0 }} />
-                          <Line type="monotone" dataKey="Forecast" stroke="#00E5FF" strokeWidth={2.5} dot={{ r: 3.5, fill: '#00E5FF', stroke: '#0f172a', strokeWidth: 1.5 }} activeDot={{ r: 6 }} />
+                        <ComposedChart data={forecastData} margin={{ top: 5, right: 10, left: -25, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.04)" />
+                          <XAxis dataKey="day" stroke="#64748b" tick={{ fontSize: 8 }} />
+                          <YAxis domain={yForecastDomain} stroke="#64748b" tick={{ fontSize: 8 }} />
+                          <Tooltip />
+                          <ReferenceLine y={95} stroke="var(--accent-yellow)" strokeDasharray="4 2" />
+                          <Area type="monotone" dataKey="Optimistic" stroke="var(--accent-green)" fill="rgba(16,185,129,0.05)" />
+                          <Area type="monotone" dataKey="Pessimistic" stroke="var(--accent-red)" fill="rgba(239,68,68,0.05)" />
+                          <Line type="monotone" dataKey="Forecast" stroke="var(--accent-purple)" strokeWidth={2} dot={{ r: 2 }} />
                         </ComposedChart>
                       </ResponsiveContainer>
                     )}
                   </div>
-                  <div style={{ fontSize: '11px', display: 'flex', flexDirection: 'column', gap: '6px', overflowY: 'auto' }}>
-                    <div style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '4px', fontWeight: 'bold', color: 'var(--accent-blue)' }}>7-Day Quality Forecast:</div>
-                    <div>• <strong>Data Stability Index:</strong> <span style={{ color: 'var(--accent-green)' }}>{projection.loading ? 'Calculating...' : (projection.data?.stability_index || 'N/A')}</span></div>
-                    <div>• <strong>SLA Breach Probability:</strong> <span style={{ color: 'var(--accent-red)' }}>{projection.loading ? 'Calculating...' : (projection.data?.sla_breach_probability || 'N/A')}</span></div>
-                    <div style={{ color: 'var(--text-muted)', fontSize: '10.5px' }}>{projection.loading ? 'Analyzing historical trends...' : (projection.data?.historical_trend || 'No historical trend data available.')}</div>
-
-                    {projection.data?.crisis_forecast && projection.data.crisis_forecast.severity !== 'LOW' && (
-                      <div className="bp-alert">
-                        <strong>Predicted Quality Crisis Alert</strong>
-                        <div>Quality crisis predicted in {projection.data.crisis_forecast.days_until_crisis} days on "{projection.data.crisis_forecast.impacted_component}"</div>
-                      </div>
-                    )}
+                  <div style={{ fontSize: '10.5px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <strong>SLA Stability Index:</strong>
+                    <span style={{ color: 'var(--accent-green)', fontWeight: 700 }}>{projection.data?.stability_index || 'Calculating...'}</span>
+                    <strong>Breach Risk Rate:</strong>
+                    <span style={{ color: 'var(--accent-red)', fontWeight: 700 }}>{projection.data?.sla_breach_probability || 'Calculating...'}</span>
                   </div>
                 </div>
               )}
 
               {centerTab === 'RootCause' && (
-                <div style={{ overflowY: 'auto', height: '100%', fontSize: '11.5px' }}>
-                  <div style={{ fontWeight: 'bold', marginBottom: '6px', color: 'var(--accent-purple)' }}>Error Pattern Clustering:</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   {clustering.loading ? (
-                    <div>Clustering root causes...</div>
-                  ) : clustering.data?.clusters?.map((cluster) => (
-                    <div key={cluster.id} style={{ padding: '6px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '6px', marginBottom: '6px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold' }}>
-                        <span>Source: {cluster.source}</span>
+                    <div className="gs-empty">Clustering patterns...</div>
+                  ) : clustering.data?.clusters?.slice(0, 2).map((cluster) => (
+                    <div key={cluster.id} style={{ padding: '6px 10px', background: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: '8px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: 'bold' }}>
+                        <span>{cluster.source}</span>
                         <span style={{ color: 'var(--accent-red)' }}>{cluster.percentage}% (N={cluster.errors_count})</span>
                       </div>
-                      <div style={{ color: 'var(--text-muted)', fontSize: '11px', marginTop: '2px' }}>Pattern: {cluster.pattern}</div>
+                      <div style={{ color: 'var(--text-muted)', fontSize: '10px', marginTop: '2px' }}>Pattern: {cluster.pattern}</div>
                     </div>
                   ))}
-                  <div className="alert-item info" style={{ marginTop: '8px' }}>
-                    <strong>Correlation Analysis:</strong> {clustering.data?.correlation_analysis}
-                  </div>
                 </div>
               )}
 
               {centerTab === 'Impact' && (
-                <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
-                    {impact.data?.kpi_connections?.map((kpi, i) => (
-                      <div key={i} className={`impact-card ${kpi.status === 'CRITICAL' ? 'crit' : kpi.status === 'WARN' ? 'warn' : 'ok'}`} style={{ borderLeftWidth: '3px' }}>
-                        <span className="impact-kpi">{kpi.kpi_name}</span>
-                        <span className="impact-val" style={{ color: kpi.status === 'CRITICAL' ? 'var(--accent-red)' : kpi.status === 'WARN' ? 'var(--accent-yellow)' : 'var(--accent-green)' }}>
-                          -{kpi.impact_pct}%
-                        </span>
-                        <span className="impact-desc">${(kpi.monetary_loss_usd || 0).toLocaleString()} Loss</span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
+                    {impact.data?.kpi_connections?.slice(0, 3).map((kpi, i) => (
+                      <div key={i} style={{ padding: '8px', background: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: '8px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                        <span style={{ fontSize: '9px', color: 'var(--text-muted)', fontWeight: 700 }}>{kpi.kpi_name}</span>
+                        <span style={{ fontSize: '14px', fontWeight: 800, color: 'var(--accent-red)', margin: '2px 0' }}>-{kpi.impact_pct}%</span>
                       </div>
                     ))}
                   </div>
-                  <div style={{ padding: '8px', background: 'rgba(244,63,94,0.06)', border: '1px solid rgba(244,63,94,0.12)', borderRadius: '6px', fontSize: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span>Cumulative Projected Business Financial Loss:</span>
-                    <strong style={{ color: 'var(--accent-red)', fontSize: '14px', fontFamily: 'var(--font-mono)' }}>
-                      ${(impact.data?.total_financial_impact_usd || 0).toLocaleString()} USD
-                    </strong>
+                  <div style={{ padding: '6px', background: 'rgba(239,68,68,0.04)', border: '1px solid rgba(239,68,68,0.1)', borderRadius: '6px', fontSize: '11px', display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Projected Financial Risk:</span>
+                    <strong style={{ color: 'var(--accent-red)' }}>${(impact.data?.total_financial_impact_usd || 0).toLocaleString()} USD</strong>
                   </div>
                 </div>
               )}
 
               {centerTab === 'Actionable' && (
-                <div style={{ overflowY: 'auto', height: '100%', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  {recommendations.data?.recommendations?.map((rec) => {
-                    const badgeMap = {
-                      PENDING: 'pending',
-                      RECOMMENDED: 'recommended',
-                      AVAILABLE: 'available'
-                    };
-                    return (
-                      <div key={rec.id} className="actionable-item">
-                        <div className="actionable-meta">
-                          <span className="actionable-title">{rec.title}</span>
-                          <span className="actionable-desc">{rec.description}</span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span className={`actionable-badge ${badgeMap[rec.status]}`}>{rec.status}</span>
-                          <button className="btn-action" onClick={() => alert(`Executing action: ${rec.action_type}`)}>Run</button>
-                        </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  {recommendations.data?.recommendations?.slice(0, 2).map((rec) => (
+                    <div key={rec.id} style={{ display: 'flex', justify: 'space-between', alignItems: 'center', padding: '6px', background: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: '8px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', fontSize: '10.5px' }}>
+                        <strong>{rec.title}</strong>
+                        <span style={{ color: 'var(--text-muted)', fontSize: '9.5px' }}>{rec.description}</span>
                       </div>
-                    );
-                  })}
+                      <button className="gs-btn-outline" style={{ padding: '2px 6px', fontSize: '9.5px' }} onClick={() => alert(`Run: ${rec.action_type}`)}>Run</button>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
           </div>
 
-        </div>
-
-        {/* ================= COLUMN RIGHT ================= */}
-        <div className="col-right">
-
-          {/* Card 1: End-to-End Data Lineage Map */}
-          <div className="glass-card animate-in">
-            <div className="card-header">
+          {/* Card 3: Activity Log Terminal */}
+          <div className="gs-card">
+            <div className="gs-card-head">
               <div>
-                <h3 className="card-title"><span className="icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', verticalAlign: 'middle', marginTop: '-2px' }}><circle cx="12" cy="12" r="3" /><circle cx="19" cy="5" r="3" /><circle cx="5" cy="19" r="3" /><circle cx="19" cy="19" r="3" /><circle cx="5" cy="5" r="3" /><line x1="7.5" y1="7.5" x2="16.5" y2="16.5" /><line x1="16.5" y1="7.5" x2="7.5" y2="16.5" /></svg></span> Real-time Data Lineage Map</h3>
-                <p className="card-subtitle">Real-time Data Flow & Quarantine Map</p>
-              </div>
-            </div>
-            {(() => {
-              const activeRun = selectedRun || (qualityHistory.data && qualityHistory.data[0]);
-              const totalRecs = activeRun?.total_records || 0;
-              const quarRecs = activeRun?.quarantined_records || 0;
-              const hasError = activeRun && quarRecs > 0;
-              const hasClean = activeRun && (totalRecs - quarRecs > 0);
-              const isExecutionFailed = activeRun && (activeRun.quality_score === 0 || activeRun.quality_score === null);
-              return (
-            <div className="lineage-wrapper dynamic-lineage">
-              <div className="lineage-path">
-                {/* Node 1 */}
-                <div className="lineage-node source">
-                  <div className="node-icon">IN</div>
-                  <div className="node-content">
-                    <h4>{activeRun ? activeRun.data_source : 'Ingest Source'}</h4>
-                    <span className="node-stat">{activeRun ? `${totalRecs.toLocaleString()} rows` : 'Waiting for data...'}</span>
-                  </div>
-                </div>
-
-                <div className={`lineage-connector ${isExecutionFailed ? 'danger' : (activeRun ? 'active' : '')}`}></div>
-
-                {/* Node 2 */}
-                <div className="lineage-node audit">
-                  <div className="node-icon">PR</div>
-                  <div className="node-content">
-                    <h4>Spark QA Audit</h4>
-                    <span className="node-stat">Processing Engine</span>
-                  </div>
-                </div>
-
-                <div className={`lineage-connector ${isExecutionFailed ? 'danger' : (activeRun ? 'active' : '')}`} style={{ flexGrow: 0, minWidth: '35px', width: '35px' }}></div>
-
-                {/* Branches Container */}
-                <div className="lineage-branches-container" style={{ display: 'flex', alignItems: 'center', flexShrink: 0, padding: '5px 0' }}>
-                  {/* Left Fork (Split for error highlighting) */}
-                  <div style={{ display: 'flex', flexDirection: 'column', width: '20px', height: '90px', minWidth: '20px', flexShrink: 0 }}>
-                    <div style={{ height: '45px', borderLeft: '2px solid var(--accent-indigo)', borderTop: '2px solid var(--accent-indigo)', borderTopLeftRadius: '6px' }}></div>
-                    <div style={{ height: '45px', borderLeft: `2px solid ${hasError ? 'var(--accent-red)' : 'var(--accent-indigo)'}`, borderBottom: `2px solid ${hasError ? 'var(--accent-red)' : 'var(--accent-indigo)'}`, borderBottomLeftRadius: '6px' }}></div>
-                  </div>
-
-                  {/* Branch Items */}
-                  <div className="lineage-branches" style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem', margin: '0 10px', flexShrink: 0 }}>
-                    <div className={`lineage-node hdfs-active ${hasClean ? 'highlight' : ''}`}>
-                      <div className="node-icon">OK</div>
-                      <div className="node-content">
-                        <h4>Active Store</h4>
-                        <span className="node-stat">{activeRun ? `${(totalRecs - quarRecs).toLocaleString()} clean` : 'Verified Data'}</span>
-                      </div>
-                    </div>
-
-                    <div className={`lineage-node hdfs-quarantine ${hasError ? 'highlight-danger' : ''}`}>
-                      <div className="node-icon">QA</div>
-                      <div className="node-content">
-                        <h4>Quarantine</h4>
-                        <span className="node-stat">{activeRun ? `${quarRecs.toLocaleString()} isolated` : 'Bad Data'}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Right Fork (Only top half connects Active Store to Serving) */}
-                  <div style={{ display: 'flex', flexDirection: 'column', width: '20px', height: '90px', minWidth: '20px', flexShrink: 0 }}>
-                    <div style={{ height: '45px', borderRight: '2px solid var(--accent-blue)', borderTop: '2px solid var(--accent-blue)', borderTopRightRadius: '6px' }}></div>
-                    <div style={{ height: '45px', borderRight: '2px solid transparent', borderBottom: '2px solid transparent' }}></div>
-                  </div>
-                </div>
-
-                <div className={`lineage-connector ${activeRun ? 'active' : ''}`} style={{ flexGrow: 0, minWidth: '35px', width: '35px' }}></div>
-
-                {/* Node 4 */}
-                <div className="lineage-node serving">
-                  <div className="node-icon">API</div>
-                  <div className="node-content">
-                    <h4>Serving API</h4>
-                    <span className="node-stat">BI & Analytics</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            );
-            })()}
-          </div>
-
-
-          {/* Card 2: Performance & Scalability */}
-          <div className="glass-card animate-in">
-            <div className="card-header">
-              <div>
-                <h3 className="card-title"><span className="icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', verticalAlign: 'middle', marginTop: '-2px' }}><rect x="4" y="4" width="16" height="16" rx="2" /><rect x="9" y="9" width="6" height="6" /><line x1="9" y1="1" x2="9" y2="4" /><line x1="15" y1="1" x2="15" y2="4" /><line x1="9" y1="20" x2="9" y2="23" /><line x1="15" y1="20" x2="15" y2="23" /><line x1="20" y1="9" x2="23" y2="9" /><line x1="20" y1="15" x2="23" y2="15" /><line x1="1" y1="9" x2="4" y2="9" /><line x1="1" y1="15" x2="4" y2="15" /></svg></span> Performance & Scalability</h3>
-                <p className="card-subtitle">Spark Cluster Performance Metrics</p>
-              </div>
-
-              <button
-                className="btn-export"
-                onClick={() => handleExportCSV([perf.data], "SDOQAP_Performance_Metrics")}
-              >
-                Export Metrics
-              </button>
-            </div>
-
-            {perf.data ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', flexGrow: 1, justifyContent: 'center' }}>
-                {/* Row 1: CPU and Memory */}
-                <div style={{ display: 'flex', gap: '12px' }}>
-                  <div className="stat-card" style={{ flex: 1, padding: '8px 12px' }}>
-                    <span className="stat-label">CPU USAGE</span>
-                    <span className="stat-value" style={{ color: 'var(--accent-blue)', fontSize: '18px', margin: '2px 0' }}>
-                      {perf.data.current_cpu}%
-                    </span>
-                    <div style={{ width: '100%', height: '4px', background: '#E2E8F0', borderRadius: '2px', overflow: 'hidden', marginTop: '4px' }}>
-                      <div style={{ width: `${perf.data.current_cpu}%`, height: '100%', background: 'var(--accent-blue)', borderRadius: '2px' }} />
-                    </div>
-                  </div>
-                  <div className="stat-card" style={{ flex: 1, padding: '8px 12px' }}>
-                    <span className="stat-label">MEMORY USAGE</span>
-                    <span className="stat-value" style={{ color: 'var(--accent-purple)', fontSize: '18px', margin: '2px 0' }}>
-                      {perf.data.current_memory}%
-                    </span>
-                    <div style={{ width: '100%', height: '4px', background: '#E2E8F0', borderRadius: '2px', overflow: 'hidden', marginTop: '4px' }}>
-                      <div style={{ width: `${perf.data.current_memory}%`, height: '100%', background: 'var(--accent-purple)', borderRadius: '2px' }} />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Row 2: Latency and SLA Limit */}
-                <div style={{ display: 'flex', gap: '12px' }}>
-                  <div className="stat-card" style={{ flex: 1, padding: '8px 12px' }}>
-                    <span className="stat-label">AVG PROCESSING LATENCY</span>
-                    <span className="stat-value" style={{ color: 'var(--accent-green)', fontSize: '18px', margin: '2px 0' }}>
-                      {perf.data.average_latency_seconds}s
-                    </span>
-                    <div style={{ width: '100%', height: '4px', background: '#E2E8F0', borderRadius: '2px', overflow: 'hidden', marginTop: '4px' }}>
-                      <div style={{ width: `${Math.min(100, (perf.data.average_latency_seconds / perf.data.sla_latency_limit_seconds) * 100)}%`, height: '100%', background: 'var(--accent-green)', borderRadius: '2px' }} />
-                    </div>
-                  </div>
-                  <div className="stat-card" style={{ flex: 1, padding: '8px 12px' }}>
-                    <span className="stat-label">SPARK SUCCESS RATE</span>
-                    <span className="stat-value" style={{ color: 'var(--accent-green)', fontSize: '18px', margin: '2px 0' }}>
-                      {perf.data.spark_success_rate ?? 100.0}%
-                    </span>
-                    <div style={{ width: '100%', height: '4px', background: '#E2E8F0', borderRadius: '2px', overflow: 'hidden', marginTop: '4px' }}>
-                      <div style={{ width: `${perf.data.spark_success_rate ?? 100.0}%`, height: '100%', background: 'var(--accent-green)', borderRadius: '2px' }} />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="loading-state"><span>Calculating resource usage...</span></div>
-            )}
-          </div>
-
-          {/* Card 3: Activity Log & Distribution */}
-          <div className="glass-card animate-in">
-            <div className="card-header">
-              <div>
-                <h3 className="card-title"><span className="icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', verticalAlign: 'middle', marginTop: '-2px' }}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><polyline points="10 9 9 9 8 9" /></svg></span> Activity Log & Distribution</h3>
-                <p className="card-subtitle">Pipeline Logs (Elasticsearch Stream)</p>
+                <h3>System Activity Stream</h3>
+                <p>Elasticsearch real-time logs ingestion</p>
               </div>
               <button
-                className="btn-export"
+                className="gs-btn-outline"
                 onClick={() => handleExportCSV(activity.data || [], "SDOQAP_System_Logs")}
               >
                 Export Logs
               </button>
             </div>
 
-            <div className="terminal-window">
-              <div className="terminal-header">
-                <div className="term-controls">
-                  <div className="term-dot term-close" />
-                  <div className="term-dot term-min" />
-                  <div className="term-dot term-max" />
+            <div className="gs-terminal">
+              <div className="gs-terminal-bar">
+                <div className="gs-terminal-dots">
+                  <i></i><i></i><i></i>
                 </div>
-                <span className="terminal-title">sdoqap@observability-node:~</span>
+                <span>sdoqap@observability-node:~</span>
               </div>
-
-              <div className="terminal-body">
+              <div className="gs-terminal-body">
                 {activity.loading ? (
-                  <div className="log-line info">Connecting to Log Stream...</div>
+                  <div className="gs-log">Connecting to stream...</div>
                 ) : activity.data && activity.data.length > 0 ? (
                   <>
                     {[...activity.data].reverse().map((act, i) => {
-                      let logClass = 'info';
-                      if (act.level === 'error') logClass = 'error';
-                      else if (act.level === 'warning') logClass = 'warning';
-                      else if (act.level === 'success') logClass = 'success';
+                      let lvlClass = 'info';
+                      if (act.level === 'error') lvlClass = 'error';
+                      else if (act.level === 'warning') lvlClass = 'warn';
 
                       return (
-                        <div key={i} className={`log-line ${logClass}`}>
-                          <span className="log-time">[{new Date(act.timestamp).toLocaleTimeString([], { hour12: false })}]</span>
-                          <span>{act.message}</span>
+                        <div key={i} className="gs-terminal-line">
+                          <span className="gs-log-ts">[{new Date(act.timestamp).toLocaleTimeString([], { hour12: false })}]</span>
+                          <span className={`gs-log ${lvlClass}`}>{act.message}</span>
                         </div>
                       );
                     })}
                     <div ref={terminalEndRef} />
                   </>
                 ) : (
-                  <div className="log-line error">ไม่มีประวัติข้อความ Log ล่าสุดพบในระบบ</div>
+                  <div className="gs-log error">No active logs fetched from node</div>
                 )}
               </div>
             </div>
           </div>
 
         </div>
-
       </div>
     </div>
   );

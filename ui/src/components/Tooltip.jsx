@@ -12,13 +12,13 @@ export default function Tooltip({ text }) {
         justifyContent: "center",
         marginLeft: "6px",
         cursor: "help",
-        color: "var(--accent-blue)",
-        fontSize: "0.8rem",
+        color: "var(--accent-purple)",
+        fontSize: "11px",
         fontWeight: "bold",
         width: "14px",
         height: "14px",
         borderRadius: "50%",
-        border: "1px solid var(--accent-blue)",
+        border: "1px solid var(--accent-purple)",
         userSelect: "none"
       }}
       onMouseEnter={() => setVisible(true)}
@@ -32,20 +32,18 @@ export default function Tooltip({ text }) {
             bottom: "120%",
             left: "50%",
             transform: "translateX(-50%)",
-            background: "rgba(10, 15, 30, 0.95)",
-            backdropFilter: "blur(8px)",
-            border: "1px solid rgba(255, 255, 255, 0.12)",
-            color: "#e2e8f0",
+            background: "#1E293B",
+            color: "#FFFFFF",
             padding: "8px 12px",
-            borderRadius: "6px",
-            fontSize: "0.75rem",
+            borderRadius: "8px",
+            fontSize: "11px",
             fontWeight: "normal",
             whiteSpace: "normal",
             width: "220px",
-            boxShadow: "0 4px 12px rgba(0, 0, 0, 0.4)",
+            boxShadow: "0 10px 25px rgba(15, 23, 42, 0.15)",
             zIndex: 1000,
             pointerEvents: "none",
-            lineHeight: "1.3"
+            lineHeight: "1.4"
           }}
         >
           {text}

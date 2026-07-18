@@ -20,39 +20,43 @@ export default function ConfirmationModal({ isOpen, title, message, onConfirm, o
       }}
     >
       <div 
-        className="glass-card" 
+        className="gs-modal-card" 
         style={{
-          width: "400px",
-          padding: "2rem",
-          background: "rgba(10, 15, 30, 0.85)",
-          border: "1px solid rgba(255, 255, 255, 0.1)",
-          boxShadow: "0 10px 25px rgba(0, 0, 0, 0.5)",
+          width: "420px",
+          padding: "24px",
+          background: "#FFFFFF",
+          border: "1px solid #E2E8F0",
+          borderRadius: "14px",
+          boxShadow: "0 20px 50px rgba(15, 23, 42, 0.15)",
           textAlign: "center"
         }}
       >
-        <h3 style={{ color: "#fff", fontSize: "1.1rem", fontWeight: 600, marginBottom: "1rem" }}>
+        <h3 style={{ color: "#0F172A", fontSize: "15px", fontWeight: 700, marginBottom: "8px", margin: 0 }}>
           {title}
         </h3>
-        <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginBottom: "2rem", lineHeight: "1.4" }}>
+        <p style={{ color: "#64748B", fontSize: "12px", marginBottom: "20px", lineHeight: "1.5", marginTop: "4px" }}>
           {message}
         </p>
-        <div style={{ display: "flex", gap: "1rem", justifyContent: "center" }}>
+        <div style={{ display: "flex", gap: "10px", justifyContent: "center" }}>
           <button 
-            className="btn btn-secondary" 
+            className="gs-btn-outline" 
             onClick={onCancel}
-            style={{ padding: "0.5rem 1.5rem", fontSize: "0.85rem", cursor: "pointer" }}
+            style={{ padding: "8px 16px", fontSize: "12px", borderRadius: "8px" }}
           >
             Cancel
           </button>
           <button 
-            className="btn btn-primary" 
+            className="gs-btn-primary" 
             onClick={onConfirm}
             style={{ 
-              padding: "0.5rem 1.5rem", 
-              fontSize: "0.85rem", 
-              background: "var(--accent-blue)", 
+              padding: "8px 16px", 
+              fontSize: "12px", 
+              borderRadius: "8px",
+              background: "linear-gradient(135deg, #6C47FF, #8B5CF6)", 
               border: "none", 
-              cursor: "pointer" 
+              color: "#fff",
+              cursor: "pointer",
+              fontWeight: 600
             }}
           >
             Confirm

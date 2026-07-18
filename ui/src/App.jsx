@@ -23,7 +23,7 @@ function AppContent({ isSidebarOpen, toggleSidebar }) {
       {/* Top Black Banner (Only rendered on Home page) */}
       {isHome && (
         <div className="top-banner">
-          <span>SDOQAP Platform v2.0 is now live</span>
+          <span>SDOQAP Platform <span className="banner-badge">v2.0</span> is now live</span>
         </div>
       )}
       

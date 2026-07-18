@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useApi } from "../hooks/useApi";
+import "./DataExport.css";
 
 export default function DataExport() {
   const [activeTab, setActiveTab] = useState("datasets"); // "datasets" or "gold"
@@ -154,63 +155,41 @@ export default function DataExport() {
   const supportedLayers = currentTableConfig ? currentTableConfig.layers : [];
 
   return (
-    <div className="sdoqap-app">
-      <div style={{ marginBottom: "1.5rem", width: "100%" }}>
-        <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "0.4rem", fontFamily: "var(--font-sans)", display: "flex", gap: "6px", alignItems: "center" }}>
-          <span>SDOQAP Data Engine</span>
-          <span style={{ opacity: 0.5 }}>&gt;</span>
-          <span style={{ color: "var(--text-main)", fontWeight: 500 }}>Export Hub</span>
+    <div className="gs-export">
+      {/* 1. Page Header */}
+      <div className="gs-page-header">
+        <div>
+          <h1 className="gs-page-title">Export <span>Data Hub</span></h1>
+          <p className="gs-page-desc">Download clean datasets from Medallion HDFS and structured BI Elasticsearch indices</p>
         </div>
-        <h1 style={{ fontSize: "1.6rem", fontWeight: 700, color: "var(--text-main)", letterSpacing: "-0.02em", margin: 0 }}>Export Hub</h1>
-        <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", margin: "4px 0 0 0" }}>Download clean, validated datasets directly from HDFS Medallion layers and Elasticsearch reports</p>
       </div>
 
-      {/* Tabs */}
-      <div style={{ display: "flex", gap: "10px", marginBottom: "15px" }}>
+      {/* 2. Export Mode Tabs */}
+      <div className="gs-export-tabs" style={{ alignSelf: 'flex-start' }}>
         <button 
-          className={`btn ${activeTab === "datasets" ? "btn-primary" : "btn-secondary"}`}
+          className={`gs-export-btn ${activeTab === "datasets" ? "active" : ""}`}
           onClick={() => { setActiveTab("datasets"); setPreviewData(null); }}
-          style={{ 
-            padding: "0.5rem 1.25rem", 
-            borderRadius: "20px",
-            background: activeTab === "datasets" ? "var(--accent-indigo)" : "#FFFFFF",
-            border: "1px solid #E2E8F0",
-            color: activeTab === "datasets" ? "#FFFFFF" : "var(--text-muted)",
-            cursor: "pointer",
-            fontWeight: 500
-          }}
         >
           Pipeline Datasets (HDFS)
         </button>
         <button 
-          className={`btn ${activeTab === "gold" ? "btn-primary" : "btn-secondary"}`}
+          className={`gs-export-btn ${activeTab === "gold" ? "active" : ""}`}
           onClick={() => { setActiveTab("gold"); setPreviewData(null); }}
-          style={{ 
-            padding: "0.5rem 1.25rem", 
-            borderRadius: "20px",
-            background: activeTab === "gold" ? "var(--accent-indigo)" : "#FFFFFF",
-            border: "1px solid #E2E8F0",
-            color: activeTab === "gold" ? "#FFFFFF" : "var(--text-muted)",
-            cursor: "pointer",
-            fontWeight: 500
-          }}
         >
           Gold BI Reports (Elasticsearch)
         </button>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "350px 1fr", gap: "15px", flex: 1, minHeight: 0 }}>
-        {/* Left Panel: Control Panel */}
-        <div className="glass-card" style={{ display: "flex", flexDirection: "column", gap: "15px", padding: "20px" }}>
-          <h2 style={{ fontSize: "16px", fontWeight: "700", borderBottom: "1px solid #F1F5F9", paddingBottom: "10px" }}>
-            Export Configuration
-          </h2>
+      {/* 3. Grid Workspace */}
+      <div className="gs-export-layout">
+        {/* Left Card: Ingestion/Export configuration */}
+        <div className="gs-ecard">
+          <h3>Export Configuration</h3>
 
           {activeTab === "datasets" ? (
-            <>
-              {/* Layer Selection */}
-              <div className="form-group">
-                <label>Data Layer</label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div className="gs-input-grp">
+                <label>Target Data Layer</label>
                 <select 
                   value={selectedLayer} 
                   onChange={(e) => {
@@ -219,7 +198,6 @@ export default function DataExport() {
                       setSelectedTable(tables[0].name);
                     }
                   }}
-                  style={{ width: "100%", background: "rgba(0,0,0,0.3)", color: "white", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", padding: "8px" }}
                 >
                   <option value="active">Active Layer (Silver/Clean)</option>
                   <option value="raw">Raw Layer (Bronze/Raw CSV)</option>
@@ -228,15 +206,10 @@ export default function DataExport() {
                 </select>
               </div>
 
-              {/* Table / Subreddit Selection */}
               {selectedLayer === "reddit" ? (
-                <div className="form-group">
-                  <label>Subreddit Feed</label>
-                  <select 
-                    value={subreddit} 
-                    onChange={(e) => setSubreddit(e.target.value)}
-                    style={{ width: "100%", background: "rgba(0,0,0,0.3)", color: "white", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", padding: "8px" }}
-                  >
+                <div className="gs-input-grp">
+                  <label>Streaming Subreddit</label>
+                  <select value={subreddit} onChange={(e) => setSubreddit(e.target.value)}>
                     <option value="python">r/python</option>
                     <option value="bigdata">r/bigdata</option>
                     <option value="datascience">r/datascience</option>
@@ -245,16 +218,12 @@ export default function DataExport() {
                   </select>
                 </div>
               ) : (
-                <div className="form-group">
+                <div className="gs-input-grp">
                   <label>Table Source</label>
                   {tablesLoading ? (
-                    <div style={{ color: "var(--text-muted)", fontSize: "12px" }}>Loading tables...</div>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Loading catalog...</span>
                   ) : (
-                    <select 
-                      value={selectedTable} 
-                      onChange={(e) => setSelectedTable(e.target.value)}
-                      style={{ width: "100%", background: "rgba(0,0,0,0.3)", color: "white", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", padding: "8px" }}
-                    >
+                    <select value={selectedTable} onChange={(e) => setSelectedTable(e.target.value)}>
                       {tables.map(t => (
                         <option key={t.name} value={t.name}>{t.name}</option>
                       ))}
@@ -263,39 +232,27 @@ export default function DataExport() {
                 </div>
               )}
 
-              {/* Layer compatibility message */}
               {selectedLayer !== "reddit" && selectedTable && supportedLayers.length > 0 && (
-                <div style={{ fontSize: "11px", color: "var(--text-muted)", background: "rgba(255,255,255,0.02)", padding: "8px", borderRadius: "6px" }}>
-                  <strong>Available layers for this table:</strong>
-                  <div style={{ display: "flex", gap: "6px", marginTop: "4px" }}>
-                    {["raw", "active", "quarantine"].map(l => (
-                      <span 
-                        key={l}
-                        style={{ 
-                          padding: "2px 6px", 
-                          borderRadius: "4px", 
-                          background: supportedLayers.includes(l) ? "rgba(16,185,129,0.1)" : "rgba(244,63,94,0.1)",
-                          color: supportedLayers.includes(l) ? "var(--accent-green)" : "var(--accent-red)",
-                          fontWeight: "600"
-                        }}
-                      >
-                        {l.toUpperCase()}
-                      </span>
-                    ))}
+                <div className="gs-layer-status">
+                  <strong>Available Medallion Layers</strong>
+                  <div className="gs-layer-pills">
+                    {["raw", "active", "quarantine"].map(l => {
+                      const yes = supportedLayers.includes(l);
+                      return (
+                        <span key={l} className={`gs-layer-pill ${yes ? 'yes' : 'no'}`}>
+                          {l.toUpperCase()}
+                        </span>
+                      );
+                    })}
                   </div>
                 </div>
               )}
-            </>
+            </div>
           ) : (
-            <>
-              {/* Gold Metrics Config */}
-              <div className="form-group">
-                <label>Gold Metric Type</label>
-                <select 
-                  value={goldMetric} 
-                  onChange={(e) => setGoldMetric(e.target.value)}
-                  style={{ width: "100%", background: "rgba(0,0,0,0.3)", color: "white", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", padding: "8px" }}
-                >
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div className="gs-input-grp">
+                <label>Gold Metric Index Type</label>
+                <select value={goldMetric} onChange={(e) => setGoldMetric(e.target.value)}>
                   <option value="daily-quality">Daily Quality Summaries</option>
                   <option value="error-patterns">Common Error Patterns</option>
                   <option value="financial-impact">Financial Loss Estimates (COPDQ)</option>
@@ -303,137 +260,84 @@ export default function DataExport() {
                 </select>
               </div>
 
-              <div className="form-group">
-                <label>Date Range (Last N days)</label>
+              <div className="gs-input-grp">
+                <label>Range (Last N Days)</label>
                 <input 
                   type="number" 
                   value={goldDays} 
                   onChange={(e) => setGoldDays(parseInt(e.target.value) || 7)}
                   min="1" 
                   max="365"
-                  style={{ width: "100%", background: "rgba(0,0,0,0.3)", color: "white", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", padding: "8px" }}
                 />
               </div>
-            </>
+            </div>
           )}
 
-          {/* Export Action Button */}
-          <button 
-            className="btn btn-primary"
-            onClick={handleDownload}
-            disabled={exportStatus?.loading || (activeTab === "datasets" && !selectedTable && selectedLayer !== "reddit")}
-            style={{ width: "100%", padding: "12px", marginTop: "auto", display: "flex", justifyContent: "center", alignItems: "center", gap: "8px", fontWeight: "700" }}
-          >
-            {exportStatus?.loading ? (
-              <span>Preparing Export File...</span>
-            ) : (
-              <>
-                <span>Export CSV Attachment</span>
-              </>
-            )}
-          </button>
-
-          {/* Feedback alerts */}
           {exportStatus && (
-            <div 
-              style={{ 
-                padding: "10px", 
-                borderRadius: "6px", 
-                fontSize: "12px",
-                background: exportStatus.loading ? "rgba(108,71,255,0.05)" : exportStatus.success ? "rgba(16,185,129,0.1)" : "rgba(244,63,94,0.1)",
-                color: exportStatus.loading ? "var(--accent-indigo)" : exportStatus.success ? "var(--accent-green)" : "var(--accent-red)",
-                border: `1px solid ${exportStatus.loading ? "rgba(108,71,255,0.15)" : exportStatus.success ? "rgba(16,185,129,0.2)" : "rgba(244,63,94,0.2)"}`
-              }}
-            >
+            <div className={`gs-toast ${exportStatus.loading ? 'loading' : exportStatus.success ? 'ok' : 'err'}`} style={{ marginTop: '12px' }}>
               {exportStatus.message}
             </div>
           )}
+
+          <button 
+            onClick={handleDownload}
+            disabled={exportStatus?.loading || (activeTab === "datasets" && !selectedTable && selectedLayer !== "reddit")}
+            className="gs-btn-download"
+            style={{ marginTop: 'auto' }}
+          >
+            {exportStatus?.loading ? "Generating export..." : "Export CSV File"}
+          </button>
         </div>
 
-        {/* Right Panel: Preview Grid */}
-        <div className="glass-card" style={{ display: "flex", flexDirection: "column", padding: "20px", overflow: "hidden" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #F1F5F9", paddingBottom: "10px", marginBottom: "15px", flexShrink: 0 }}>
-            <h2 style={{ fontSize: "16px", fontWeight: "700" }}>Dataset Preview (First 10 records)</h2>
-            {activeTab === "datasets" && selectedLayer !== "reddit" && selectedTable && (
-              <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>
-                Reading HDFS: <code style={{ color: "var(--accent-blue)" }}>/data/{selectedLayer}/{selectedTable}</code>
+        {/* Right Card: Preview Grid */}
+        <div className="gs-ecard" style={{ overflow: "hidden" }}>
+          <div className="gs-preview-header">
+            <h3>Dataset Preview (First 10 Rows)</h3>
+            {activeTab === "datasets" ? (
+              <span>
+                HDFS: <code>/data/{selectedLayer}/{selectedLayer === 'reddit' ? `subreddit=${subreddit}` : selectedTable}</code>
               </span>
-            )}
-            {activeTab === "datasets" && selectedLayer === "reddit" && (
-              <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>
-                Reading HDFS: <code style={{ color: "var(--accent-blue)" }}>/data/reddit/parquet/subreddit={subreddit}</code>
-              </span>
-            )}
-            {activeTab === "gold" && (
-              <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>
-                Index: <code style={{ color: "var(--accent-blue)" }}>sdoqap_gold_{goldMetric.replace("-", "_")}</code>
+            ) : (
+              <span>
+                Elasticsearch Index: <code>sdoqap_gold_{goldMetric.replace("-", "_")}</code>
               </span>
             )}
           </div>
 
-          <div style={{ flex: 1, overflow: "auto", display: "flex", flexDirection: "column", minHeight: 0 }}>
+          <div className="gs-preview-wrap">
             {previewLoading ? (
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "var(--text-muted)" }}>
-                Loading preview data...
-              </div>
+              <div className="gs-empty">Loading delta preview rows...</div>
             ) : previewError ? (
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", color: "var(--accent-red)", textAlign: "center", padding: "20px" }}>
-                <span style={{ fontSize: "28px", marginBottom: "10px" }}>⚠️</span>
-                <strong>Preview unavailable</strong>
-                <span style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "5px" }}>{previewError}</span>
+              <div className="gs-empty" style={{ color: 'var(--accent-red)' }}>
+                <span>⚠️</span> {previewError}
               </div>
             ) : previewData && previewData.rows && previewData.rows.length > 0 ? (
-              <div style={{ overflowX: "auto", width: "100%" }}>
-                <table className="runs-table" style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
-                  <thead>
-                    <tr style={{ background: "rgba(255,255,255,0.04)" }}>
+              <table className="gs-preview-table">
+                <thead>
+                  <tr>
+                    {previewData.columns.map(col => (
+                      <th key={col}>{col}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {previewData.rows.map((row, idx) => (
+                    <tr key={idx}>
                       {previewData.columns.map(col => (
-                        <th 
-                          key={col} 
-                          style={{ padding: "8px 12px", textAlign: "left", color: "var(--accent-blue)", borderBottom: "2px solid rgba(255,255,255,0.1)", whiteSpace: "nowrap" }}
-                        >
-                          {col}
-                        </th>
+                        <td key={col} title={String(row[col])}>
+                          {row[col] !== null ? String(row[col]) : <em>null</em>}
+                        </td>
                       ))}
                     </tr>
-                  </thead>
-                  <tbody>
-                    {previewData.rows.map((row, idx) => (
-                      <tr 
-                        key={idx} 
-                        style={{ 
-                          borderBottom: "1px solid rgba(255,255,255,0.06)", 
-                          background: idx % 2 === 0 ? "transparent" : "rgba(255,255,255,0.01)" 
-                        }}
-                      >
-                        {previewData.columns.map(col => (
-                          <td 
-                            key={col} 
-                            style={{ 
-                              padding: "8px 12px", 
-                              color: "var(--text-main)", 
-                              whiteSpace: "nowrap", 
-                              overflow: "hidden", 
-                              textOverflow: "ellipsis", 
-                              maxWidth: "200px" 
-                            }}
-                            title={String(row[col])}
-                          >
-                            {row[col] !== null ? String(row[col]) : <em style={{ color: "var(--text-muted)" }}>null</em>}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                  ))}
+                </tbody>
+              </table>
             ) : (
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "var(--text-muted)" }}>
-                Select a table and layer to load preview data.
-              </div>
+              <div className="gs-empty">Select catalog table to preview delta rows</div>
             )}
           </div>
         </div>
+
       </div>
     </div>
   );

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useApi, postApi } from "../hooks/useApi";
+import "./Schema.css";
 
 export default function Schema() {
   const [statusFilter, setStatusFilter] = useState("PENDING");
@@ -63,14 +64,13 @@ export default function Schema() {
     }
   };
 
-  // Format date/time to matching the mockup "Proposed detected at HH:MM GST" or similar
   const formatProposedTime = (isoString) => {
     if (!isoString) return "";
     try {
       const date = new Date(isoString);
       const hours = String(date.getHours()).padStart(2, '0');
       const minutes = String(date.getMinutes()).padStart(2, '0');
-      return `Proposed detected at ${hours}:${minutes} GST`;
+      return `Detected at ${hours}:${minutes} GST`;
     } catch (e) {
       return "";
     }
@@ -81,18 +81,18 @@ export default function Schema() {
     return Object.entries(proposal.drift_details).map(([col, details]) => {
       let typeLabel = "New column";
       let badgeLabel = "NEW COLUMN";
-      let badgeColor = "#10b981"; // Green
+      let badgeColor = "var(--accent-green)";
       let detailText = col;
 
       if (details.error === "type_mismatch" || details.error === "type") {
         typeLabel = "Type column";
         badgeLabel = "TYPE MISMATCH";
-        badgeColor = "#fbbf24"; // Amber/Yellow
-        detailText = `${col} ${details.actual || "type"}`;
+        badgeColor = "var(--accent-yellow)";
+        detailText = `${col} → ${details.actual || "type"}`;
       } else if (details.error === "missing_column") {
         typeLabel = "Missing column";
         badgeLabel = "MISSING COLUMN";
-        badgeColor = "#f43f5e"; // Red
+        badgeColor = "var(--accent-red)";
         detailText = col;
       }
 
@@ -106,39 +106,37 @@ export default function Schema() {
   };
 
   return (
-    <div className="page-container" style={{ overflowY: "auto", height: "calc(100vh - 56px)", paddingBottom: "2rem" }}>
-      <div style={{ marginBottom: "1.5rem", width: "100%" }}>
-        <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "0.4rem", fontFamily: "var(--font-sans)", display: "flex", gap: "6px", alignItems: "center" }}>
-          <span>SDOQAP Data Engine</span>
-          <span style={{ opacity: 0.5 }}>&gt;</span>
-          <span style={{ color: "var(--text-main)", fontWeight: 500 }}>Schema Drift</span>
+    <div className="gs-schema">
+      {/* 1. Page Header */}
+      <div className="gs-page-header">
+        <div>
+          <h1 className="gs-page-title">Schema <span>Drift Governance</span></h1>
+          <p className="gs-page-desc">Approve or reject table structure auto-evolutions proposal queue</p>
         </div>
-        <h1 style={{ fontSize: "1.6rem", fontWeight: 700, color: "var(--text-main)", letterSpacing: "-0.02em", margin: 0 }}>Schema Drift</h1>
-        <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", margin: "4px 0 0 0" }}>Review and approve/reject schema drift proposals detected by Spark engines</p>
       </div>
 
       {actionResult && (
-        <div className={`alert-box ${actionResult.success ? "info" : "critical"}`} style={{ marginBottom: "1rem" }}>
-          <span>{actionResult.message}</span>
+        <div 
+          style={{ 
+            padding: '10px 14px', 
+            borderRadius: '8px', 
+            fontSize: '12px', 
+            background: actionResult.success ? '#d1fae5' : '#fee2e2',
+            border: `1px solid ${actionResult.success ? '#10b981' : '#ef4444'}`,
+            color: actionResult.success ? '#059669' : '#dc2626',
+            fontFamily: 'var(--font-mono)'
+          }}
+        >
+          {actionResult.message}
         </div>
       )}
 
-      {/* Navigation Filter Tabs */}
-      <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1.5rem" }}>
+      {/* 2. Navigation Filter Tabs */}
+      <div className="gs-filter-tabs" style={{ alignSelf: 'flex-start' }}>
         {["PENDING", "APPROVED", "REJECTED"].map((tab) => (
           <button
             key={tab}
-            className={`btn ${statusFilter === tab ? "btn-primary" : "btn-secondary"}`}
-            style={{ 
-              padding: "0.5rem 1.25rem", 
-              fontSize: "0.85rem",
-              borderRadius: "20px",
-              background: statusFilter === tab ? "var(--accent-indigo)" : "#FFFFFF",
-              border: "1px solid #E2E8F0",
-              color: statusFilter === tab ? "#FFFFFF" : "var(--text-muted)",
-              cursor: "pointer",
-              fontWeight: 500
-            }}
+            className={`gs-filter-btn ${statusFilter === tab ? "active" : ""}`}
             onClick={() => {
               setStatusFilter(tab);
               setSelectedId(null);
@@ -150,131 +148,97 @@ export default function Schema() {
         ))}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "360px 1fr", gap: "1.5rem", alignItems: "start" }}>
+      {/* 3. Main Workspace */}
+      <div className="gs-schema-layout">
         {/* Left Column: Proposals List */}
-        <div>
-          <h3 style={{ fontSize: "1rem", fontWeight: 600, color: "var(--text-main)", marginBottom: "0.25rem" }}>
-            {statusFilter === "PENDING" ? "PENDING" : statusFilter === "APPROVED" ? "APPROVED" : "REJECTED"} Proposals
-          </h3>
-          <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginBottom: "1rem" }}>
-            Awaiting schema validation review
-          </p>
-
-          <div 
-            className="glass-card" 
-            style={{ 
-              padding: "1rem", 
-              background: "#FFFFFF",
-              border: "1px solid #E2E8F0",
-              display: "flex", 
-              flexDirection: "column", 
-              gap: "0.75rem", 
-              maxHeight: "calc(100vh - 280px)", 
-              overflowY: "auto" 
-            }}
-          >
-            {proposals.loading ? (
-              <div className="loading-state">
-                <div className="loading-spinner"></div>
-                <span>Loading proposals...</span>
-              </div>
-            ) : proposals.error ? (
-              <div className="alert-box critical">Failed to fetch proposals: {proposals.error}</div>
-            ) : !proposals.data?.proposals || proposals.data.proposals.length === 0 ? (
-              <div style={{ padding: "2rem", textAlign: "center", color: "var(--text-muted)", fontSize: "0.8rem" }}>
-                No {statusFilter.toLowerCase()} proposals found.
-              </div>
-            ) : (
-              proposals.data.proposals.map((p) => {
-                const isSelected = p.id === selectedId;
-                return (
-                  <div
-                    key={p.id}
-                    style={{
-                      padding: "1rem",
-                      cursor: "pointer",
-                      borderRadius: "8px",
-                      border: isSelected ? "2px solid var(--accent-indigo)" : "1px solid #E2E8F0",
-                      background: isSelected ? "rgba(108, 71, 255, 0.08)" : "#FFFFFF",
-                      boxShadow: isSelected ? "0 0 10px rgba(108, 71, 255, 0.15)" : "none",
-                      transition: "all 0.2s ease"
-                    }}
-                    onClick={() => {
-                      setSelectedId(p.id);
-                      setActionResult(null);
-                    }}
-                  >
-                    <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--text-main)", marginBottom: "0.5rem" }}>
-                      {p.table_name}
+        <div className="gs-schema-list">
+          <div className="gs-scard">
+            <h3>{statusFilter} Proposals</h3>
+            <div className="gs-proposals">
+              {proposals.loading ? (
+                <div className="gs-empty">Loading proposals...</div>
+              ) : proposals.error ? (
+                <div className="gs-empty" style={{ color: 'var(--accent-red)' }}>Failed to load proposals</div>
+              ) : !proposals.data?.proposals || proposals.data.proposals.length === 0 ? (
+                <div className="gs-empty">No {statusFilter.toLowerCase()} proposals found</div>
+              ) : (
+                proposals.data.proposals.map((p) => {
+                  const isSelected = p.id === selectedId;
+                  return (
+                    <div
+                      key={p.id}
+                      className={`gs-proposal-item ${isSelected ? "selected" : ""}`}
+                      onClick={() => {
+                        setSelectedId(p.id);
+                        setActionResult(null);
+                      }}
+                    >
+                      <div className="gs-proposal-header">
+                        <span className="gs-table-tag">{p.table_name}</span>
+                        <span className="gs-severity-badge" style={{ borderColor: 'var(--accent-purple)', color: 'var(--accent-purple)' }}>
+                          SEV {p.severity_score || 1}
+                        </span>
+                      </div>
+                      <div className="gs-proposal-meta">
+                        <span>Run: {(p.run_id || '').slice(0, 10)}</span>
+                        <span>{formatProposedTime(p.proposed_at || p.timestamp)}</span>
+                      </div>
                     </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem", fontSize: "0.75rem", color: "var(--text-muted)" }}>
-                      <div>Run ID: {p.run_id}</div>
-                      <div>{formatProposedTime(p.proposed_at || p.timestamp)}</div>
-                    </div>
-                  </div>
-                )
-              })
-            )}
+                  );
+                })
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Right Column: Detailed Proposal view & actions */}
-        {selectedProposal ? (
-          <div 
-            className="glass-card animate-in" 
-            style={{ 
-              padding: "2rem", 
-              background: "#FFFFFF",
-              border: "1px solid #E2E8F0",
-              borderRadius: "12px"
-            }}
-          >
-            <h2 style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--text-main)", marginBottom: "0.25rem" }}>
-              {selectedProposal.table_name}
-            </h2>
-            <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "1.5rem" }}>
-              Run ID: {selectedProposal.run_id}
-            </p>
-
-            {actionResult && (
-              <div 
-                className={`alert-box ${actionResult.success ? 'success' : 'critical'}`} 
-                style={{ marginBottom: '1.25rem', padding: '0.75rem', borderRadius: '6px', fontSize: '0.85rem' }}
-              >
-                {actionResult.message}
-              </div>
-            )}
-
-            <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-              {/* Drift details list in mockup style */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
-                {getModificationLines(selectedProposal).map((line, i) => (
-                  <div key={i} style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.85rem" }}>
-                    <span style={{ color: line.badgeColor }}>•</span>
-                    <span style={{ color: "var(--text-main)" }}>{line.typeLabel}:</span>
-                    <span 
-                      style={{ 
-                        fontSize: "0.68rem", 
-                        fontWeight: 700,
-                        padding: "0.15rem 0.5rem", 
-                        borderRadius: "12px", 
-                        backgroundColor: line.badgeColor,
-                        color: "#040815"
-                      }}
+        {/* Right Column: Detailed Proposal view */}
+        <div className="gs-schema-workspace">
+          {selectedProposal ? (
+            <div className="gs-scard gs-workspace-card">
+              <div className="gs-workspace-header">
+                <div>
+                  <h2>Table Evolution Workspace: {selectedProposal.table_name}</h2>
+                  <span>Run UUID: {selectedProposal.run_id}</span>
+                </div>
+                {statusFilter === "PENDING" && (
+                  <div className="gs-actions">
+                    <button
+                      disabled={submitting}
+                      className="gs-btn-approve"
+                      onClick={() => handleAction(selectedProposal.id, "approve")}
                     >
-                      {line.badgeLabel}
-                    </span>
-                    <span style={{ fontFamily: "var(--font-mono)", color: "var(--text-muted)" }}>
-                      {line.detailText}
-                    </span>
+                      {submitting ? "Processing..." : "Approve Evolution"}
+                    </button>
+                    <button
+                      disabled={submitting}
+                      className="gs-btn-reject"
+                      onClick={() => handleAction(selectedProposal.id, "reject")}
+                    >
+                      {submitting ? "Rejecting..." : "Reject & Quarantine"}
+                    </button>
                   </div>
-                ))}
+                )}
+              </div>
+
+              <div className="gs-drift-details-section">
+                <h4 style={{ fontSize: '12px', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Detected Drift Mutations</h4>
+                <div className="gs-drift-lines">
+                  {getModificationLines(selectedProposal).map((line, i) => (
+                    <div key={i} className="gs-drift-line">
+                      <span className="gs-drift-badge" style={{ backgroundColor: line.badgeColor }}>{line.badgeLabel}</span>
+                      <div className="gs-drift-info">
+                        <strong>{line.typeLabel}</strong>
+                        <p>{line.detailText}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               {/* JSON code viewer with line numbers */}
-              <div>
-                <h4 style={{ fontSize: "0.8rem", fontWeight: 500, color: "var(--text-muted)", marginBottom: "0.5rem" }}>
-                  JSON code viewer
+              <div style={{ marginBottom: '16px' }}>
+                <h4 style={{ fontSize: "11px", fontWeight: 700, color: "var(--text-muted)", marginBottom: "6px", textTransform: "uppercase" }}>
+                  Proposed Delta Schema JSON
                 </h4>
                 {(() => {
                   const jsonString = JSON.stringify(selectedProposal.proposed_schema || {}, null, 2);
@@ -286,19 +250,18 @@ export default function Schema() {
                         borderRadius: "8px",
                         border: "1px solid #1e293b",
                         fontFamily: "var(--font-mono)",
-                        fontSize: "0.78rem",
-                        maxHeight: "none",
-                        overflowY: "auto",
+                        fontSize: "11px",
                         display: "flex",
-                        padding: "0.75rem 0",
-                        boxShadow: "inset 0 2px 4px 0 rgba(0,0,0,0.2)"
+                        padding: "8px 0",
+                        maxHeight: "220px",
+                        overflowY: "auto"
                       }}
                     >
                       <div 
                         style={{
                           color: "#475569",
                           textAlign: "right",
-                          padding: "0 0.75rem",
+                          padding: "0 10px",
                           borderRight: "1px solid #1e293b",
                           userSelect: "none",
                           minWidth: "2rem"
@@ -306,39 +269,17 @@ export default function Schema() {
                       >
                         {lines.map((_, i) => <div key={i}>{i + 1}</div>)}
                       </div>
-                      <div 
-                        style={{
-                          paddingLeft: "1rem",
-                          whiteSpace: "pre",
-                          width: "100%"
-                        }}
-                      >
+                      <div style={{ paddingLeft: "12px", whiteSpace: "pre", width: "100%", color: '#cbd5e1' }}>
                         {lines.map((line, i) => {
-                          // Simple regex highlighting for JSON
-                          let highlighted = <span style={{ color: "#cbd5e1" }}>{line}</span>;
                           const trimmed = line.trim();
-                          
+                          let highlightedColor = '#cbd5e1';
                           if (trimmed === "{" || trimmed === "}" || trimmed === "}," || trimmed === "[" || trimmed === "]") {
-                            highlighted = <span style={{ color: "#64748b" }}>{line}</span>;
-                          } else {
-                            const match = line.match(/^(\s*)(".*?")(\s*:\s*)(".*?"|\d+|true|false|null)(,?)(\s*)$/);
-                            if (match) {
-                              const [_, indent, key, colon, value, comma, trailing] = match;
-                              const isTypeVal = value.includes("Type") || !value.startsWith('"');
-                              const valColor = isTypeVal ? "#f59e0b" : "#38bdf8";
-                              highlighted = (
-                                <span>
-                                  {indent}
-                                  <span style={{ color: "#a5b4fc" }}>{key}</span>
-                                  <span style={{ color: "#64748b" }}>{colon}</span>
-                                  <span style={{ color: valColor }}>{value}</span>
-                                  {comma && <span style={{ color: "#64748b" }}>{comma}</span>}
-                                  {trailing}
-                                </span>
-                              );
-                            }
+                            highlightedColor = '#64748b';
+                          } else if (trimmed.includes(":")) {
+                            if (trimmed.includes("type") || trimmed.includes("Type")) highlightedColor = '#f59e0b';
+                            else highlightedColor = '#34d399';
                           }
-                          return <div key={i}>{highlighted}</div>;
+                          return <div key={i} style={{ color: highlightedColor }}>{line}</div>;
                         })}
                       </div>
                     </div>
@@ -346,133 +287,64 @@ export default function Schema() {
                 })()}
               </div>
 
-              {/* Approval Override inputs (only for PENDING) */}
+              {/* Approval Override inputs */}
               {statusFilter === "PENDING" && (
-                <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-                  <div>
-                    <label style={{ display: "block", fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "0.4rem" }}>
-                      Primary Key definition
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. users"
-                      value={primaryKeyOverride}
-                      onChange={(e) => setPrimaryKeyOverride(e.target.value)}
-                      style={{
-                        width: "100%",
-                        padding: "0.6rem",
-                        borderRadius: "6px",
-                        border: "1px solid rgba(255,255,255,0.08)",
-                        background: "rgba(0, 0, 0, 0.2)",
-                        color: "#fff",
-                        fontSize: "0.85rem"
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ display: "block", fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "0.4rem" }}>
-                      Date Column definition
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Date Column"
-                      value={dateColumnOverride}
-                      onChange={(e) => setDateColumnOverride(e.target.value)}
-                      style={{
-                        width: "100%",
-                        padding: "0.6rem",
-                        borderRadius: "6px",
-                        border: "1px solid rgba(255,255,255,0.08)",
-                        background: "rgba(0, 0, 0, 0.2)",
-                        color: "#fff",
-                        fontSize: "0.85rem"
-                      }}
-                    />
+                <div className="gs-governance-config">
+                  <h4 style={{ fontSize: '11.5px', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-main)' }}>Approval Override Parameters</h4>
+                  <p className="gs-sub-desc">Define delta table constraints and active partition columns</p>
+                  
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div className="gs-input-grp">
+                      <label style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Primary Key Column</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. user_id"
+                        value={primaryKeyOverride}
+                        onChange={(e) => setPrimaryKeyOverride(e.target.value)}
+                      />
+                    </div>
+                    <div className="gs-input-grp">
+                      <label style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Partition Date Column</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. created_date"
+                        value={dateColumnOverride}
+                        onChange={(e) => setDateColumnOverride(e.target.value)}
+                      />
+                    </div>
                   </div>
                 </div>
               )}
 
-              {/* Interactive buttons right aligned */}
-              {statusFilter === "PENDING" ? (
-                <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "1rem" }}>
-                  <button
-                    disabled={submitting}
-                    style={{
-                      padding: "0.55rem 1.5rem",
-                      backgroundColor: "#10b981", // Emerald Green
-                      color: "#fff",
-                      border: "none",
-                      borderRadius: "6px",
-                      fontWeight: 600,
-                      fontSize: "0.82rem",
-                      cursor: "pointer",
-                      transition: "all 0.2s ease"
-                    }}
-                    onClick={() => handleAction(selectedProposal.id, "approve")}
-                  >
-                    {submitting ? "Approving..." : "Approve Proposal"}
-                  </button>
-                  <button
-                    disabled={submitting}
-                    style={{
-                      padding: "0.55rem 1.5rem",
-                      backgroundColor: "#ef4444", // Red
-                      color: "#fff",
-                      border: "none",
-                      borderRadius: "6px",
-                      fontWeight: 600,
-                      fontSize: "0.82rem",
-                      cursor: "pointer",
-                      transition: "all 0.2s ease"
-                    }}
-                    onClick={() => handleAction(selectedProposal.id, "reject")}
-                  >
-                    {submitting ? "Rejecting..." : "Reject Proposal"}
-                  </button>
-                </div>
-              ) : (
-                <div
+              {statusFilter !== "PENDING" && (
+                <div 
                   style={{
-                    padding: "0.75rem",
+                    padding: "12px",
                     textAlign: "center",
-                    borderRadius: "6px",
-                    border: `1px solid ${statusFilter === "APPROVED" ? "var(--accent-green)" : "var(--accent-red)"}`,
+                    borderRadius: "8px",
+                    border: `1.5px solid ${statusFilter === "APPROVED" ? "var(--accent-green)" : "var(--accent-red)"}`,
                     color: statusFilter === "APPROVED" ? "var(--accent-green)" : "var(--accent-red)",
                     fontWeight: 700,
-                    fontSize: "0.85rem",
-                    marginTop: "1rem"
+                    fontSize: "12px",
+                    fontFamily: 'var(--font-mono)',
+                    textTransform: 'uppercase',
+                    marginTop: "auto"
                   }}
                 >
-                  PROPOSAL {statusFilter} AT {new Date(selectedProposal.resolved_at).toLocaleString()}
+                  PROPOSAL {statusFilter} AT {new Date(selectedProposal.resolved_at || selectedProposal.timestamp).toLocaleString()}
                 </div>
               )}
             </div>
-          </div>
-        ) : (
-          <div 
-            className="glass-card animate-in" 
-            style={{ 
-              display: "flex", 
-              flexDirection: "column", 
-              alignItems: "center", 
-              justifyContent: "center", 
-              padding: "4rem", 
-              textAlign: "center", 
-              minHeight: "450px", 
-              background: "#FFFFFF",
-              border: "1px solid #E2E8F0",
-              borderRadius: "12px"
-            }}
-          >
-            <div className="card-icon blue" style={{ width: 60, height: 60, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "1rem" }}>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          ) : (
+            <div className="gs-workspace-placeholder">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--accent-purple)', marginBottom: '12px' }}>
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                <path d="M2 10h20" />
+              </svg>
+              <p>Select a schema proposal from the left pane to analyze structural drift mutations and configure overrides.</p>
             </div>
-            <h3 className="section-title">No Proposal Selected</h3>
-            <p className="section-subtitle" style={{ maxWidth: "320px", margin: "0.5rem auto 0" }}>
-              Select a schema proposal from the list on the left to inspect drift details, configure overrides, and take governance actions.
-            </p>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );

@@ -41,3 +41,17 @@ scripts/*.log
 # OS files
 .DS_Store
 Thumbs.db
+
+# Agent Temporary / Cache Files
+graphify-out/
+graphify_repo/
+gridgeist_repo/
+ponytail_repo/
+ui/src/backup_original/
+ui/src/_backup_original/
+ui/debug_status.py
+chunk2.txt
+chunk2_utf8.txt
+dump.txt
+.graphifyignore
+temp_input.txt

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useApi } from "../hooks/useApi";
+import "./NavBar.css";
 
 // --- SVG Icons ---
 const HomeIcon = () => (
@@ -33,26 +34,6 @@ const IngestionIcon = () => (
 
 const ExportIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-);
-
-const ChevronIcon = ({ isOpen }) => (
-  <svg
-    width="12"
-    height="12"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    style={{
-      transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)",
-      transition: "transform 0.2s ease",
-      opacity: 0.5,
-    }}
-  >
-    <polyline points="6 9 12 15 18 9" />
-  </svg>
 );
 
 const SearchIcon = () => (
@@ -102,21 +83,6 @@ export default function NavBar({ isOpen, toggleSidebar, isSidebarOpen }) {
       ]
     }
   ];
-
-  // Accordion open/close state
-  const [openSections, setOpenSections] = useState({
-    general: true,
-    observability: true,
-    governance: true,
-    pipeline_stages: true
-  });
-
-  const toggleSection = (key) => {
-    setOpenSections(prev => ({
-      ...prev,
-      [key]: !prev[key]
-    }));
-  };
 
   // Command Palette states
   const [showSearchModal, setShowSearchModal] = useState(false);
@@ -176,220 +142,137 @@ export default function NavBar({ isOpen, toggleSidebar, isSidebarOpen }) {
     }
   };
 
+  const navOpen = isSidebarOpen !== undefined ? isSidebarOpen : isOpen;
+
   return (
     <>
-      <aside className="sidebar">
+      <aside className={`gs-nav ${navOpen ? "open" : "closed"}`}>
         {/* Sidebar Header */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.25rem", padding: "0 0.25rem" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-            <div style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              background: "rgba(108, 71, 255, 0.08)",
-              borderRadius: "6px",
-              width: "32px",
-              height: "32px",
-              border: "1px solid rgba(108, 71, 255, 0.2)"
-            }}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6C47FF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <div className="gs-nav-logo">
+          <Link to="/" className="gs-nav-brand">
+            <div className="gs-nav-logo-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
               </svg>
             </div>
-            <div style={{ display: "flex", flexDirection: "column", lineHeight: "1.1" }}>
-              <span style={{ fontSize: "13px", fontWeight: 800, color: "var(--text-main)", letterSpacing: "0.5px" }}>SDOQAP</span>
-              <span style={{ fontSize: "9px", fontWeight: 700, color: "var(--accent-indigo)", letterSpacing: "0.5px" }}>OBSERVABILITY</span>
-            </div>
-          </div>
-          <button className="sidebar-close-btn" onClick={toggleSidebar} title="Collapse Sidebar" style={{ margin: 0, padding: "4px" }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
-          </button>
+            {navOpen && (
+              <div className="gs-nav-logo-text">
+                <span className="gs-nav-logo-name">SDOQAP</span>
+                <span className="gs-nav-logo-sub">Observability</span>
+              </div>
+            )}
+          </Link>
+          {navOpen && (
+            <button className="gs-nav-toggle" onClick={toggleSidebar} title="Collapse Sidebar">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          )}
         </div>
 
         {/* Search Bar */}
-        <div 
-          onClick={() => setShowSearchModal(true)}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            background: "#F1F5F9",
-            border: "1px solid #E2E8F0",
-            borderRadius: "6px",
-            padding: "0.45rem 0.6rem",
-            marginBottom: "1.25rem",
-            cursor: "pointer",
-            color: "#64748B",
-            fontSize: "13px"
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        {navOpen ? (
+          <div className="gs-nav-search" onClick={() => setShowSearchModal(true)}>
+            <SearchIcon />
             <span>Search page...</span>
+            <kbd>Ctrl K</kbd>
           </div>
-          <span style={{ fontSize: "10px", fontWeight: "bold", background: "#FFFFFF", border: "1px solid #E2E8F0", padding: "0.1rem 0.35rem", borderRadius: "4px", color: "#94A3B8" }}>Ctrl K</span>
-        </div>
+        ) : (
+          <div className="gs-nav-search" style={{ justifyContent: "center", padding: "8px 0" }} onClick={() => setShowSearchModal(true)}>
+            <SearchIcon />
+          </div>
+        )}
 
         {/* Navigation Categories */}
-        <div className="sidebar-menu">
-          {/* Group 1: GENERAL */}
-          <div className="menu-group">
-            <div className="sidebar-section-header" onClick={() => toggleSection("general")} style={{ display: "flex", alignItems: "center", gap: "0.4rem", cursor: "pointer", marginTop: 0 }}>
-              <ChevronIcon isOpen={openSections.general} />
-              <span>General</span>
-            </div>
-            {openSections.general && (
-              <div className="menu-group-items" style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
-                <Link to="/" className={`menu-item${location.pathname === "/" ? " active" : ""}`}>
-                  <span className="item-icon"><HomeIcon /></span>
-                  <span className="item-label">Home</span>
-                </Link>
-                <Link to="/dashboard" className={`menu-item${location.pathname === "/dashboard" ? " active" : ""}`}>
-                  <span className="item-icon"><DashboardIcon /></span>
-                  <span className="item-label">Dashboard</span>
-                </Link>
+        <div className="gs-nav-groups">
+          {menuGroups.map((group) => (
+            <div className="gs-nav-group" key={group.key}>
+              {navOpen && <span className="gs-nav-group-label">{group.title}</span>}
+              <div className="gs-nav-items">
+                {group.links.map((link) => {
+                  const isActive = location.pathname === link.to;
+                  return (
+                    <Link
+                      key={link.to}
+                      to={link.to}
+                      className={`gs-nav-item ${isActive ? "active" : ""}`}
+                      title={link.label}
+                    >
+                      <span className="gs-nav-icon">{link.icon}</span>
+                      {navOpen && <span className="gs-nav-label">{link.label}</span>}
+                    </Link>
+                  );
+                })}
               </div>
-            )}
-          </div>
-
-          {/* Group 2: OBSERVABILITY */}
-          <div className="menu-group">
-            <div className="sidebar-section-header" onClick={() => toggleSection("observability")} style={{ display: "flex", alignItems: "center", gap: "0.4rem", cursor: "pointer" }}>
-              <ChevronIcon isOpen={openSections.observability} />
-              <span>Observability</span>
             </div>
-            {openSections.observability && (
-              <div className="menu-group-items" style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
-                <Link to="/analytics" className={`menu-item${location.pathname === "/analytics" ? " active" : ""}`}>
-                  <span className="item-icon"><AnalyticsIcon /></span>
-                  <span className="item-label">Live Analytics</span>
-                </Link>
-                <Link to="/pipeline" className={`menu-item${location.pathname === "/pipeline" ? " active" : ""}`}>
-                  <span className="item-icon"><PipelineIcon /></span>
-                  <span className="item-label">Pipeline Runs</span>
-                </Link>
-              </div>
-            )}
-          </div>
-
-          {/* Group 3: GOVERNANCE */}
-          <div className="menu-group">
-            <div className="sidebar-section-header" onClick={() => toggleSection("governance")} style={{ display: "flex", alignItems: "center", gap: "0.4rem", cursor: "pointer" }}>
-              <ChevronIcon isOpen={openSections.governance} />
-              <span>Governance</span>
-            </div>
-            {openSections.governance && (
-              <div className="menu-group-items" style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
-                <Link to="/schema" className={`menu-item${location.pathname === "/schema" ? " active" : ""}`}>
-                  <span className="item-icon"><SchemaIcon /></span>
-                  <span className="item-label">Schema Drift</span>
-                </Link>
-                <Link to="/rules" className={`menu-item${location.pathname === "/rules" ? " active" : ""}`}>
-                  <span className="item-icon"><RulesIcon /></span>
-                  <span className="item-label">Rules Hub</span>
-                </Link>
-              </div>
-            )}
-          </div>
-
-          {/* Group 4: DATA PIPELINE */}
-          <div className="menu-group">
-            <div className="sidebar-section-header" onClick={() => toggleSection("pipeline_stages")} style={{ display: "flex", alignItems: "center", gap: "0.4rem", cursor: "pointer" }}>
-              <ChevronIcon isOpen={openSections.pipeline_stages} />
-              <span>Data Pipeline</span>
-            </div>
-            {openSections.pipeline_stages && (
-              <div className="menu-group-items" style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
-                <Link to="/ingestion" className={`menu-item${location.pathname === "/ingestion" ? " active" : ""}`}>
-                  <span className="item-icon"><IngestionIcon /></span>
-                  <span className="item-label">Ingestion Stage</span>
-                </Link>
-                <Link to="/export" className={`menu-item${location.pathname === "/export" ? " active" : ""}`}>
-                  <span className="item-icon"><ExportIcon /></span>
-                  <span className="item-label">Export Hub</span>
-                </Link>
-              </div>
-            )}
-          </div>
+          ))}
         </div>
 
         {/* Bottom System Status */}
-        <div className="sidebar-footer">
-          <div className="system-health">
-            <span className={`health-dot ${isHealthy ? "healthy" : "warning"}`} />
-            <span className="health-label">
-              {isHealthy ? "API Status: Healthy" : "API Connected with Warnings"}
-            </span>
-          </div>
-          <div className="footer-links">
-            <a href="https://github.com" target="_blank" rel="noreferrer" className="footer-icon-link" title="GitHub Repository">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg>
-            </a>
-            <div className="footer-version">v0.1.0</div>
+        <div className="gs-nav-bottom">
+          {navOpen && (
+            <div className="gs-nav-status">
+              <span className={`gs-nav-status-dot ${isHealthy ? "online" : "offline"}`} />
+              <span className="gs-nav-status-text">
+                {isHealthy ? "API: HEALTHY" : "API: OFFLINE"}
+              </span>
+            </div>
+          )}
+          <div className="gs-nav-version" style={{ justifyContent: navOpen ? "space-between" : "center" }}>
+            {navOpen && (
+              <a href="https://github.com/ohmiler/gridgeist" target="_blank" rel="noreferrer" style={{ color: "var(--text-muted)", display: "flex" }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg>
+              </a>
+            )}
+            <span style={{ fontSize: "9px" }}>v1.1.0</span>
           </div>
         </div>
       </aside>
 
       {/* Command Palette Modal */}
       {showSearchModal && (
-        <div className="command-palette-overlay" onClick={() => setShowSearchModal(false)}>
-          <div className="command-palette-container" onClick={(e) => e.stopPropagation()}>
-            <div className="command-palette-header">
-              <span className="modal-search-icon"><SearchIcon /></span>
+        <div className="gs-search-overlay" onClick={() => setShowSearchModal(false)}>
+          <div className="gs-search-modal" onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: "flex", alignItems: "center" }}>
               <input
                 ref={searchInputRef}
                 type="text"
-                placeholder="Type a page name or category to navigate..."
+                placeholder="Type page name to navigate..."
                 value={searchQuery}
                 onChange={(e) => {
                   setSearchQuery(e.target.value);
                   setSelectedIndex(0);
                 }}
                 onKeyDown={handleModalKeyDown}
-                className="modal-search-input"
               />
-              <span className="esc-badge" onClick={() => setShowSearchModal(false)}>ESC</span>
             </div>
 
-            <div className="command-palette-results">
+            <div style={{ maxHeight: "300px", overflowY: "auto" }}>
               {filteredLinks.length > 0 ? (
                 filteredLinks.map((link, idx) => (
                   <div
                     key={link.to}
-                    className={`result-item${selectedIndex === idx ? " selected" : ""}`}
+                    className={`gs-search-result`}
+                    style={{
+                      background: selectedIndex === idx ? "var(--accent-purple-light)" : "transparent",
+                      color: selectedIndex === idx ? "var(--accent-purple)" : "var(--text-main)"
+                    }}
                     onClick={() => {
                       navigate(link.to);
                       setShowSearchModal(false);
                     }}
                     onMouseEnter={() => setSelectedIndex(idx)}
                   >
-                    <span className="result-icon">{link.icon}</span>
-                    <div className="result-details">
-                      <span className="result-label">{link.label}</span>
-                      <span className="result-category">{link.category}</span>
-                    </div>
-                    <span className="arrow-enter-indicator">↵ Navigate</span>
+                    <span>{link.label}</span>
+                    <span style={{ marginLeft: "auto", fontSize: "10px", color: "var(--text-muted)" }}>{link.category}</span>
                   </div>
                 ))
               ) : (
-                <div className="no-results-state">
+                <div className="gs-search-empty">
                   No pages found matching "{searchQuery}"
                 </div>
               )}
-            </div>
-            
-            <div className="command-palette-footer">
-              <span className="help-pills">
-                <kbd>↑↓</kbd> to navigate
-              </span>
-              <span className="help-pills">
-                <kbd>Enter</kbd> to select
-              </span>
-              <span className="help-pills">
-                <kbd>ESC</kbd> to close
-              </span>
             </div>
           </div>
         </div>

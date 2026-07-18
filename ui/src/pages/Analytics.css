@@ -1,0 +1,241 @@
+/* ═══════════════════════════════════════════════════
+   GRIDGEIST ANALYTICS — SDOQAP Clerk White/Purple
+   ═══════════════════════════════════════════════════ */
+
+.gs-analytics {
+  padding: 20px 24px;
+  height: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.gs-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 14px;
+  flex-shrink: 0;
+}
+.gs-page-title {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--text-main);
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  margin: 0;
+}
+.gs-page-title span { color: var(--accent-purple); }
+.gs-page-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.gs-filter-tabs {
+  display: flex;
+  gap: 4px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  padding: 3px;
+  border-radius: 8px;
+}
+.gs-filter-btn {
+  background: transparent;
+  border: none;
+  padding: 5px 12px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--text-muted);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: var(--font-sans);
+}
+.gs-filter-btn.active {
+  background: var(--accent-purple);
+  color: #ffffff;
+}
+
+.gs-analytics-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  flex-shrink: 0;
+}
+.gs-akpi {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: var(--shadow-sm);
+}
+.gs-akpi:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: rgba(108,71,255,0.15);
+}
+.gs-akpi-label {
+  font-size: 9px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 700;
+}
+.gs-akpi-value {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--text-main);
+  font-family: var(--font-mono);
+  margin-top: 2px;
+}
+
+.gs-analytics-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.gs-acard {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-sm);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.gs-acard:hover {
+  border-color: rgba(108,71,255,0.15);
+  box-shadow: var(--shadow-md);
+}
+.gs-acard-wide {
+  grid-column: span 2;
+}
+.gs-acard-head {
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 8px;
+  flex-shrink: 0;
+}
+.gs-acard-head h3 {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--text-main);
+  text-transform: uppercase;
+}
+.gs-acard-head p {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+.gs-achart {
+  flex-grow: 1;
+  min-height: 220px;
+}
+.gs-achart-sm {
+  min-height: 180px;
+}
+
+.gs-impact-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-grow: 1;
+  overflow-y: auto;
+}
+.gs-impact-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.gs-impact-name {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  width: 120px;
+  flex-shrink: 0;
+  text-transform: capitalize;
+  font-weight: 500;
+}
+.gs-impact-bar-bg {
+  flex-grow: 1;
+  height: 6px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.gs-impact-bar {
+  height: 100%;
+}
+.gs-impact-score {
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  width: 40px;
+  text-align: right;
+}
+
+.gs-rec-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-grow: 1;
+  overflow-y: auto;
+}
+.gs-rec {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+}
+.gs-rec.high {
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+.gs-rec.medium {
+  background: #fff7ed;
+  border-color: #fed7aa;
+}
+.gs-rec-badge {
+  font-size: 8.5px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--accent-purple);
+  color: #ffffff;
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+}
+.gs-rec.high .gs-rec-badge { background: var(--accent-red); }
+.gs-rec.medium .gs-rec-badge { background: var(--accent-yellow); }
+.gs-rec-body strong {
+  font-size: 12px;
+  color: var(--text-main);
+  display: block;
+}
+.gs-rec-body p {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+  line-height: 1.4;
+}
+.gs-toast {
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+.gs-toast.ok { background: #d1fae5; color: #059669; border: 1px solid #10b981; }
+.gs-toast.err { background: #fee2e2; color: #dc2626; border: 1px solid #ef4444; }
+.gs-toast.loading { background: #eff6ff; color: #2563eb; border: 1px solid #3b82f6; }
